@@ -78,22 +78,10 @@ const char *pci_class_str(u8 class)
 	};
 }
 
-__weak int pci_skip_dev(struct pci_controller *hose, pci_dev_t dev)
+int pci_skip_dev(struct pci_controller *hose, pci_dev_t dev)
 {
-	/*
-	 * Check if pci device should be skipped in configuration
-	 */
-	if (dev == PCI_BDF(hose->first_busno, 0, 0)) {
-#if defined(CONFIG_PCI_CONFIG_HOST_BRIDGE) /* don't skip host bridge */
-		/*
-		 * Only skip configuration if "pciconfighost" is not set
-		 */
-		if (env_get("pciconfighost") == NULL)
-			return 1;
-#else
+	if (PCI_BUS(dev) != 0 && PCI_DEV(dev) > 0)
 		return 1;
-#endif
-	}
 
 	return 0;
 }

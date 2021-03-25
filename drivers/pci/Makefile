@@ -35,3 +35,4 @@ obj-$(CONFIG_PCIE_LAYERSCAPE) += pcie_layerscape_fixup.o
 obj-$(CONFIG_PCI_XILINX) += pcie_xilinx.o
 obj-$(CONFIG_PCIE_INTEL_FPGA) += pcie_intel_fpga.o
 obj-$(CONFIG_PCIE_DW_COMMON) += pcie_dw_common.o
+obj-$(CONFIG_PCIE_DW_MESON) += pcie_dw_meson.o

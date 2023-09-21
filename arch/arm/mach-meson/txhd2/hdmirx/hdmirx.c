@@ -718,13 +718,13 @@ void rx_set_phy_rterm(void)
 	extern int64_t meson_trustzone_efuse_caliItem(const char *str);
 	rterm_val = meson_trustzone_efuse_caliItem("hdmirx");
 	if (rterm_val >= 0) {
-		data32 = hdmirx_rd_amlphy(HHI_RX_PHY_MISC_CNTL1);
+		data32 = hdmirx_rd_amlphy(TXHD2_HDMIRX20PHY_DCHA_MISC1);
 		data32 &= (~(0xf << 12));
 		/* rterm val */
 		data32 |= (rterm_val << 12);
 		/* rterm flag */
 		data32 |= 0x1 << 0;
-		hdmirx_wr_amlphy(HHI_RX_PHY_MISC_CNTL1, data32);
+		hdmirx_wr_amlphy(TXHD2_HDMIRX20PHY_DCHA_MISC1, data32);
 		printf("rx trim:0x%x\n", data32);
 	} else
 		printf("no trim val!\n");

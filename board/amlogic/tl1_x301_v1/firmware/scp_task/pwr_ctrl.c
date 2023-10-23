@@ -13,8 +13,11 @@
 #endif
 #include <gpio.h>
 #include "pwm_ctrl.h"
+#include <gpio.c>
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
+unsigned char gpio_groups[] = {};
 
 static void set_vddee_voltage(unsigned int target_voltage)
 {
@@ -48,6 +51,8 @@ static void power_off_ddr(unsigned int flag)
 
 static void power_off_at_24M(unsigned int suspend_from)
 {
+	gpio_state_backup(gpio_groups, ARRAY_SIZE(gpio_groups));
+
 	/*set gpioao_2 low to power off VDDCPU*/
 	writel(readl(AO_GPIO_O) & (~(1 << 2)), AO_GPIO_O);
 	writel(readl(AO_GPIO_O_EN_N) & (~(1 << 2)), AO_GPIO_O_EN_N);
@@ -86,6 +91,7 @@ static void power_on_at_24M(unsigned int suspend_from)
 	writel(readl(AO_GPIO_O_EN_N) & (~(1 << 3)), AO_GPIO_O_EN_N);
 	writel(readl(AO_RTI_PINMUX_REG0) & (~(0xf << 12)), AO_RTI_PINMUX_REG0);
 	_udelay(10000);
+	gpio_state_restore(gpio_groups, ARRAY_SIZE(gpio_groups));
 	if (suspend_from == SYS_POWEROFF) {
 		power_off_ddr(1);
 	}

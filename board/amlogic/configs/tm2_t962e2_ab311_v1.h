@@ -363,11 +363,11 @@
             "\0"\
         "init_display="\
             "if test ${vendor_boot_mode} = true; then "\
-                "hdmitx hpd;hdmitx get_preferred_mode;hdmitx get_parse_edid;dovi process;osd open;osd clear;"\
+                "hdmitx hpd;hdmitx get_parse_edid;dovi process;osd open;osd clear;"\
                 "imgread pic logo bootup $loadaddr;bmp display $bootup_offset;"\
                 "bmp scale;vout output ${outputmode};dovi set;dovi pkg;vpp hdrpkt;"\
             "else "\
-                "hdmitx hpd;hdmitx get_preferred_mode;hdmitx get_parse_edid;dovi process;osd open;osd clear;"\
+                "hdmitx hpd;hdmitx get_parse_edid;dovi process;osd open;osd clear;"\
                 "if rdext4pic $board_logo_part $loadaddr; then echo $board_logo_part logo; "\
                 "else rdext4pic odm $loadaddr;fi;bmp display $logoLoadAddr;"\
                 "bmp scale;vout output ${outputmode};dovi set;dovi pkg;vpp hdrpkt;"\

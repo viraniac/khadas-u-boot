@@ -36,6 +36,11 @@
 /* SMC Identifiers for non-secure world functions */
 #define CALL_TRUSTZONE_HAL_API                  0x5
 
+#define GET_SHARE_MEM_INFORMATION		0x8200002a
+	/* bootloader version message */
+	#define GET_SHARE_VERSION_ADDR		 0x3	//for secure use
+	#define GET_SHARE_VERSION_DATA		 0x4	//for none secure use
+
 /* EFUSE */
 #define EFUSE_READ					0x82000030
 #define EFUSE_WRITE				0x82000031
@@ -158,4 +163,5 @@ void set_viu_probe_enable(void);
 int32_t set_boot_params(const keymaster_boot_params*);
 void aml_set_power_domain(uint64_t function_id, uint64_t arg0, uint64_t arg1);
 int bl31_get_cornerinfo(uint8_t *outbuf, int size);
+int32_t aml_get_bootloader_version(uint8_t *outbuf);
 #endif

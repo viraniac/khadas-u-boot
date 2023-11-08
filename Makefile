@@ -1250,7 +1250,8 @@ define filechk_version.h
 	(echo \#define PLAIN_VERSION \"$(UBOOTRELEASE)\"; \
 	echo \#define U_BOOT_VERSION \"U-Boot \" PLAIN_VERSION; \
 	echo \#define CC_VERSION_STRING \"$$($(CC) --version | head -n 1)\"; \
-	echo \#define LD_VERSION_STRING \"$$($(LD) --version | head -n 1)\"; )
+	echo \#define LD_VERSION_STRING \"$$($(LD) --version | head -n 1)\"; \
+	echo \#define COMPILE_USER \"${USER}\";)
 endef
 
 define filechk_timestamp.h

@@ -283,7 +283,13 @@
 			"run load_bmp_logo_base;"\
 			"\0"\
 	"init_display="\
-		"osd open;osd clear;run load_bmp_logo;bmp scale;vout output ${outputmode};lcd enable; lcd1 enable;"\
+		/* logo1 */\
+		"setenv display_layer osd0;"\
+		"osd open;osd clear;run load_bmp_logo;bmp scale;vout output ${outputmode};"\
+		/* logo2 */\
+		"setenv display_layer viu2_osd0;"\
+		"osd open;osd clear;run load_bmp_logo;bmp scale;vout2 prepare ${outputmode2};"\
+		"vout2 output ${outputmode2};"\
 		"\0"\
 	"check_display="\
 		"echo check_display reboot_mode : ${reboot_mode} ,powermode : ${powermode};"\

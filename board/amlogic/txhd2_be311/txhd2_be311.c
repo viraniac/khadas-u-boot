@@ -566,9 +566,9 @@ phys_size_t get_effective_memsize(void)
 {
 	// >>16 -> MB, <<20 -> real size, so >>16<<20 = <<4
 #if defined(CONFIG_SYS_MEM_TOP_HIDE)
-	return (((readl(AO_SEC_GP_CFG0)) & 0xFFF80000) << 4) - CONFIG_SYS_MEM_TOP_HIDE;
+	return (((readl(AO_SEC_GP_CFG0)) & 0xFFF00000) << 4) - CONFIG_SYS_MEM_TOP_HIDE;
 #else
-	return (((readl(AO_SEC_GP_CFG0)) & 0xFFF80000) << 4);
+	return (((readl(AO_SEC_GP_CFG0)) & 0xFFF00000) << 4);
 #endif
 }
 
@@ -601,25 +601,39 @@ int checkhw(char * name)
 	unsigned long ddr_size = 0;
 	int i;
 	cpu_id_t cpu_id = get_cpu_id();
+	int sipinfo = ((((readl(AO_SEC_GP_CFG0)) & 0xFFF80000) >> 19) & 0x1);
 
 	for (i = 0; i < CONFIG_NR_DRAM_BANKS; i++)
 		ddr_size += gd->bd->bi_dram[i].size;
 #if defined(CONFIG_SYS_MEM_TOP_HIDE)
 	ddr_size += CONFIG_SYS_MEM_TOP_HIDE;
 #endif
-	printf("ddr_size is %lx\n", ddr_size);
+	printf("ddr_size is %lx, sipinfo = %d\n", ddr_size, sipinfo);
+
 	switch (ddr_size) {
 	case 0x20000000:
 		if (cpu_id.chip_rev == 0xA)
-			strcpy(loc_name, "txhd2-reva_t950s_be311-512m\0");
+			if (sipinfo == 0)
+				strcpy(loc_name, "txhd2-reva_t950s_be301-512m\0");
+			else
+				strcpy(loc_name, "txhd2-reva_t950s_be311-512m\0");
 		else
-			strcpy(loc_name, "txhd2_t950s_be311-512m\0");
+			if (sipinfo == 0)
+				strcpy(loc_name, "txhd2_t950s_be301-512m\0");
+			else
+				strcpy(loc_name, "txhd2_t950s_be311-512m\0");
 		break;
 	case 0x40000000:
 		if (cpu_id.chip_rev == 0xA)
-			strcpy(loc_name, "txhd2-reva_t950s_be311\0");
+			if (sipinfo == 0)
+				strcpy(loc_name, "txhd2-reva_t950s_be301\0");
+			else
+				strcpy(loc_name, "txhd2-reva_t950s_be311\0");
 		else
-			strcpy(loc_name, "txhd2_t950s_be311\0");
+			if (sipinfo == 0)
+				strcpy(loc_name, "txhd2_t950s_be301\0");
+			else
+				strcpy(loc_name, "txhd2_t950s_be311\0");
 		break;
 	default:
 		strcpy(loc_name, "txhd2_t950s_unsupport");

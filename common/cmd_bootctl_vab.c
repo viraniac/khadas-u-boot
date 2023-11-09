@@ -36,6 +36,8 @@
 #define WIPE_PACKAGE_OFFSET_IN_MISC 16 * 1024
 #define SYSTEM_SPACE_OFFSET_IN_MISC 32 * 1024
 #define SYSTEM_SPACE_SIZE_IN_MISC 32 * 1024
+#define BOOTLOADER_OFFSET		512
+#define BOOTLOADER_MAX_SIZE		(4 * 1024 * 1024)
 
 
 extern int store_read_ops(
@@ -533,6 +535,66 @@ exit:
 	return ret;
 }
 
+static int write_bootloader_up(int i)
+{
+	unsigned char *buffer = NULL;
+	int capacity_boot = 0x2000 * 512;
+	int ret = 0;
+	char partname[32] = {0};
+	char *slot_name = NULL;
+	int bootloader_index = 0;
+	int size = BOOTLOADER_MAX_SIZE - BOOTLOADER_OFFSET;
+
+#ifdef CONFIG_MMC_MESON_GX
+	struct mmc *mmc = NULL;
+
+	if (store_get_type() == BOOT_EMMC)
+		mmc = find_mmc_device(1);
+
+	if (mmc)
+		capacity_boot = mmc->capacity_boot;
+#endif
+
+	printf("capacity_boot: 0x%x\n", capacity_boot);
+	buffer = (unsigned char *)malloc(capacity_boot);
+	if (!buffer) {
+		printf("ERROR! fail to allocate memory ...\n");
+		return -1;
+	}
+	memset(buffer, 0, capacity_boot);
+
+	slot_name = getenv("active_slot");
+	if (slot_name && (strcmp(slot_name, "_a") == 0))
+		strcpy((char *)partname, "bootloader_a");
+	else if (slot_name && (strcmp(slot_name, "_b") == 0))
+		strcpy((char *)partname, "bootloader_b");
+	else
+		strcpy((char *)partname, "bootloader_up");
+
+	ret = store_read_ops((unsigned char *)partname, buffer, 0, size);
+	if (ret) {
+		printf("Fail to read 0x%xB from part[%s] at offset 0\n",
+					size, "bootloader_up");
+		free(buffer);
+		return -1;
+	}
+
+	if (i == 0)
+		bootloader_index = AML_BL_BOOT0;
+	else
+		bootloader_index = AML_BL_BOOT1;
+
+	ret = amlmmc_write_bootloader(1, bootloader_index, size, buffer);
+	if (ret) {
+		printf("Failed to write boot0\n");
+		free(buffer);
+		return -1;
+	}
+
+	free(buffer);
+	return 0;
+}
+
 static void update_after_failed_rollback(void)
 {
 	run_command("run init_display; run storeargs; run update;", 0);
@@ -553,9 +615,30 @@ static int do_GetValidSlot(
 	int AB_mode = 0;
 	bool bootable_a, bootable_b;
 	char str_count[16];
+	int ret = 0;
 
 	if (argc != 1)
 		return cmd_usage(cmdtp);
+
+	char *writeboot = getenv("write_boot");
+
+	if (writeboot && !strcmp(writeboot, "1")) {
+		if (has_boot_slot == 0) {
+			printf("non ab for kernel 5.15 update boot0 & boot1 from bootloader_up\n");
+			ret = write_bootloader_up(0);
+			ret += write_bootloader_up(1);
+		} else {
+			printf("ab for kernel 5.15 update boot0 from bootloader_a or _b\n");
+			ret = write_bootloader_up(0);
+		}
+		if (ret != 0)
+			run_command("reboot", 0);
+
+		setenv("write_boot", "0");
+		setenv("upgrade_step", "1");
+		run_command("saveenv", 0);
+		run_command("reboot", 0);
+	}
 
 	//recovery mode, need disable dolby
 	run_command("get_rebootmode", 0);

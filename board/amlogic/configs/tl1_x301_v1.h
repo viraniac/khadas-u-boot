@@ -427,7 +427,7 @@
 			"fi;fi;" \
 		"fi;\0" \
 	"ddr_fast_boot_enable_flag=1\0" \
-	"enable_ddr_check_boot_reason=1\0" \
+	"enable_ddr_check_boot_reason=0\0" \
 
 #define CONFIG_PREBOOT  \
 	"mw ff638630 0 2;"\

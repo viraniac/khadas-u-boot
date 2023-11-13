@@ -158,6 +158,9 @@ struct lcd_timing_s {
 	unsigned int h_offset;
 	unsigned int v_offset;
 
+	unsigned char pre_de_h;
+	unsigned char pre_de_v;
+
 	unsigned short de_hs_addr;
 	unsigned short de_he_addr;
 	unsigned short de_vs_addr;

@@ -73,8 +73,10 @@ static void lcd_timing_info_print(struct lcd_config_s * pconf)
 		"vs_backporch      %d%s\n"
 		"vs_frontporch     %d%s\n"
 		"vs_pol            %d\n"
-		"video_on_pixel    %d\n"
-		"video_on_line     %d\n\n",
+		"pre_de_h          %d\n"
+		"pre_de_v          %d\n"
+		"video_hstart      %d\n"
+		"video_vstart      %d\n\n",
 		h_period, v_period, hs_width, hs_bp,
 		((herr & 0x4) ? "(X)" : ((herr & 0x8) ? "(!)" : "")),
 		pconf->lcd_timing.hsync_fp,
@@ -83,7 +85,10 @@ static void lcd_timing_info_print(struct lcd_config_s * pconf)
 		((verr & 0x4) ? "(X)" : ((verr & 0x8) ? "(!)" : "")),
 		pconf->lcd_timing.vsync_fp,
 		((verr & 0x1) ? "(X)" : ((verr & 0x2) ? "(!)" : "")),
-		vs_pol, video_on_pixel, video_on_line);
+		vs_pol,
+		pconf->lcd_timing.pre_de_h,
+		pconf->lcd_timing.pre_de_v,
+		video_on_pixel, video_on_line);
 
 	printf("h_period_min      %d\n"
 		"h_period_max      %d\n"

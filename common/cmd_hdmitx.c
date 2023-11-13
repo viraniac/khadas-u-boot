@@ -103,7 +103,7 @@ static int do_hpd_detect(cmd_tbl_t *cmdtp, int flag, int argc,
 			mdelay(100);
 			hpd_st = hdmitx_device.HWOp.get_hpd_state();
 			if (hpd_st) {
-				printf("hpd delay %d ms\n", (10 - loop) * 100);
+				printf("hpd delay %d ms\n", (15 - loop) * 100);
 				break;
 			}
 		}

@@ -329,6 +329,18 @@ struct aml_nand_flash_dev aml_nand_flash_ids[] = {
 		0,
 		(NAND_TIMING_MODE5 | NAND_ECC_BCH8_MODE )},
 
+	{"2Gib S34ML02G300TFI000 ",
+		{NAND_MFR_AMD, 0xda, 0x00, 0x95, 0x46},
+		2048,
+		256,
+		0x20000,
+		128,
+		1,
+		16,
+		15,
+		0,
+		(NAND_TIMING_MODE5 | NAND_ECC_BCH8_MODE)},
+
 	{"AMD/Spansion Slc NAND 2Gib S34ML02G1(MLO2G100BH1OO)",
 		{NAND_MFR_AMD, 0xda, 0x90, 0x95, 0x44, 0x01},
 		2048,

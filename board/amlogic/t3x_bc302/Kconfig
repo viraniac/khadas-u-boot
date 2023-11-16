@@ -9,8 +9,17 @@ config SYS_BOARD
 config SYS_VENDOR
 	default "amlogic"
 
+config ENV_DISPLAY_PIPELINE
+	string
+	option env="BOARD_DISPLAY_PIPELINE"
+
+config DISPLAY_PIPELINE
+	string
+	default "multidisplay" if ENV_DISPLAY_PIPELINE="multidisplay"
+
 config SYS_CONFIG_NAME
-	default "t3x_bc302"
+	default "t3x_bc302" if ENV_DISPLAY_PIPELINE!="multidisplay"
+	default "t3x_bc302_multidisplay" if ENV_DISPLAY_PIPELINE="multidisplay"
 
 config DTB_BIND_KERNEL
     bool "load dtb from boot part but not flash rsv"

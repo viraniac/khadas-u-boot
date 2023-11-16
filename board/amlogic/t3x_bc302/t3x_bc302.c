@@ -448,8 +448,17 @@ int checkhw(char *name)
 		case 0xe0000000:
 			if (cpu_id.chip_rev == 0xA)
 				strcpy(loc_name, "t3x-reva_t968d4_bc302\0");
-			else if (cpu_id.chip_rev == 0xB)
-				strcpy(loc_name, "t3x_t968d4_bc302\0");
+			else if (cpu_id.chip_rev == 0xB) {
+				#if defined(CONFIG_DISPLAY_PIPELINE)
+					if (strcmp(CONFIG_DISPLAY_PIPELINE, "multidisplay") == 0) {
+						strcpy(loc_name, "t3x_t968d4_bc302-multidisplay\0");
+					} else {
+						strcpy(loc_name, "t3x_t968d4_bc302\0");
+					}
+				#else
+					strcpy(loc_name, "t3x_t968d4_bc302\0");
+				#endif
+			}
 			break;
 		case 0x200000000:
 			if (cpu_id.chip_rev == 0xA)

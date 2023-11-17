@@ -124,4 +124,7 @@ typedef struct build_messages {
 #endif /* ! CONFIG_MALLOC */
 #endif /* CONFIG_POLARSSL_RSA */
 
+/* Do not support extended reboot mode */
+#define NO_EXTEND_REBOOT_MODE
+
 #endif /* _BOOT_ROM_CONFIG_H_ */

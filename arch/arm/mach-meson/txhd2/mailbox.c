@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
 /*
- * arch/arm/cpu/armv8/t5d/mailbox.c
+ * arch/arm/cpu/armv8/thxd2/mailbox.c
  *
  * Copyright (C) 2020 Amlogic, Inc. All rights reserved.
  *
@@ -41,7 +41,7 @@ void send_pwm_delt(int32_t vcck_delt, int32_t ee_delt)
 static inline void mbwrite(uint32_t to, void *from, long count)
 {
 	int i = 0;
-	int len = (count + 3) / 4;
+	int len = count / 4 + ((count % 4) ? 1 : 0);
 	uint32_t *p = from;
 
 	while (len > 0) {
@@ -54,7 +54,7 @@ static inline void mbwrite(uint32_t to, void *from, long count)
 static inline void mbread(void *to, uint32_t from, long count)
 {
 	int i = 0;
-	int len = (count + 3) / 4;
+	int len = count / 4 + ((count % 4) ? 1 : 0);
 	uint32_t *p = to;
 
 	while (len > 0) {
@@ -67,7 +67,7 @@ static inline void mbread(void *to, uint32_t from, long count)
 static inline void mbclean(uint32_t to, long count)
 {
 	int i = 0;
-	int len = count / 4 + (count % 4);
+	int len = count / 4 + ((count % 4) ? 1 : 0);
 
 	while (len > 0) {
 		aml_writel32(0, to + (4 * i));
@@ -123,19 +123,17 @@ void mhu_message_send(uintptr_t mboxset_addr, uint32_t command, uint32_t size)
 {
 	uint32_t mbox_cmd;
 
-	//if (size < 0 || size > (MHU_PAYLOAD_SIZE - MHU_DATA_OFFSET)) {  //coverity error
 	if (size > (MHU_PAYLOAD_SIZE - MHU_DATA_OFFSET)) {
 		printf("[BL33]: scpi send input size error\n");
 		return;
 	}
 	mbox_cmd = MHU_CMD_BUILD(command, size + MHU_DATA_OFFSET);
-	/* Send command to HIFI and wait for it to pick it up */
+	/* Send command to other core and wait for it to pick it up */
 	writel(mbox_cmd, mboxset_addr);
 }
 
 void mhu_build_payload(uintptr_t mboxpl_addr, void *message, uint32_t size)
 {
-	//if (size < 0 || size > (MHU_PAYLOAD_SIZE - MHU_DATA_OFFSET)) {  //coverity error
 	if (size > (MHU_PAYLOAD_SIZE - MHU_DATA_OFFSET)) {
 		printf("[BL33]: scpi send input size error\n");
 		return;
@@ -146,7 +144,6 @@ void mhu_build_payload(uintptr_t mboxpl_addr, void *message, uint32_t size)
 
 void mhu_get_payload(uintptr_t mboxpl_addr, void *message, uint32_t size)
 {
-	//if (size < 0 || size > (MHU_PAYLOAD_SIZE - MHU_DATA_OFFSET)) {  //coverity error
 	if (size > (MHU_PAYLOAD_SIZE - MHU_DATA_OFFSET)) {
 		printf("[BL33]: scpi revsize input size error\n");
 		return;
@@ -157,7 +154,7 @@ void mhu_get_payload(uintptr_t mboxpl_addr, void *message, uint32_t size)
 
 uint32_t mhu_message_wait(uintptr_t mboxstat_addr)
 {
-	/* Wait for response from HIFI */
+	/* Wait for response from other core */
 	uint32_t response;
 
 	while ((response = readl(mboxstat_addr)))
@@ -182,6 +179,7 @@ void mhu_init(void)
 	 * or garbage value and think it's a message we've already sent.
 	 */
 	writel(REE2AO_CLR_ADDR, 0xffffffffu);
+	printf("[BL33] mhu init done payload-v1\n");
 }
 
 int scpi_send_data(uint32_t chan, uint32_t command, void *sendmessage,

@@ -43,6 +43,7 @@
          /*SYSTEM*/
 #define CMD_UNDEFINE            0x0
 #define CMD_TEST                0x6
+#define CMD_GET_STICK_REBOOT_FLAG 0x40
 #define CMD_LED_INFO            0xF7
 /*******************************************************************************
  * Mssage Composition
@@ -68,6 +69,6 @@ void init_dsp(unsigned int id,unsigned int addr,unsigned int cfg0,unsigned int j
 void init_dsp_jtag(unsigned int id);
 
 /*t5 only support to aocpu donot add more api, please use commom api*/
-void scpi_send_data(uint32_t chan, uint32_t command, void *sendmessage,
-		    uint32_t sendsize, void *revmessage, uint32_t revsize);
+int scpi_send_data(u32 chan, u32 command, void *sendmessage,
+		    u32 sendsize, void *revmessage, u32 revsize);
 #endif

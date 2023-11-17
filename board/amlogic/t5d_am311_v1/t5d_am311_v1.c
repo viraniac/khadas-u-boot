@@ -51,6 +51,7 @@
 #endif
 #include <asm/arch/timer.h>
 #include <partition_table.h>
+#include <asm/arch/stick_mem.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -641,6 +642,7 @@ int board_late_init(void)
 		run_command("defenv_reserv;setenv upgrade_step 2; saveenv;", 0);
 	}
 
+	get_stick_reboot_flag_mbx();
 	//update env before anyone using it
 	run_command("get_rebootmode; echo reboot_mode=${reboot_mode};", 0);
 	run_command("if itest ${upgrade_step} == 1; then "\

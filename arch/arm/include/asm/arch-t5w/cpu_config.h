@@ -135,4 +135,7 @@ typedef struct build_messages {
 #endif /* ! CONFIG_MALLOC */
 #endif /* CONFIG_POLARSSL_RSA */
 
+/* Stick Memory Support */
+#define CONFIG_SUPPORT_STICK_MEM
+
 #endif /* _BOOT_ROM_CONFIG_H_ */

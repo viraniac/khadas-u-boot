@@ -3,7 +3,6 @@
  * please confirm with dvfs owner.
  */
 #define CPU_CLK                                 2004
-#define DSU_CLK                                 1512
 
 /* ddr config support multiple configs for boards which use same bootloader:
  * config steps:
@@ -37,7 +36,6 @@ board_clk_set_t __board_clk_setting
 __attribute__ ((section(".clk_param"))) = {
 	/* clock settings for bl2 */
 	.cpu_clk		= CPU_CLK / 24 * 24,
-	.dsu_clk		= DSU_CLK / 24 * 24,
 #ifdef CONFIG_PXP_EMULATOR
 	.pxp			= 1,
 #else

@@ -137,7 +137,7 @@ static int edid_check_valid(unsigned char *buf)
 	unsigned int i = 0;
 
 	/* check block 0 first 8 bytes */
-	if (buf[0] != 0 && buf[7] != 0)
+	if (buf[0] != 0 || buf[7] != 0)
 		return 0;
 	for (i = 1; i < 7; i++) {
 		if (buf[i] != 0xff)
@@ -172,34 +172,55 @@ static int edid_check_valid(unsigned char *buf)
 	return 1;
 }
 
+static int get_check_policy(void)
+{
+	char *edid_check = getenv("edid_check");
+	int ret = 0;
+
+	if (edid_check && edid_check[0] != '\0') {
+		int tmp = edid_check[0] - '0';
+
+		if (tmp >= 0 && tmp <= 3)
+			ret = tmp;
+	}
+
+	return ret;
+}
+
 /* check the checksum for each sub block */
 static int _check_edid_blk_chksum(unsigned char *block)
 {
 	unsigned int chksum = 0;
 	unsigned int i = 0;
+	int edid_check = 0;
 
-	for (chksum = 0, i = 0; i < 0x80; i++)
-		chksum += block[i];
-	if ((chksum & 0xff) != 0)
-		return 0;
-	else
-		return 1;
+	edid_check = get_check_policy();
+	if (!(edid_check & 0x02)) {
+		for (chksum = 0, i = 0; i < 0x80; i++)
+			chksum += block[i];
+		if ((chksum & 0xff) != 0)
+			return 0;
+	}
+	return 1;
 }
 
 /* check the first edid block */
 static int _check_base_structure(unsigned char *buf)
 {
 	unsigned int i = 0;
+	int edid_check = 0;
 
-	/* check block 0 first 8 bytes */
-	if (buf[0] != 0 && buf[7] != 0)
-		return 0;
-
-	for (i = 1; i < 7; i++) {
-		if (buf[i] != 0xff)
+	edid_check = get_check_policy();
+	if (!(edid_check & 0x01)) {
+		/* check block 0 first 8 bytes */
+		if (buf[0] != 0 || buf[7] != 0)
 			return 0;
+		for (i = 1; i < 7; i++) {
+			if (buf[i] != 0xff)
+				return 0;
+		}
 	}
-
+	/* check block 0 checksum */
 	if (_check_edid_blk_chksum(buf) == 0)
 		return 0;
 
@@ -215,7 +236,9 @@ static int check_dvi_hdmi_edid_valid(unsigned char *buf)
 {
 	int i;
 	int blk_cnt = buf[0x7e] + 1;
+	int edid_check = 0;
 
+	edid_check = get_check_policy();
 	/* limit blk_cnt to EDID_BLK_NO  */
 	if (blk_cnt > EDID_BLK_NO)
 		blk_cnt = EDID_BLK_NO;
@@ -229,8 +252,10 @@ static int check_dvi_hdmi_edid_valid(unsigned char *buf)
 
 	/* check extension block 1 and more */
 	for (i = 1; i < blk_cnt; i++) {
-		if (buf[i * 0x80] == 0)
-			return 0;
+		if (!(edid_check & 0x01)) {
+			if (buf[i * 0x80] == 0)
+				return 0;
+		}
 		if (_check_edid_blk_chksum(&buf[i * 0x80]) == 0)
 			return 0;
 	}
@@ -975,16 +1000,6 @@ static int hdmitx_edid_cta_block_parse(struct rx_cap *pRXCap,
 	int i;
 	unsigned char *vfpdb_offset = NULL;
 
-	/* CEA-861 implementations are required to use Tag = 0x02
-	 * for the CEA Extension Tag and Sources should ignore
-	 * Tags that are not understood. but for Samsung LA32D400E1
-	 * its extension tag is 0x0 while other bytes normal,
-	 * so continue parse as other sources do
-	 */
-	if (BlockBuf[0] == 0x0)
-		printf("unknown Extension Tag detected, continue\n");
-	else if (BlockBuf[0] != 0x02)
-		return -1; /* not a CEA BLOCK. */
 	End = BlockBuf[2]; /* CEA description. */
 	pRXCap->native_Mode = BlockBuf[1] >= 2 ? BlockBuf[3] : 0;
 	pRXCap->number_of_dtd += BlockBuf[1] >= 2 ? (BlockBuf[3] & 0xf) : 0;
@@ -1235,7 +1250,9 @@ unsigned int hdmi_edid_parsing(unsigned char *EDID_buf, struct rx_cap *pRXCap)
 	int idx[4];
 	struct dv_info *dv = &pRXCap->dv_info;
 	unsigned char cta_block_count;
+	int edid_check = 0;
 
+	edid_check = get_check_policy();
 	/* Clear all parsing data */
 	memset(pRXCap, 0, sizeof(struct rx_cap));
 	pRXCap->IEEEOUI = 0x00; /* Default is DVI device */
@@ -1257,7 +1274,7 @@ unsigned int hdmi_edid_parsing(unsigned char *EDID_buf, struct rx_cap *pRXCap)
 	if (cta_block_count > EDID_MAX_BLOCK - 1)
 		cta_block_count = EDID_MAX_BLOCK - 1;
 	for (i = 1; i <= cta_block_count; i++) {
-		if (EDID_buf[i * 0x80] == 0x02)
+		if (EDID_buf[i * 0x80] == 0x02 || edid_check & 0x01)
 			hdmitx_edid_cta_block_parse(pRXCap, &EDID_buf[i * 0x80]);
 	}
 /*

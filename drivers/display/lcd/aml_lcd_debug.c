@@ -26,11 +26,26 @@
 static struct lcd_debug_info_reg_s *lcd_debug_info_reg;
 static struct lcd_debug_info_if_s *lcd_debug_info_if;
 
+int lcd_debug_info_len(int num)
+{
+	int ret = 0;
+
+	if (num >= (PR_BUF_MAX - 1)) {
+		printf("%s: string length %d is out of support\n",
+			__func__, num);
+		return 0;
+	}
+
+	ret = PR_BUF_MAX - 1 - num;
+	return ret;
+}
+
 static void lcd_timing_info_print(struct lcd_config_s * pconf)
 {
 	unsigned int hs_width, hs_bp, hs_pol, h_period;
 	unsigned int vs_width, vs_bp, vs_pol, v_period;
 	unsigned int video_on_pixel, video_on_line;
+	int ret, herr, verr;
 
 	video_on_pixel = pconf->lcd_timing.video_on_pixel;
 	video_on_line = pconf->lcd_timing.video_on_line;
@@ -44,18 +59,31 @@ static void lcd_timing_info_print(struct lcd_config_s * pconf)
 	vs_bp = pconf->lcd_timing.vsync_bp;
 	vs_pol = pconf->lcd_timing.vsync_pol;
 
+	ret = lcd_config_check();
+	herr = ret & 0xf;
+	verr = (ret >> 4) & 0xf;
+
 	printf("h_period          %d\n"
 		"v_period          %d\n"
 		"hs_width          %d\n"
-		"hs_backporch      %d\n"
+		"hs_backporch      %d%s\n"
+		"hs_frontporch     %d%s\n"
 		"hs_pol            %d\n"
 		"vs_width          %d\n"
-		"vs_backporch      %d\n"
+		"vs_backporch      %d%s\n"
+		"vs_frontporch     %d%s\n"
 		"vs_pol            %d\n"
 		"video_on_pixel    %d\n"
 		"video_on_line     %d\n\n",
-		h_period, v_period, hs_width, hs_bp, hs_pol,
-		vs_width, vs_bp, vs_pol, video_on_pixel, video_on_line);
+		h_period, v_period, hs_width, hs_bp,
+		((herr & 0x4) ? "(X)" : ((herr & 0x8) ? "(!)" : "")),
+		pconf->lcd_timing.hsync_fp,
+		((herr & 0x1) ? "(X)" : ((herr & 0x2) ? "(!)" : "")),
+		hs_pol, vs_width, vs_bp,
+		((verr & 0x4) ? "(X)" : ((verr & 0x8) ? "(!)" : "")),
+		pconf->lcd_timing.vsync_fp,
+		((verr & 0x1) ? "(X)" : ((verr & 0x2) ? "(!)" : "")),
+		vs_pol, video_on_pixel, video_on_line);
 
 	printf("h_period_min      %d\n"
 		"h_period_max      %d\n"

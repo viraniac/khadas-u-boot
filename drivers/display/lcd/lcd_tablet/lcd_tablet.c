@@ -190,6 +190,16 @@ static int lcd_config_load_from_dts(char *dt_addr, struct lcd_config_s *pconf)
 		pconf->lcd_basic.lcd_type = lcd_type_str_to_type(propdata);
 	}
 
+	propdata = (char *)fdt_getprop(dt_addr, child_offset, "config_check", NULL);
+	if (!propdata) {
+		pconf->lcd_basic.config_check = 0; //follow config_check_glb
+	} else {
+		temp = be32_to_cpup((u32 *)propdata);
+		pconf->lcd_basic.config_check = temp ? 0x3 : 0x2;
+		if (lcd_debug_print_flag)
+			LCDPR("find config_check: %d\n", temp);
+	}
+
 	propdata = (char *)fdt_getprop(dt_addr, child_offset, "basic_setting", NULL);
 	if (propdata == NULL) {
 		LCDERR("failed to get basic_setting\n");
@@ -830,7 +840,9 @@ static int lcd_config_load_from_unifykey(struct lcd_config_s *pconf)
 		sizeof(pconf->lcd_basic.model_name) - 1);
 	pconf->lcd_basic.model_name[sizeof(pconf->lcd_basic.model_name) - 1]
 		= '\0';
-	pconf->lcd_basic.lcd_type = *(p + LCD_UKEY_INTERFACE);
+	temp = *(p + LCD_UKEY_INTERFACE);
+	pconf->lcd_basic.lcd_type = temp & 0x3f;
+	pconf->lcd_basic.config_check = (temp >> 6) & 0x3;
 	pconf->lcd_basic.lcd_bits = *(p + LCD_UKEY_LCD_BITS);
 	pconf->lcd_basic.screen_width = (*(p + LCD_UKEY_SCREEN_WIDTH) |
 		((*(p + LCD_UKEY_SCREEN_WIDTH + 1)) << 8));
@@ -1076,7 +1088,7 @@ static void lcd_config_init(struct lcd_config_s *pconf)
 	lcd_clk_generate_parameter(pconf);
 }
 
-static int lcd_config_check(char *mode, unsigned int frac)
+static int lcd_config_valid(char *mode, unsigned int frac)
 {
 	int ret;
 
@@ -1095,7 +1107,7 @@ int get_lcd_tablet_config(char *dt_addr, int load_id)
 	strcpy(lcd_drv->version, LCD_DRV_VERSION);
 	lcd_drv->list_support_mode = lcd_list_support_mode;
 	lcd_drv->outputmode_check = check_lcd_output_mode;
-	lcd_drv->config_check = lcd_config_check;
+	lcd_drv->config_valid = lcd_config_valid;
 	lcd_drv->driver_init_pre = lcd_tablet_driver_init_pre;
 	lcd_drv->driver_init = lcd_tablet_driver_init;
 	lcd_drv->driver_disable = lcd_tablet_driver_disable;

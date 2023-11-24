@@ -24,6 +24,8 @@ extern unsigned int lcd_debug_print_flag;
 #define LCDPR(fmt, args...)     printf("lcd: "fmt"", ## args)
 #define LCDERR(fmt, args...)    printf("lcd: error: "fmt"", ## args)
 
+#define PR_BUF_MAX              (4 * 1024)
+
 /* **********************************
  * clk parameter bit define
  * pll_ctrl, div_ctrl, clk_ctrl
@@ -100,6 +102,7 @@ struct lcd_basic_s {
 	char model_name[MOD_LEN_MAX];
 	enum lcd_type_e lcd_type;
 	unsigned char lcd_bits;
+	unsigned char config_check;
 
 	unsigned short h_active; /* Horizontal display area */
 	unsigned short v_active; /* Vertical display area */
@@ -145,9 +148,11 @@ struct lcd_timing_s {
 
 	unsigned short hsync_width;
 	unsigned short hsync_bp;
+	unsigned short hsync_fp;
 	unsigned short hsync_pol;
 	unsigned short vsync_width;
 	unsigned short vsync_bp;
+	unsigned short vsync_fp;
 	unsigned short vsync_pol;
 	/* unsigned int vsync_h_phase; // [31]sign, [15:0]value */
 	unsigned int h_offset;
@@ -167,6 +172,14 @@ struct lcd_timing_s {
 	unsigned short vs_he_addr;
 	unsigned short vs_vs_addr;
 	unsigned short vs_ve_addr;
+};
+
+struct lcd_disp_tmg_req_s {
+	unsigned int alert_level;//0:disable, 1:warning, 2:fatal err
+	unsigned int hswbp_vid;
+	unsigned int hfp_vid;
+	unsigned int vswbp_vid;
+	unsigned int vfp_vid;
 };
 
 struct ttl_config_s {
@@ -617,12 +630,15 @@ struct aml_lcd_drv_s {
 	enum lcd_chip_e chip_type;
 	char rev_type;
 	unsigned char lcd_status;
+	unsigned char config_check_glb;
+	unsigned char config_check_en;
 
 	struct lcd_config_s *lcd_config;
 	struct bl_config_s *bl_config;
+	struct lcd_disp_tmg_req_s disp_req;
 
 	int  (*outputmode_check)(char *mode, unsigned int frac);
-	int  (*config_check)(char *mode, unsigned int frac);
+	int  (*config_valid)(char *mode, unsigned int frac);
 	void (*driver_init_pre)(void);
 	int  (*driver_init)(void);
 	void (*driver_disable)(void);
@@ -635,6 +651,7 @@ struct aml_lcd_drv_s {
 	void (*lcd_set_ss)(unsigned int level, unsigned int freq, unsigned int mode);
 	void (*lcd_get_ss)(void);
 	void (*lcd_test)(int num);
+	void (*lcd_config_check)(void);
 	int (*lcd_prbs)(unsigned int s, unsigned int mode_flag);
 	void (*lcd_clk)(void);
 	void (*lcd_info)(void);

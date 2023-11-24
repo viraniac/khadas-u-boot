@@ -508,6 +508,20 @@ static int do_lcd_test(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 	return 0;
 }
 
+static int do_lcd_check(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	struct aml_lcd_drv_s *lcd_drv;
+
+	lcd_drv = aml_lcd_get_driver();
+	if (lcd_drv) {
+		if (lcd_drv->lcd_config_check)
+			lcd_drv->lcd_config_check();
+	} else {
+		printf("no lcd driver\n");
+	}
+	return 0;
+}
+
 static int do_lcd_prbs(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	struct aml_lcd_drv_s *lcd_drv;
@@ -692,6 +706,7 @@ static cmd_tbl_t cmd_lcd_sub[] = {
 	U_BOOT_CMD_MKENT(vbyone, 3, 0, do_lcd_vbyone, "", ""),
 	U_BOOT_CMD_MKENT(reg,  2, 0, do_lcd_reg, "", ""),
 	U_BOOT_CMD_MKENT(test, 3, 0, do_lcd_test, "", ""),
+	U_BOOT_CMD_MKENT(check, 2, 0, do_lcd_check, "", ""),
 	U_BOOT_CMD_MKENT(prbs, 2, 0, do_lcd_prbs, "", ""),
 	U_BOOT_CMD_MKENT(key,  4, 0, do_lcd_key, "", ""),
 #ifdef CONFIG_AML_LCD_EXTERN
@@ -732,6 +747,7 @@ U_BOOT_CMD(
 	"lcd vbyone       - show lcd vbyone debug\n"
 	"lcd reg          - dump lcd registers\n"
 	"lcd test         - show lcd bist pattern\n"
+	"lcd check        - check lcd config\n"
 	"lcd key          - show lcd unifykey test\n"
 #ifdef CONFIG_AML_LCD_EXTERN
 	"lcd ext          - show lcd extern information\n"

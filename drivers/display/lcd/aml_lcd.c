@@ -116,7 +116,7 @@ static void lcd_chip_detect(void)
 
 static int lcd_check_valid(void)
 {
-	if (aml_lcd_driver.config_check == NULL) {
+	if (!aml_lcd_driver.config_valid) {
 		LCDERR("invalid lcd config\n");
 		return -1;
 	}
@@ -303,7 +303,7 @@ static void lcd_module_enable(char *mode, unsigned int frac)
 	struct lcd_config_s *pconf = lcd_drv->lcd_config;
 	int ret;
 
-	ret = lcd_drv->config_check(mode, frac);
+	ret = lcd_drv->config_valid(mode, frac);
 	if (ret) {
 		LCDERR("init exit\n");
 		return;
@@ -354,7 +354,7 @@ static void lcd_module_prepare(char *mode, unsigned int frac)
 	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
 	int ret;
 
-	ret = lcd_drv->config_check(mode, frac);
+	ret = lcd_drv->config_valid(mode, frac);
 	if (ret) {
 		LCDERR("prepare exit\n");
 		return;
@@ -578,6 +578,41 @@ static int lcd_init_load_from_dts(char *dt_addr)
 	for (j = i; j < LCD_CPU_GPIO_NUM_MAX; j++)
 		strcpy(pconf->lcd_power->cpu_gpio[j], "invalid");
 
+	propdata = (char *)fdt_getprop(dt_addr, parent_offset, "config_check_glb", NULL);
+	if (!propdata) {
+		aml_lcd_driver.config_check_glb = 0;
+	} else {
+		aml_lcd_driver.config_check_glb = be32_to_cpup((u32 *)propdata);
+		if (lcd_debug_print_flag) {
+			LCDPR("find config_check_glb: %d\n",
+				aml_lcd_driver.config_check_glb);
+		}
+	}
+
+	propdata = (char *)fdt_getprop(dt_addr, parent_offset, "display_timing_req_min", NULL);
+	if (!propdata) {
+		aml_lcd_driver.disp_req.alert_level = 0;
+		aml_lcd_driver.disp_req.hswbp_vid = 0;
+		aml_lcd_driver.disp_req.hfp_vid = 0;
+		aml_lcd_driver.disp_req.vswbp_vid = 0;
+		aml_lcd_driver.disp_req.vfp_vid = 0;
+	} else {
+		aml_lcd_driver.disp_req.alert_level = be32_to_cpup((u32 *)propdata);
+		aml_lcd_driver.disp_req.hswbp_vid   = be32_to_cpup((((u32 *)propdata) + 1));
+		aml_lcd_driver.disp_req.hfp_vid     = be32_to_cpup((((u32 *)propdata) + 2));
+		aml_lcd_driver.disp_req.vswbp_vid   = be32_to_cpup((((u32 *)propdata) + 3));
+		aml_lcd_driver.disp_req.vfp_vid     = be32_to_cpup((((u32 *)propdata) + 4));
+		if (lcd_debug_print_flag) {
+			LCDPR("find display_timing_req_min: alert_level:%d\n"
+				"hswbp:%d, hfp:%d, vswbp:%d, vfp:%d\n",
+				aml_lcd_driver.disp_req.alert_level,
+				aml_lcd_driver.disp_req.hswbp_vid,
+				aml_lcd_driver.disp_req.hfp_vid,
+				aml_lcd_driver.disp_req.vswbp_vid,
+				aml_lcd_driver.disp_req.vfp_vid);
+		}
+	}
+
 	return 0;
 }
 #endif
@@ -698,7 +733,7 @@ static int lcd_config_load_id_check(char *dt_addr)
 
 static int lcd_mode_probe(char *dt_addr, int load_id)
 {
-	int ret = 0;
+	int dbg_chk, ret = 0;
 
 	switch (debug_ctrl.debug_lcd_mode) {
 	case 1:
@@ -730,9 +765,8 @@ static int lcd_mode_probe(char *dt_addr, int load_id)
 		LCDERR("invalid lcd mode: %d\n", aml_lcd_driver.lcd_config->lcd_mode);
 		break;
 	}
-
 	if (ret) {
-		aml_lcd_driver.config_check = NULL;
+		aml_lcd_driver.config_valid = NULL;
 		LCDERR("invalid lcd config\n");
 		return -1;
 	}
@@ -742,6 +776,29 @@ static int lcd_mode_probe(char *dt_addr, int load_id)
 #ifdef CONFIG_AML_LCD_TCON
 	lcd_tcon_probe(dt_addr, &aml_lcd_driver, load_id);
 #endif
+
+	dbg_chk = getenv_ulong("lcd_debug_check", 10, 0xff);
+	if (dbg_chk == 0xff) {
+		if (aml_lcd_driver.lcd_config->lcd_basic.config_check & 0x2) {
+			aml_lcd_driver.config_check_en =
+				aml_lcd_driver.lcd_config->lcd_basic.config_check & 0x1;
+		} else {
+			aml_lcd_driver.config_check_en = aml_lcd_driver.config_check_glb;
+		}
+	} else {
+		LCDPR("lcd_debug_check: %d\n", dbg_chk);
+		aml_lcd_driver.config_check_en = dbg_chk;
+	}
+	if (aml_lcd_driver.config_check_en == 0) {
+		if (lcd_debug_print_flag)
+			LCDPR("config_check disabled\n");
+	} else {
+		ret = lcd_config_check();
+		if (ret & 0x155) {
+			LCDERR("%s: lcd config check fatal error!\n", __func__);
+			return -1;
+		}
+	}
 
 #ifdef CONFIG_AML_LCD_EXTERN
 	lcd_extern_load_config(dt_addr, aml_lcd_driver.lcd_config);
@@ -1039,6 +1096,31 @@ static void aml_lcd_test(int num)
 		LCDPR("already disabled\n");
 }
 
+static void aml_lcd_config_check(void)
+{
+	int ret;
+
+	if (lcd_check_valid())
+		return;
+
+	ret = lcd_config_check();
+	if (ret == 0)
+		printf("lcd_config_check: PASS\n");
+	printf("disp_tmg_min_req:\n"
+		"  alert_lvl  %d\n"
+		"  hswbp  %d\n"
+		"  hfp    %d\n"
+		"  vswbp  %d\n"
+		"  vfp    %d\n\n",
+		aml_lcd_driver.disp_req.alert_level,
+		aml_lcd_driver.disp_req.hswbp_vid, aml_lcd_driver.disp_req.hfp_vid,
+		aml_lcd_driver.disp_req.vswbp_vid, aml_lcd_driver.disp_req.vfp_vid);
+	printf("config_check_glb: %d, config_check: 0x%x, config_check_en: %d\n\n",
+		aml_lcd_driver.config_check_glb,
+		aml_lcd_driver.lcd_config->lcd_basic.config_check,
+		aml_lcd_driver.config_check_en);
+}
+
 static void aml_lcd_clk(void)
 {
 	if (lcd_check_valid())
@@ -1149,7 +1231,7 @@ static struct aml_lcd_drv_s aml_lcd_driver = {
 	.lcd_status = 0,
 	.lcd_config = &lcd_config_dft,
 	.bl_config = &bl_config_dft,
-	.config_check = NULL,
+	.config_valid = NULL,
 	.lcd_probe = lcd_probe,
 	.lcd_outputmode_check = lcd_outputmode_check,
 	.lcd_prepare = lcd_prepare,
@@ -1158,6 +1240,7 @@ static struct aml_lcd_drv_s aml_lcd_driver = {
 	.lcd_set_ss = aml_lcd_set_ss,
 	.lcd_get_ss = aml_lcd_get_ss,
 	.lcd_test = aml_lcd_test,
+	.lcd_config_check = aml_lcd_config_check,
 	.lcd_prbs = aml_lcd_prbs_test,
 	.lcd_clk = aml_lcd_clk,
 	.lcd_info = aml_lcd_info,

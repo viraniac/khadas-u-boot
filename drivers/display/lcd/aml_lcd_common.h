@@ -62,7 +62,8 @@
 /* 20230816: optimize clk accuracy*/
 /* 20230821: update lcd ss support*/
 /* 20230912: bypass phy data buffer */
-#define LCD_DRV_VERSION    "20230912"
+/* 20231205: add lcd config check*/
+#define LCD_DRV_VERSION    "20231205"
 
 #define LCD_STATUS_IF_ON      (1 << 0)
 #define LCD_STATUS_ENCL_ON    (1 << 1)
@@ -91,6 +92,7 @@ extern int lcd_power_load_from_dts(struct lcd_config_s *pconf,
 extern int lcd_power_load_from_unifykey(struct lcd_config_s *pconf,
 		unsigned char *buf, int key_len, int len);
 extern int lcd_pinmux_load_config(char *dt_addr, struct lcd_config_s *pconf);
+int lcd_config_check(void);
 extern void lcd_timing_init_config(struct lcd_config_s *pconf);
 extern int lcd_vmode_change(struct lcd_config_s *pconf);
 
@@ -110,6 +112,7 @@ extern void lcd_tcon_info_print(void);
 extern int lcd_tcon_enable(struct lcd_config_s *pconf);
 extern void lcd_tcon_disable(struct lcd_config_s *pconf);
 extern int lcd_tcon_probe(char *dt_addr, struct aml_lcd_drv_s *lcd_drv, int load_id);
+int lcd_tcon_check(char *ferr_str, char *warn_str);
 
 /* lcd pinctrl */
 int lcd_pinmux_probe(unsigned int cpu_type);
@@ -121,6 +124,7 @@ extern int aml_lcd_gpio_set(int gpio, int value);
 extern unsigned int aml_lcd_gpio_input_get(int gpio);
 
 /* lcd debug */
+int lcd_debug_info_len(int num);
 extern void aml_lcd_debug_test(unsigned int num);
 extern void aml_lcd_mute_setting(unsigned char flag);
 extern void aml_lcd_info_print(void);

@@ -258,8 +258,6 @@ static void lcd_list_support_mode(void)
 
 static void lcd_config_load_print(struct lcd_config_s *pconf)
 {
-	unsigned int count;
-
 	if (lcd_debug_print_flag == 0)
 		return;
 
@@ -268,15 +266,6 @@ static void lcd_config_load_print(struct lcd_config_s *pconf)
 		lcd_type_type_to_str(pconf->lcd_basic.lcd_type),
 		pconf->lcd_basic.lcd_bits,
 		pconf->lcd_basic.h_active, pconf->lcd_basic.v_active);
-
-	count = pconf->lcd_basic.h_active + pconf->lcd_timing.hsync_width
-		+ pconf->lcd_timing.hsync_bp;
-	if (count > pconf->lcd_basic.h_period)
-		LCDERR("h_timing is invalid(%d)\n", pconf->lcd_basic.h_period);
-	count = pconf->lcd_basic.v_active + pconf->lcd_timing.vsync_width
-		+ pconf->lcd_timing.vsync_bp;
-	if (count > pconf->lcd_basic.v_period)
-		LCDERR("v_timing is invalid(%d)\n", pconf->lcd_basic.v_period);
 
 	LCDPR("h_period = %d\n", pconf->lcd_basic.h_period);
 	LCDPR("v_period = %d\n", pconf->lcd_basic.v_period);
@@ -398,6 +387,16 @@ static int lcd_config_load_from_dts(char *dt_addr, struct lcd_config_s *pconf)
 	} else {
 		pconf->customer_pinmux = (unsigned char)(be32_to_cpup((u32*)propdata));
 		LCDPR("customer_pinmux: %d\n", pconf->customer_pinmux);
+	}
+
+	propdata = (char *)fdt_getprop(dt_addr, child_offset, "config_check", NULL);
+	if (!propdata) {
+		pconf->lcd_basic.config_check = 0; //follow config_check_glb
+	} else {
+		temp = be32_to_cpup((u32 *)propdata);
+		pconf->lcd_basic.config_check = temp ? 0x3 : 0x2;
+		if (lcd_debug_print_flag)
+			LCDPR("find config_check: %d\n", temp);
 	}
 
 	propdata = (char *)fdt_getprop(dt_addr, child_offset, "basic_setting", NULL);
@@ -1239,7 +1238,9 @@ static int lcd_config_load_from_unifykey(struct lcd_config_s *pconf)
 		sizeof(pconf->lcd_basic.model_name) - 1);
 	pconf->lcd_basic.model_name[sizeof(pconf->lcd_basic.model_name) - 1]
 		= '\0';
-	pconf->lcd_basic.lcd_type = *(p + LCD_UKEY_INTERFACE);
+	temp = *(p + LCD_UKEY_INTERFACE);
+	pconf->lcd_basic.lcd_type = temp & 0x3f;
+	pconf->lcd_basic.config_check = (temp >> 6) & 0x3;
 	pconf->lcd_basic.lcd_bits = *(p + LCD_UKEY_LCD_BITS);
 	pconf->lcd_basic.screen_width = (*(p + LCD_UKEY_SCREEN_WIDTH) |
 		((*(p + LCD_UKEY_SCREEN_WIDTH + 1)) << 8));
@@ -1506,7 +1507,7 @@ static int lcd_outputmode_check(char *mode, unsigned int frac)
 	return ret;
 }
 
-static int lcd_config_check(char *mode, unsigned int frac)
+static int lcd_config_valid(char *mode, unsigned int frac)
 {
 	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
 	struct lcd_config_s *pconf = lcd_drv->lcd_config;
@@ -1549,7 +1550,7 @@ int get_lcd_tv_config(char *dt_addr, int load_id)
 	strcpy(lcd_drv->version, LCD_DRV_VERSION);
 	lcd_drv->list_support_mode = lcd_list_support_mode;
 	lcd_drv->outputmode_check = lcd_outputmode_check;
-	lcd_drv->config_check = lcd_config_check;
+	lcd_drv->config_valid = lcd_config_valid;
 	lcd_drv->driver_init_pre = lcd_tv_driver_init_pre;
 	lcd_drv->driver_init = lcd_tv_driver_init;
 	lcd_drv->driver_disable = lcd_tv_driver_disable;

@@ -24,7 +24,7 @@
 #include "aml_lcd_common.h"
 #include "aml_lcd_tcon.h"
 
-#define PR_BUF_MAX    200
+#define PR_LINE_BUF_MAX    200
 
 #define TCON_IRQ_TIMEOUT_MAX    (1 << 17)
 //static unsigned int tcon_irq_timeout;
@@ -322,7 +322,7 @@ static unsigned int lcd_tcon_table_write(unsigned int addr, unsigned int val)
 
 static void lcd_tcon_vac_print(void)
 {
-	int i, j, n, size;
+	int i, j, n, size, left;
 	char *buf;
 	int ret;
 
@@ -340,7 +340,7 @@ static void lcd_tcon_vac_print(void)
 		return;
 	}
 
-	buf = (char *)malloc(PR_BUF_MAX * sizeof(char));
+	buf = (char *)malloc(PR_LINE_BUF_MAX * sizeof(char));
 	if (buf == NULL) {
 		LCDERR("%s: buf malloc error\n", __func__);
 		return;
@@ -353,11 +353,12 @@ static void lcd_tcon_vac_print(void)
 		(tcon_rmem.vac_rmem.mem_vaddr[3] << 24);
 	size += 8; /* header for data_cnt & crc */
 	for (i = 0; i < size; i += 16) {
-		n = snprintf(buf, PR_BUF_MAX, "0x%04x: ", i);
+		n = snprintf(buf, PR_LINE_BUF_MAX, "0x%04x: ", i);
 		for (j = 0; j < 16; j++) {
 			if ((i + j) >= size)
 				break;
-			n += snprintf(buf+n, PR_BUF_MAX, " %02x",
+			left = PR_LINE_BUF_MAX - n - 1;
+			n += snprintf(buf + n, left, " %02x",
 				tcon_rmem.vac_rmem.mem_vaddr[i+j]);
 		}
 		buf[n] = '\0';
@@ -369,7 +370,7 @@ static void lcd_tcon_vac_print(void)
 
 static void lcd_tcon_demura_print(void)
 {
-	int i, j, n, size;
+	int i, j, n, size, left;
 	char *buf;
 	int ret;
 
@@ -387,7 +388,7 @@ static void lcd_tcon_demura_print(void)
 		return;
 	}
 
-	buf = (char *)malloc(PR_BUF_MAX * sizeof(char));
+	buf = (char *)malloc(PR_LINE_BUF_MAX * sizeof(char));
 	if (buf == NULL) {
 		LCDERR("%s: buf malloc error\n", __func__);
 		return;
@@ -400,11 +401,12 @@ static void lcd_tcon_demura_print(void)
 		(tcon_rmem.demura_set_rmem.mem_vaddr[3] << 24);
 	size += 8; /* header for data_cnt & crc */
 	for (i = 0; i < size; i += 16) {
-		n = snprintf(buf, PR_BUF_MAX, "0x%04x: ", i);
+		n = snprintf(buf, PR_LINE_BUF_MAX, "0x%04x: ", i);
 		for (j = 0; j < 16; j++) {
 			if ((i + j) >= size)
 				break;
-			n += snprintf(buf+n, PR_BUF_MAX, " %02x",
+			left = PR_LINE_BUF_MAX - n - 1;
+			n += snprintf(buf + n, left, " %02x",
 				tcon_rmem.demura_set_rmem.mem_vaddr[i+j]);
 		}
 		buf[n] = '\0';
@@ -418,11 +420,12 @@ static void lcd_tcon_demura_print(void)
 		(tcon_rmem.demura_lut_rmem.mem_vaddr[3] << 24);
 	size += 8; /* header for data_cnt & crc */
 	for (i = 0; i < size; i += 16) {
-		n = snprintf(buf, PR_BUF_MAX, "0x%04x: ", i);
+		n = snprintf(buf, PR_LINE_BUF_MAX, "0x%04x: ", i);
 		for (j = 0; j < 16; j++) {
 			if ((i + j) >= size)
 				break;
-			n += snprintf(buf+n, PR_BUF_MAX, " %02x",
+			left = PR_LINE_BUF_MAX - n - 1;
+			n += snprintf(buf + n, left, " %02x",
 				tcon_rmem.demura_lut_rmem.mem_vaddr[i+j]);
 		}
 		buf[n] = '\0';
@@ -434,7 +437,7 @@ static void lcd_tcon_demura_print(void)
 
 static void lcd_tcon_acc_print(void)
 {
-	int i, j, n, size;
+	int i, j, n, size, left;
 	char *buf;
 	int ret;
 
@@ -452,7 +455,7 @@ static void lcd_tcon_acc_print(void)
 		return;
 	}
 
-	buf = (char *)malloc(PR_BUF_MAX * sizeof(char));
+	buf = (char *)malloc(PR_LINE_BUF_MAX * sizeof(char));
 	if (buf == NULL) {
 		LCDERR("%s: buf malloc error\n", __func__);
 		return;
@@ -465,11 +468,12 @@ static void lcd_tcon_acc_print(void)
 		(tcon_rmem.acc_lut_rmem.mem_vaddr[3] << 24);
 	size += 8; /* header for data_cnt & crc */
 	for (i = 0; i < size; i += 16) {
-		n = snprintf(buf, PR_BUF_MAX, "0x%04x: ", i);
+		n = snprintf(buf, PR_LINE_BUF_MAX, "0x%04x: ", i);
 		for (j = 0; j < 16; j++) {
 			if ((i + j) >= size)
 				break;
-			n += snprintf(buf+n, PR_BUF_MAX, " %02x",
+			left = PR_LINE_BUF_MAX - n - 1;
+			n += snprintf(buf + n, left, " %02x",
 				tcon_rmem.acc_lut_rmem.mem_vaddr[i+j]);
 		}
 		buf[n] = '\0';
@@ -481,19 +485,19 @@ static void lcd_tcon_acc_print(void)
 
 static void lcd_tcon_data_block_print(char *buf, unsigned char *data_mem)
 {
-	int i, j, n, size;
+	int i, j, n, size, left;
 
 	size = data_mem[8] |
 		(data_mem[9] << 8) |
 		(data_mem[10] << 16) |
 		(data_mem[11] << 24);
 	for (i = 0; i < size; i += 16) {
-		n = snprintf(buf, PR_BUF_MAX, "0x%04x: ", i);
+		n = snprintf(buf, PR_LINE_BUF_MAX, "0x%04x: ", i);
 		for (j = 0; j < 16; j++) {
 			if ((i + j) >= size)
 				break;
-			n += snprintf(buf+n, PR_BUF_MAX, " %02x",
-				data_mem[i+j]);
+			left = PR_LINE_BUF_MAX - n - 1;
+			n += snprintf(buf + n, left, " %02x", data_mem[i + j]);
 		}
 		buf[n] = '\0';
 		printf("%s\n", buf);
@@ -515,7 +519,7 @@ static void lcd_tcon_data_print(unsigned char index)
 		return;
 	}
 
-	buf = (char *)malloc(PR_BUF_MAX * sizeof(char));
+	buf = (char *)malloc(PR_LINE_BUF_MAX * sizeof(char));
 	if (buf == NULL) {
 		LCDERR("%s: buf malloc error\n", __func__);
 		return;
@@ -721,6 +725,22 @@ static int lcd_tcon_bin_path_resv_mem_set(void)
 	return 0;
 }
 #endif
+
+int lcd_tcon_check(char *ferr_str, char *warn_str)
+{
+	int ret;
+
+	ret = lcd_tcon_valid_check();
+	if (ret)
+		return -1;
+
+	if (lcd_tcon_conf->tcon_check)
+		ret = lcd_tcon_conf->tcon_check(ferr_str, warn_str);
+	else
+		ret = 0;
+
+	return ret;
+}
 
 int lcd_tcon_enable(struct lcd_config_s *pconf)
 {
@@ -2116,6 +2136,7 @@ static struct lcd_tcon_config_s tcon_data_txhd = {
 	.tcon_enable = lcd_tcon_enable_txhd,
 	.tcon_disable = lcd_tcon_disable_tl1,
 	.tcon_forbidden_check = NULL,
+	.tcon_check = NULL,
 };
 
 static struct lcd_tcon_config_s tcon_data_tl1 = {
@@ -2155,6 +2176,7 @@ static struct lcd_tcon_config_s tcon_data_tl1 = {
 	.tcon_enable = lcd_tcon_enable_tl1,
 	.tcon_disable = lcd_tcon_disable_tl1,
 	.tcon_forbidden_check = NULL,
+	.tcon_check = NULL,
 };
 
 static struct lcd_tcon_config_s tcon_data_t5 = {
@@ -2194,6 +2216,7 @@ static struct lcd_tcon_config_s tcon_data_t5 = {
 	.tcon_enable = lcd_tcon_enable_t5,
 	.tcon_disable = lcd_tcon_disable_t5,
 	.tcon_forbidden_check = lcd_tcon_forbidden_check_t5,
+	.tcon_check = lcd_tcon_setting_check_t5,
 };
 
 static struct lcd_tcon_config_s tcon_data_t5d = {
@@ -2233,6 +2256,7 @@ static struct lcd_tcon_config_s tcon_data_t5d = {
 	.tcon_enable = lcd_tcon_enable_t5,
 	.tcon_disable = lcd_tcon_disable_t5,
 	.tcon_forbidden_check = lcd_tcon_forbidden_check_t5d,
+	.tcon_check = lcd_tcon_setting_check_t5d,
 };
 
 int lcd_tcon_probe(char *dt_addr, struct aml_lcd_drv_s *lcd_drv, int load_id)

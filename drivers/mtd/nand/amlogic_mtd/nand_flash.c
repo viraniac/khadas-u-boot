@@ -1215,6 +1215,17 @@ struct aml_nand_flash_dev aml_nand_flash_ids[] = {
 		0,
 		(NAND_TIMING_MODE5 | NAND_ECC_BCH16_MODE )},
 #endif
+	{"A Version NAND 1GiB FSNS8A001G",
+		{NAND_MFR_FORESEE, 0xF1, 0x00, 0x95, 0x40},
+		2048,
+		128,
+		0x20000,
+		64,
+		1,
+		20,
+		15,
+		0,
+		NAND_ECC_BCH8_MODE},
 	{NULL,}
 };
 

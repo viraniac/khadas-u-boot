@@ -371,7 +371,6 @@ int checkhw(char * name)
 	unsigned long ddr_size = 0;
 	int i;
 	cpu_id_t cpu_id = get_cpu_id();
-
 	for (i = 0; i < CONFIG_NR_DRAM_BANKS; i++)
 		ddr_size += gd->bd->bi_dram[i].size;
 
@@ -385,6 +384,9 @@ int checkhw(char * name)
 			strcpy(loc_name, "t5m-reva_t963d4_ay301-2g\0");
 		else if (cpu_id.chip_rev == 0xB)
 			strcpy(loc_name, "t5m_t963d4_ay301-2g\0");
+		break;
+	case 0xa0000000:
+		strcpy(loc_name, "t5m_t963d4_ay301-2.5g\0");
 		break;
 	case 0xc0000000:
 		if (cpu_id.chip_rev == 0xA)

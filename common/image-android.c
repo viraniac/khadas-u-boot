@@ -24,13 +24,18 @@ static const unsigned char gzip_magic[] = {
 	0x1f, 0x8b
 };
 
+static const unsigned char lzma_magic[] = {
+	0x5d, 0x00, 0x00
+};
+
 static struct {
 	const unsigned char * szID;
 	int   nIDLength;
 	ulong nCompID;
 } arrComp[] = {
-	{lzop_magic,9,IH_COMP_LZO},
-	{gzip_magic,2,IH_COMP_GZIP},
+	{lzop_magic, 9, IH_COMP_LZO},
+	{gzip_magic, 2, IH_COMP_GZIP},
+	{lzma_magic, 3, IH_COMP_LZMA}
 };
 
 /* android R*/

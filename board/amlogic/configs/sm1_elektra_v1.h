@@ -669,6 +669,7 @@
 #define CONFIG_FS_FAT 1
 #define CONFIG_FS_EXT4 1
 #define CONFIG_LZO 1
+#define CONFIG_LZMA 1
 
 /* Cache Definitions */
 //#define CONFIG_SYS_DCACHE_OFF

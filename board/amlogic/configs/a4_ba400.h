@@ -150,6 +150,8 @@
 		"\0" \
 	"storeboot="\
 		"run get_os_type;"\
+		"setenv bootargs ${bootargs} panel_type=rgb_0;"\
+		"setenv outputmode panel;"\
 		"run storage_param;"\
 		"if test ${os_type} = rtos; then "\
 			"setenv loadaddr ${loadaddr_rtos};"\

@@ -710,12 +710,12 @@ static void lcd_set_pll_ss_level_tl1(unsigned int level)
 	unsigned int pll_ctrl2;
 
 	pll_ctrl2 = lcd_hiu_read(HHI_TCON_PLL_CNTL2);
-	pll_ctrl2 &= ~((0xf << 16) | (0xf << 28));
+	pll_ctrl2 &= ~((1 << 15) | (0xf << 16) | (0xf << 28));
 
 	if (level > 0) {
 		cconf->ss_dep_sel = pll_ss_reg_tl1[level][0];
 		cconf->ss_str_m = pll_ss_reg_tl1[level][1];
-		pll_ctrl2 |= ((cconf->ss_dep_sel << 28) | (cconf->ss_str_m << 16));
+		pll_ctrl2 |= ((1 << 15) | (cconf->ss_dep_sel << 28) | (cconf->ss_str_m << 16));
 		cconf->ss_ppm = cconf->ss_dep_sel * cconf->ss_str_m * cconf->data->ss_dep_base;
 		LCDPR("set pll spread spectrum: level %d, %dppm\n", level, cconf->ss_ppm);
 	} else {
@@ -974,13 +974,15 @@ static void lcd_set_pll_ss_level_t5w(unsigned int level)
 	int ret;
 
 	pll_ctrl2 = lcd_hiu_read(HHI_TCON_PLL_CNTL2);
-	pll_ctrl2 &= ~((0xf << 16) | (0xf << 28));
+	pll_ctrl2 &= ~((1 << 15) | (0xf << 16) | (0xf << 28));
 
 	if (level > 0) {
 		ret = lcd_pll_ss_level_generate(cconf);
 		if (ret == 0) {
 			cconf->ss_en = 1;
-			pll_ctrl2 |= ((cconf->ss_dep_sel << 28) | (cconf->ss_str_m << 16));
+			pll_ctrl2 |= ((1 << 15) |
+				      (cconf->ss_dep_sel << 28) |
+				      (cconf->ss_str_m << 16));
 			LCDPR("set pll spread spectrum: level: %d, %dppm\n",
 				cconf->ss_level, cconf->ss_ppm);
 		}

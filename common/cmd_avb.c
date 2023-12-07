@@ -400,14 +400,8 @@ int avb_verify(AvbSlotVerifyData** out_data)
 	printf("ab_suffix is %s\n", ab_suffix);
 
 	AvbSlotVerifyFlags flags = AVB_SLOT_VERIFY_FLAGS_NONE;
-	char *upgradestep = NULL;
 
 	avb_init();
-
-	upgradestep = getenv("upgrade_step");
-
-	if ((upgradestep != NULL) && !strcmp(upgradestep, "3"))
-		flags |= AVB_SLOT_VERIFY_FLAGS_ALLOW_VERIFICATION_ERROR;
 
 	if (is_device_unlocked())
 		flags |= AVB_SLOT_VERIFY_FLAGS_ALLOW_VERIFICATION_ERROR;
@@ -420,12 +414,6 @@ int avb_verify(AvbSlotVerifyData** out_data)
 		result = avb_slot_verify(&avb_ops_, requested_partitions_ab, ab_suffix,
 			flags,
 			AVB_HASHTREE_ERROR_MODE_RESTART_AND_INVALIDATE, out_data);
-
-	if (upgradestep && !strcmp(upgradestep, "3")) {
-		run_command("setenv bootconfig ${bootconfig} androidboot.vbmeta.avb_version=1.1;",
-			0);
-		result = AVB_SLOT_VERIFY_RESULT_OK;
-	}
 
 	return result;
 }

@@ -402,6 +402,13 @@ int gpt_verify_partitions(block_dev_desc_t *dev_desc,
 			  disk_partition_t *partitions, int parts,
 			  gpt_header *gpt_head, gpt_entry **gpt_pte);
 
+/**
+ * erase_gpt_part_table() - erase Primary GPT and Backup GPT
+ *
+ * @return - '0' on success, otherwise error
+ */
+int erase_gpt_part_table(block_dev_desc_t *dev_desc);
+
 
 /**
  * get_disk_guid() - Function to read the GUID string from a device's GPT

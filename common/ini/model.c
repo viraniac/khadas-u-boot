@@ -47,7 +47,7 @@ static int gLcdDataCnt, gLcdExtDataCnt, gBlDataCnt, glcd_optical_dcnt;
 static int g_lcd_pwr_on_seq_cnt, g_lcd_pwr_off_seq_cnt;
 static int gLcdExtInitOnCnt, gLcdExtInitOffCnt, gLcdExtCmdSize;
 static struct lcd_ext_attr_s *lcd_ext_attr;
-static unsigned int g_lcd_tcon_valid;
+static unsigned int g_lcd_if, g_lcd_tcon_valid;
 #ifdef CONFIG_AML_LCD_TCON
 static int gLcdTconDataCnt, gLcdTconSpi_cnt;
 static unsigned int g_lcd_tcon_bin_block_cnt;
@@ -613,7 +613,7 @@ static int handle_tcon_path(void)
 static int handle_lcd_basic(struct lcd_attr_s *p_attr)
 {
 	const char *ini_value = NULL;
-	unsigned int lcd_if, lcd_chk;
+	unsigned int config_chk;
 
 	ini_value = IniGetString("lcd_Attr", "model_name", "null");
 	if (model_debug_flag & DEBUG_LCD)
@@ -624,30 +624,36 @@ static int handle_lcd_basic(struct lcd_attr_s *p_attr)
 	ini_value = IniGetString("lcd_Attr", "interface", "null");
 	if (model_debug_flag & DEBUG_LCD)
 		ALOGD("%s, interface is (%s)\n", __func__, ini_value);
-	if (strcmp(ini_value, "LCD_TTL") == 0)
-		lcd_if = LCD_TTL;
+	if (strcmp(ini_value, "LCD_RGB") == 0)
+		g_lcd_if = LCD_RGB;
 	else if (strcmp(ini_value, "LCD_LVDS") == 0)
-		lcd_if = LCD_LVDS;
+		g_lcd_if = LCD_LVDS;
 	else if (strcmp(ini_value, "LCD_VBYONE") == 0)
-		lcd_if = LCD_VBYONE;
+		g_lcd_if = LCD_VBYONE;
 	else if (strcmp(ini_value, "LCD_MIPI") == 0)
-		lcd_if = LCD_MIPI;
+		g_lcd_if = LCD_MIPI;
 	else if (strcmp(ini_value, "LCD_MLVDS") == 0)
-		lcd_if = LCD_MLVDS;
+		g_lcd_if = LCD_MLVDS;
 	else if (strcmp(ini_value, "LCD_P2P") == 0)
-		lcd_if = LCD_P2P;
+		g_lcd_if = LCD_P2P;
+	else if (strcmp(ini_value, "LCD_EDP") == 0)
+		g_lcd_if = LCD_EDP;
+	else if (strcmp(ini_value, "LCD_BT656") == 0)
+		g_lcd_if = LCD_BT656;
+	else if (strcmp(ini_value, "LCD_BT1120") == 0)
+		g_lcd_if = LCD_BT1120;
 	else
-		lcd_if = LCD_TYPE_MAX;
+		g_lcd_if = LCD_TYPE_MAX;
 
 	ini_value = IniGetString("lcd_Attr", "config_check", "none");
 	if (model_debug_flag & DEBUG_LCD)
 		ALOGD("%s, config_check is (%s)\n", __func__, ini_value);
 	if (strcmp(ini_value, "none") == 0)
-		lcd_chk = 0;
+		config_chk = 0;
 	else
-		lcd_chk = strtoul(ini_value, NULL, 0) ? 0x3 : 0x2;
+		config_chk = strtoul(ini_value, NULL, 0) ? 0x3 : 0x2;
 
-	p_attr->basic.lcd_type = (lcd_if & 0x3f) | ((lcd_chk & 0x3) << 6);
+	p_attr->basic.lcd_if_chk = (g_lcd_if & 0x3f) | ((config_chk & 0x3) << 6);
 
 	ini_value = IniGetString("lcd_Attr", "lcd_bits", "10");
 	if (model_debug_flag & DEBUG_LCD)
@@ -2411,8 +2417,8 @@ static int parse_panel_ini(const char *file_name, unsigned char *lcd_buf,
 			lcd_v2_attr.head.block_cur_size);
 	}
 
-	if (lcd_attr.basic.lcd_type == LCD_MLVDS ||
-	    lcd_attr.basic.lcd_type == LCD_P2P)
+	if (g_lcd_if == LCD_MLVDS ||
+	    g_lcd_if == LCD_P2P)
 		g_lcd_tcon_valid = 1;
 	else
 		g_lcd_tcon_valid = 0;

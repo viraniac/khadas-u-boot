@@ -52,7 +52,7 @@ struct bootloader_message {
     char reserved[192];
 };
 
-
+#ifdef CONFIG_CMD_BCB
 static int clear_misc_partition(char *clearbuf, int size)
 {
     char *partition = "misc";
@@ -66,6 +66,7 @@ static int clear_misc_partition(char *clearbuf, int size)
 
     return 0;
 }
+#endif
 
 static int do_RunBcbCommand(
     cmd_tbl_t * cmdtp,
@@ -182,6 +183,7 @@ static int do_RunBcbCommand(
         return 0;
     }
 
+#ifdef CONFIG_CMD_BCB
     if (!memcmp(command_mark, command, strlen(command_mark))) {
         printf("%s\n", recovery);
         if (run_command((char *)recovery, 0) < 0) {
@@ -200,6 +202,7 @@ static int do_RunBcbCommand(
         printf("command mark(%s) not match %s,don't execute.\n",
             command_mark, command);
     }
+#endif
 
     return 0;
 

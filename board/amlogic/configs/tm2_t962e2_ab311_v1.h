@@ -40,6 +40,22 @@
 #define CONFIG_CMD_SARADC 1
 #define CONFIG_SARADC_CH  2
 
+//#define CONFIG_AML_PRODUCT_MODE 1 //
+#ifdef CONFIG_AML_PRODUCT_MODE
+#define CONFIG_SILENT_CONSOLE
+#define CONFIG_NO_FASTBOOT_FLASHING
+#define CONFIG_USB_TOOL_ENTRY   "echo product mode"
+#define CONFIG_KNL_LOG_LEVEL    "loglevel=1"
+#else
+#define CONFIG_USB_TOOL_ENTRY   "update 1500"
+#define CONFIG_KNL_LOG_LEVEL    ""
+#define CONFIG_CMD_BOOTI        1
+#define CONFIG_CMD_MEMORY       1
+#define CONFIG_CMD_JTAG	        1
+#define CONFIG_CMD_AUTOSCRIPT   1
+#define CONFIG_USB_STORAGE      1
+#endif
+
 #define CONFIG_FAT_WRITE 1
 #define CONFIG_AML_FACTORY_PROVISION 1
 
@@ -120,7 +136,7 @@
         "dv_fw_dir_odm_ext=/odm_ext/firmware/dovi_fw.bin\0" \
         "dv_fw_dir_vendor=/vendor/firmware/dovi_fw.bin\0" \
         "dv_fw_dir=/reserved/firmware/dovi_fw.bin\0" \
-        "usb_burning=update 1000\0" \
+        "usb_burning=" CONFIG_USB_TOOL_ENTRY "\0" \
         "otg_device=1\0"\
         "fdt_high=0x20000000\0"\
         "try_auto_burn=update 700 750;\0"\
@@ -155,7 +171,7 @@
         "Irq_check_en=0\0"\
         "fs_type=""rootfstype=ramfs""\0"\
         "initargs="\
-            "init=/init console=ttyS0,115200 no_console_suspend earlycon=aml-uart,0xff803000 printk.devkmsg=on ramoops.pstore_en=1 ramoops.record_size=0x8000 ramoops.console_size=0x4000 loop.max_part=4 "\
+            "init=/init " CONFIG_KNL_LOG_LEVEL " console=ttyS0,115200 no_console_suspend earlycon=aml-uart,0xff803000 printk.devkmsg=on ramoops.pstore_en=1 ramoops.record_size=0x8000 ramoops.console_size=0x4000 loop.max_part=4 "\
             "\0"\
         "upgrade_check="\
             "echo upgrade_step=${upgrade_step}; "\
@@ -662,7 +678,6 @@
 	#define CONFIG_USB_PHY_20				0xff636000
 	#define CONFIG_USB_PHY_21				0xff63A000
 	#define CONFIG_USB_PHY_22				0xff658000
-	#define CONFIG_USB_STORAGE      1
 	#define CONFIG_USB_XHCI		1
 	#define CONFIG_USB_XHCI_AMLOGIC_V2 1
 	#define CONFIG_USB_GPIO_PWR  			GPIOEE(GPIOH_6)
@@ -730,17 +745,13 @@
 
 /* commands */
 #define CONFIG_CMD_CACHE 1
-#define CONFIG_CMD_BOOTI 1
 #define CONFIG_CMD_EFUSE 1
 #define CONFIG_CMD_I2C 1
-#define CONFIG_CMD_MEMORY 1
 #define CONFIG_CMD_FAT 1
 #define CONFIG_CMD_GPIO 1
 #define CONFIG_CMD_RUN
 #define CONFIG_CMD_REBOOT 1
 #define CONFIG_CMD_ECHO 1
-#define CONFIG_CMD_JTAG	1
-#define CONFIG_CMD_AUTOSCRIPT 1
 #define CONFIG_CMD_MISC 1
 #define CONFIG_CMD_PLLTEST 1
 #define CONFIG_CMD_INI 1

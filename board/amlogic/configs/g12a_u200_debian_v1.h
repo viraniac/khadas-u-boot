@@ -41,13 +41,18 @@
 
 //#define CONFIG_AML_PRODUCT_MODE 1 //
 #ifdef CONFIG_AML_PRODUCT_MODE
-	#define CONFIG_SILENT_CONSOLE
-	#define CONFIG_NO_FASTBOOT_FLASHING
-	#define CONFIG_USB_TOOL_ENTRY   "echo product mode"
-	#define CONFIG_KNL_LOG_LEVEL	"loglevel=1"
+#define CONFIG_SILENT_CONSOLE
+#define CONFIG_NO_FASTBOOT_FLASHING
+#define CONFIG_USB_TOOL_ENTRY   "echo product mode"
+#define CONFIG_KNL_LOG_LEVEL    "loglevel=1"
 #else
-	#define CONFIG_USB_TOOL_ENTRY   "update 1500"
-	#define CONFIG_KNL_LOG_LEVEL	""
+#define CONFIG_USB_TOOL_ENTRY   "update 1500"
+#define CONFIG_KNL_LOG_LEVEL    ""
+#define CONFIG_CMD_BOOTI        1
+#define CONFIG_CMD_MEMORY       1
+#define CONFIG_CMD_JTAG	        1
+#define CONFIG_CMD_AUTOSCRIPT   1
+#define CONFIG_USB_STORAGE      1
 #endif
 
 /*if disable uboot console, enable it*/
@@ -90,7 +95,6 @@
 #define CONFIG_SYS_ARCH_TIMER  1
 
 //Boot commands
-#define CONFIG_CMD_BOOTI  1
 #define CONFIG_CMD_BOOTD  1
 #define CONFIG_CMD_BOOTM  1
 
@@ -635,7 +639,6 @@
 	#define CONFIG_GXL_USB_PHY3_BASE		0xffe09080
 	#define CONFIG_USB_PHY_20				0xff636000
 	#define CONFIG_USB_PHY_21				0xff63A000
-	#define CONFIG_USB_STORAGE	  1
 	#define CONFIG_USB_XHCI		1
 	#define CONFIG_USB_XHCI_AMLOGIC_V2 1
 	#define CONFIG_USB_GPIO_PWR				GPIOEE(GPIOH_6)
@@ -710,17 +713,13 @@
 
 /* commands */
 #define CONFIG_CMD_CACHE 1
-#define CONFIG_CMD_BOOTI 1
 #define CONFIG_CMD_EFUSE 1
 #define CONFIG_CMD_I2C 1
-#define CONFIG_CMD_MEMORY 1
 #define CONFIG_CMD_FAT 1
 #define CONFIG_CMD_GPIO 1
 #define CONFIG_CMD_RUN
 #define CONFIG_CMD_REBOOT 1
 #define CONFIG_CMD_ECHO 1
-#define CONFIG_CMD_JTAG	1
-#define CONFIG_CMD_AUTOSCRIPT 1
 #define CONFIG_CMD_MISC 1
 #define CONFIG_CMD_PLLTEST 1
 #define CONFIG_CMD_EXT4 1

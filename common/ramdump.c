@@ -37,6 +37,7 @@ void ramdump_init(void)
 	printf("%s, add:%lx, size:%lx\n", __func__, ramdump_base, ramdump_size);
 }
 
+#ifdef CONFIG_USB_STORAGE
 static void wait_usb_dev(void)
 {
 	block_dev_desc_t *usb_dev;
@@ -57,7 +58,7 @@ static void wait_usb_dev(void)
 		}
 	}
 }
-
+#endif
 /*
  * NOTE: this is a default implementation for writing compressed ramdump data
  * to /data/ partition for Android platform. You can read out dumpfile in
@@ -84,9 +85,9 @@ __weak int ramdump_save_compress_data(void)
 		printf("not supported location\n");
 		return 0;
 	}
-
+#ifdef CONFIG_USB_STORAGE
 	wait_usb_dev();
-
+#endif
 	sprintf(cmd, "fatwrite usb 0 %lx crashdump-1.bin %lx\n",
 		ramdump_base, ramdump_size);
 	printf("CMD:%s\n", cmd);

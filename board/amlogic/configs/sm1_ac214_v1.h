@@ -50,6 +50,7 @@
 #define CONFIG_CMD_MEMORY       1
 #define CONFIG_CMD_JTAG	        1
 #define CONFIG_CMD_AUTOSCRIPT   1
+#define CONFIG_USB_STORAGE      1
 #endif
 
 /*if disable uboot console, enable it*/
@@ -602,7 +603,6 @@
 	#define CONFIG_GXL_USB_PHY3_BASE        0xffe09080
 	#define CONFIG_USB_PHY_20				0xff636000
 	#define CONFIG_USB_PHY_21				0xff63A000
-	#define CONFIG_USB_STORAGE      1
 	#define CONFIG_USB_XHCI		1
 	#define CONFIG_USB_XHCI_AMLOGIC_V2 1
 	#define CONFIG_USB_GPIO_PWR  			GPIOEE(GPIOH_6)

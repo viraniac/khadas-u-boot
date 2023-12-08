@@ -217,11 +217,8 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 #endif /*CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK*/
 #endif /* ! CONFIG_SKIP_KERNEL_DTB_VERIFY */
 
+	run_command("get_avb_mode;", 0);
 	avb_s = getenv("avb2");
-	if (avb_s == NULL) {
-		run_command("get_avb_mode;", 0);
-		avb_s = getenv("avb2");
-	}
 	printf("avb2: %s\n", avb_s);
 	if (strcmp(avb_s, "1") == 0) {
 		AvbSlotVerifyData *out_data = NULL;
@@ -246,7 +243,7 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 				uint32_t version;
 				for (i = 0; i < AVB_MAX_NUMBER_OF_ROLLBACK_INDEX_LOCATIONS; i++) {
 					if (get_avb_antirollback(i, &version) &&
-							version != (uint32_t )out_data->rollback_indexes[i]) {
+						version > (uint32_t)out_data->rollback_indexes[i]) {
 						if (!set_avb_antirollback(i, (uint32_t )out_data->rollback_indexes[i]))
 							printf("rollback(%d) = %u failed\n", i, (uint32_t )out_data->rollback_indexes[i]);
 					}

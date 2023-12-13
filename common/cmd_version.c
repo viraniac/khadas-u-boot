@@ -42,7 +42,6 @@ const char compile_user[] = COMPILE_USER;
 unsigned char *bootloader_build_message;
 char version_buffer[BUFF_LENGTH];
 int index;
-#endif
 
 int putin_buf(const char *str)
 {
@@ -64,6 +63,7 @@ void free_build_message(void)
 	if (bootloader_build_message)
 		free(bootloader_build_message);
 }
+#endif
 
 int get_bootloader_build_message(void)
 {
@@ -185,11 +185,13 @@ int get_bootloader_build_message(void)
 
 static int do_build_message_print(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
+#ifdef CONFIG_BUILD_MESSAGE
 	if (index > 0) {
 		printf("%s", version_buffer);
 		return 0;
 	}
 
+#endif
 	printf("no version buffer data!");
 	return -1;
 }

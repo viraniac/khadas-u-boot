@@ -536,6 +536,30 @@ static int write_bootloader_up(int i)
 	return 0;
 }
 
+void bootloader_update_check(void)
+{
+	int ret = 0;
+	char *writeboot = getenv("write_boot");
+
+	if (writeboot && !strcmp(writeboot, "1")) {
+		if (has_boot_slot == 0) {
+			printf("non ab for kernel 5.15 update boot0 & boot1 from bootloader_up\n");
+			ret = write_bootloader_up(0);
+			ret += write_bootloader_up(1);
+		} else {
+			printf("ab for kernel 5.15 update boot0 from bootloader_a or _b\n");
+			ret = write_bootloader_up(0);
+		}
+		if (ret != 0)
+			run_command("reboot", 0);
+
+		setenv("write_boot", "0");
+		setenv("upgrade_step", "1");
+		run_command("saveenv", 0);
+		run_command("reboot", 0);
+	}
+}
+
 static void update_after_failed_rollback(void)
 {
 	run_command("run init_display; run storeargs; run update;", 0);
@@ -556,30 +580,9 @@ static int do_GetValidSlot(
 	int AB_mode = 0;
 	bool bootable_a, bootable_b;
 	char str_count[16];
-	int ret = 0;
 
 	if (argc != 1)
 		return cmd_usage(cmdtp);
-
-	char *writeboot = getenv("write_boot");
-
-	if (writeboot && !strcmp(writeboot, "1")) {
-		if (has_boot_slot == 0) {
-			printf("non ab for kernel 5.15 update boot0 & boot1 from bootloader_up\n");
-			ret = write_bootloader_up(0);
-			ret += write_bootloader_up(1);
-		} else {
-			printf("ab for kernel 5.15 update boot0 from bootloader_a or _b\n");
-			ret = write_bootloader_up(0);
-		}
-		if (ret != 0)
-			run_command("reboot", 0);
-
-		setenv("write_boot", "0");
-		setenv("upgrade_step", "1");
-		run_command("saveenv", 0);
-		run_command("reboot", 0);
-	}
 
 	//recovery mode, need disable dolby
 	run_command("get_rebootmode", 0);
@@ -748,6 +751,7 @@ static int do_GetValidSlot(
 		}
 	}
 
+	bootloader_update_check();
 	return 0;
 }
 

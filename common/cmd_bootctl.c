@@ -217,6 +217,32 @@ bool boot_info_save(BrilloBootInfo *info, char *miscbuf)
 	return true;
 }
 
+static int write_bootloader_up(int i);
+
+void bootloader_update_check(void)
+{
+	int ret = 0;
+	char *writeboot = getenv("write_boot");
+
+	if (writeboot && !strcmp(writeboot, "1")) {
+		if (has_boot_slot == 0) {
+			printf("non ab for kernel 5.15 update boot0 & boot1 from bootloader_up\n");
+			ret = write_bootloader_up(0);
+			ret += write_bootloader_up(1);
+		} else {
+			printf("ab for kernel 5.15 update boot0 from bootloader_a or _b\n");
+			ret = write_bootloader_up(0);
+		}
+		if (ret != 0)
+			run_command("reboot", 0);
+
+		setenv("write_boot", "0");
+		setenv("upgrade_step", "1");
+		run_command("saveenv", 0);
+		run_command("reboot", 0);
+	}
+}
+
 static int write_bootloader_up(int i)
 {
 	unsigned char *buffer = NULL;
@@ -292,26 +318,6 @@ static int do_GetValidSlot(
 
 	if (argc != 1)
 		return cmd_usage(cmdtp);
-
-	char *writeboot = getenv("write_boot");
-
-	if (writeboot && !strcmp(writeboot, "1")) {
-		if (has_boot_slot == 0) {
-			printf("non ab for kernel 5.15 update boot0 & boot1 from bootloader_up\n");
-			ret = write_bootloader_up(0);
-			ret += write_bootloader_up(1);
-		} else {
-			printf("ab for kernel 5.15 update boot0 from bootloader_a or _b\n");
-			ret = write_bootloader_up(0);
-		}
-		if (ret != 0)
-			run_command("reboot", 0);
-
-		setenv("write_boot", "0");
-		setenv("upgrade_step", "1");
-		run_command("saveenv", 0);
-		run_command("reboot", 0);
-	}
 
 	//recovery mode, need disable dolby
 	run_command("get_rebootmode", 0);
@@ -409,6 +415,7 @@ static int do_GetValidSlot(
 	else
 		setenv("partition_mode", "normal");
 
+	bootloader_update_check();
 	return 0;
 }
 

@@ -284,7 +284,6 @@
 		"fi;fi;"\
 		"\0"\
 	"storage_param="\
-		"setenv bootargs ${bootargs} ${emmc_quirks}; "\
 		"store param;"\
 		"setenv bootargs ${bootargs} ${mtdbootparts}; "\
 		"\0"\

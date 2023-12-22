@@ -328,8 +328,6 @@ static void lcd_module_enable(char *mode, unsigned int frac)
 			      boot_ctrl.init_level);
 		}
 	}
-	if (!lcd_debug_test)
-		aml_lcd_mute_setting(0);
 }
 
 static void lcd_module_disable(void)
@@ -338,7 +336,6 @@ static void lcd_module_disable(void)
 
 	LCDPR("disable: %s\n", lcd_drv->lcd_config->lcd_basic.model_name);
 
-	aml_lcd_mute_setting(1);
 	if (lcd_drv->lcd_status & LCD_STATUS_IF_ON) {
 		aml_bl_power_ctrl(0, 1);
 		lcd_power_ctrl(0);

@@ -98,17 +98,22 @@ int lcd_config_check(void)
 	int vactive = lcd_drv->lcd_config->lcd_basic.v_active;
 	int vpw = lcd_drv->lcd_config->lcd_timing.vsync_width;
 	int vbp = lcd_drv->lcd_config->lcd_timing.vsync_bp;
-	int hfp, vfp, cmpr_tail, temp;
+	int hfp, hfp_min, vfp, vfp_min, temp;
 	char *ferr_str = NULL, *warn_str = NULL;
 	int ferr_len = 0, warn_len = 0, ferr_left, warn_left;
 #ifdef CONFIG_AML_LCD_TCON
 	char *tcon_ferr_str = NULL, *tcon_warn_str = NULL;
+	int tcon_valid = 0;
 #endif
-	int tcon_valid = 0, ret = 0;
+	int vfp_cmpr_tail = 0, ret = 0;
 
 	if (lcd_drv->lcd_config->lcd_basic.lcd_type == LCD_MLVDS ||
-	    lcd_drv->lcd_config->lcd_basic.lcd_type == LCD_P2P)
+	    lcd_drv->lcd_config->lcd_basic.lcd_type == LCD_P2P) {
+#ifdef CONFIG_AML_LCD_TCON
 		tcon_valid = 1;
+#endif
+		vfp_cmpr_tail = 3;
+	}
 
 	ferr_str = malloc(PR_BUF_MAX);
 	if (!ferr_str) {
@@ -156,23 +161,46 @@ int lcd_config_check(void)
 			"  hfp: %d, for panel, req: >0!!!\n", hfp);
 		ret |= (1 << 0);
 	}
+	if (lcd_drv->lcd_config->lcd_basic.h_period_min) {
+		hfp_min = lcd_drv->lcd_config->lcd_basic.h_period_min - hactive - hpw - hbp;
+		if (hfp_min <= 0) {
+			warn_left = lcd_debug_info_len(warn_len);
+			warn_len += snprintf(warn_str + warn_len, warn_left,
+				"  hfp with h_period_min: %d, for panel, req: >0!!!\n",
+				hfp_min);
+			ret |= (1 << 1);
+		}
+	}
 
-	if (tcon_valid) {
-		if (vfp < 3) {
-			ferr_left = lcd_debug_info_len(ferr_len);
-			ferr_len += snprintf(ferr_str + ferr_len, ferr_left,
-				"  vfp: %d, for panel, req: >3!!!\n", vfp);
-			ret |= (1 << 4);
+	if (vfp <= vfp_cmpr_tail) {
+		ferr_left = lcd_debug_info_len(ferr_len);
+		ferr_len += snprintf(ferr_str + ferr_len, ferr_left,
+			"  vfp: %d, for panel, req: >%d!!!\n", vfp, vfp_cmpr_tail);
+		ret |= (1 << 4);
+	}
+	if (lcd_drv->chip_type == LCD_CHIP_T5W) {
+		if (lcd_drv->lcd_config->lcd_basic.v_period_min) {
+			vfp_min = lcd_drv->lcd_config->lcd_basic.v_period_min - vactive - vpw - vbp;
+			if (vfp_min <= vfp_cmpr_tail) {
+				ferr_left = lcd_debug_info_len(ferr_len);
+				ferr_len += snprintf(ferr_str + ferr_len, ferr_left,
+					"  vfp with v_period_min: %d, for panel, req: >%d!!!\n",
+					vfp_min, vfp_cmpr_tail);
+				ret |= (1 << 4);
+			}
 		}
-		cmpr_tail = 3;
 	} else {
-		if (vfp <= 0) {
-			ferr_left = lcd_debug_info_len(ferr_len);
-			ferr_len += snprintf(ferr_str + ferr_len, ferr_left,
-				"  vfp: %d, for panel, req: >0!!!\n", vfp);
-			ret |= (1 << 4);
+		//no vrr function, trade vfp with v_period_min as warning
+		if (lcd_drv->lcd_config->lcd_basic.v_period_min) {
+			vfp_min = lcd_drv->lcd_config->lcd_basic.v_period_min - vactive - vpw - vbp;
+			if (vfp_min <= vfp_cmpr_tail) {
+				warn_left = lcd_debug_info_len(warn_len);
+				warn_len += snprintf(warn_str + warn_len, warn_left,
+					"  vfp with v_period_min: %d, for panel, req: >%d!!!\n",
+					vfp_min, vfp_cmpr_tail);
+				ret |= (1 << 5);
+			}
 		}
-		cmpr_tail = 0;
 	}
 
 	//display timing check
@@ -241,7 +269,7 @@ lcd_config_valid_check_vid_vfp:
 	//vfp
 	if (lcd_drv->disp_req.vfp_vid == 0)
 		goto lcd_config_valid_check_next;
-	temp = lcd_drv->disp_req.vfp_vid + cmpr_tail;
+	temp = lcd_drv->disp_req.vfp_vid + vfp_cmpr_tail;
 	if (vfp < temp) {
 		if (lcd_drv->disp_req.alert_level == 1) {
 			warn_left = lcd_debug_info_len(warn_len);

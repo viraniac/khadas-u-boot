@@ -52,8 +52,6 @@ void hd_set_reg_bits(unsigned long addr, unsigned long value,
 	hd_write_reg(addr, data);
 }
 
-#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
-
 unsigned int hdmitx_rd_reg(unsigned int addr)
 {
 	unsigned int large_offset = addr >> 24;

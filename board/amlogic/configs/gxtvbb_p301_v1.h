@@ -100,6 +100,9 @@
 	#define CONFIG_CMD_SPI
 #endif
 
+/*smc*/
+#define CONFIG_ARM_SMCCC       1
+
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \

@@ -82,6 +82,9 @@
 
 #define CONFIG_IR_REMOTE_POWER_UP_KEY_VAL5 0x3ac5bd02
 
+/*smc*/
+#define CONFIG_ARM_SMCCC       1
+
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \

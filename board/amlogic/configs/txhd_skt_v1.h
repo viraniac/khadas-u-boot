@@ -66,7 +66,8 @@
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 
-
+/*smc*/
+#define CONFIG_ARM_SMCCC       1
 
 #ifdef CONFIG_PXP_EMULATOR
 

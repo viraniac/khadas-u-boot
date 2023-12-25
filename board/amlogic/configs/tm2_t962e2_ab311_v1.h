@@ -93,6 +93,9 @@
 #define CONFIG_ADC_POWER_KEY_VAL            0  /* sample value range: 0-1023 */
 #define CONFIG_ADC_POWER_KEY_RANGE          40 /* tolerance */
 
+/*smc*/
+#define CONFIG_ARM_SMCCC       1
+
 #define STR1(R) #R
 #define STR2(R) STR1(R)
 

@@ -11,6 +11,7 @@
 #include <fat.h>
 #include <u-boot/sha256.h>
 #include <emmc_partitions.h>
+#include <linux/arm-smccc.h>
 #ifdef CFG_FACTORY_PROVISION_VIA_PTA
 #include <tee.h>
 #endif
@@ -26,8 +27,6 @@
 
 #define LOGE(fmt, ...)    printf("%sERROR: "fmt, CMD_LOG_TAG, ##__VA_ARGS__)
 #define LOGI(fmt, ...)    printf("%s"fmt, CMD_LOG_TAG, ##__VA_ARGS__)
-
-#define __asmeq(x, y) ".ifnc " x "," y " ; .err ; .endif\n\t"
 
 #define FUNCID_PROVISION_SET_IV                0xB200E030
 #define FUNCID_PROVISION_ENCRYPT               0xB200E031
@@ -235,68 +234,34 @@ static struct fs_value g_fs_vals_fty[MAX_CNT_FS_VALUE] = {
 #ifndef CFG_FACTORY_PROVISION_VIA_PTA
 static uint32_t get_transfer_phy_addr(uint32_t *transfer_phy_addr)
 {
-	register uint32_t x0 asm("x0") = FUNCID_PROVISION_GET_TRANSFER_ADDR;
-	register uint32_t x1 asm("x1") = 0;
+	struct arm_smccc_res res;
 
-	do {
-		asm volatile(
-			__asmeq("%0", "x0")
-			__asmeq("%1", "x1")
-			__asmeq("%2", "x0")
-			"smc    #0\n"
-			: "=r"(x0), "=r"(x1)
-			: "r"(x0));
-	} while (0);
+	arm_smccc_smc(FUNCID_PROVISION_GET_TRANSFER_ADDR, 0, 0, 0, 0, 0, 0, 0, &res);
 
-	if (x0 == 0)
-		*transfer_phy_addr = x1;
+	if (res.a0 == 0)
+		*transfer_phy_addr = res.a1;
 
-	return x0;
+	return res.a0;
 }
 
 static uint32_t set_iv(uint32_t transfer_addr, uint32_t iv_size)
 {
-	register uint32_t x0 asm("x0") = FUNCID_PROVISION_SET_IV;
-	register uint32_t x1 asm("x1") = iv_size;
-	register uint32_t x2 asm("x2") = transfer_addr;
+	struct arm_smccc_res res;
 
-	do {
-		asm volatile(
-			__asmeq("%0", "x0")
-			__asmeq("%1", "x0")
-			__asmeq("%2", "x1")
-			__asmeq("%3", "x2")
-			"smc    #0\n"
-			: "=r"(x0)
-			: "r"(x0), "r"(x1), "r"(x2));
-	} while (0);
-
-	return x0;
+	arm_smccc_smc(FUNCID_PROVISION_SET_IV, iv_size, transfer_addr, 0, 0, 0, 0, 0, &res);
+	return res.a0;
 }
 
 static uint32_t encrypt(uint32_t transfer_addr, uint32_t *data_size)
 {
-	register uint32_t x0 asm("x0") = FUNCID_PROVISION_ENCRYPT;
-	register uint32_t x1 asm("x1") = *data_size;
-	register uint32_t x2 asm("x2") = transfer_addr;
+	struct arm_smccc_res res;
 
-	do {
-		asm volatile(
-			__asmeq("%0", "x0")
-			__asmeq("%1", "x1")
-			__asmeq("%2", "x2")
-			__asmeq("%3", "x0")
-			__asmeq("%4", "x1")
-			__asmeq("%5", "x2")
-			"smc    #0\n"
-			: "=r"(x0), "=r"(x1), "=r"(x2)
-			: "r"(x0), "r"(x1), "r"(x2));
-	} while (0);
+	arm_smccc_smc(FUNCID_PROVISION_ENCRYPT, *data_size, transfer_addr, 0, 0, 0, 0, 0, &res);
 
-	if (x0 == 0)
-		*data_size = x1;
+	if (res.a0 == 0)
+		*data_size = res.a1;
 
-	return x0;
+	return res.a0;
 }
 #endif
 

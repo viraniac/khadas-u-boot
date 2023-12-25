@@ -89,6 +89,9 @@
 #define STR1(R) #R
 #define STR2(R) STR1(R)
 
+/*smc*/
+#define CONFIG_ARM_SMCCC       1
+
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \

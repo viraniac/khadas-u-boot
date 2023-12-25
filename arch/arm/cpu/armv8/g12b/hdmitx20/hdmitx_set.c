@@ -18,6 +18,7 @@
 #include "mach_reg.h"
 #include "hw_enc_clk_config.h"
 #include <amlogic/dolby_vision.h>
+#include <linux/arm-smccc.h>
 
 const static char *vend_name = "Amlogic"; /* Max 8 bytes */
 const static char *prod_desc = "MBox Meson Ref"; /* Max 16 bytes */
@@ -824,15 +825,11 @@ int hdmi_outputmode_check(char *mode, unsigned int frac)
 	return ret;
 }
 
-#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
 static void hdcp14_init(void)
 {
-	register long x0 asm("x0") = 0x82000012;
-	asm volatile(
-		__asmeq("%0", "x0")
-		"smc #0\n"
-		: : "r"(x0)
-	);
+	struct arm_smccc_res res;
+
+	arm_smccc_smc(0x82000012, 0, 0, 0, 0, 0, 0, 0, &res);
 }
 
 static int hdmitx_set_audmode(struct hdmitx_dev *hdev)

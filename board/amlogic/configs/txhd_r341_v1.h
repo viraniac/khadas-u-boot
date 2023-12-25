@@ -87,6 +87,8 @@
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 
+/*smc*/
+#define CONFIG_ARM_SMCCC       1
 
 #define CONFIG_EXTRA_ENV_SETTINGS \
         "firstboot=1\0"\

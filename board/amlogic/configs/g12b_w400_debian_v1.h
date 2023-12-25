@@ -132,6 +132,9 @@
 #define CONFIG_BOOTCOMMAND "run bootcmd"
 #endif
 
+/*smc*/
+#define CONFIG_ARM_SMCCC       1
+
 #define CONFIG_EXTRA_ENV_SETTINGS \
 		"firstboot=1\0"\
 		"upgrade_step=0\0"\

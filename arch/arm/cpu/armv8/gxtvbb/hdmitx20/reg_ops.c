@@ -12,6 +12,7 @@
 #include "mach_reg.h"
 #include "hdmitx_reg.h"
 #include <amlogic/hdmi.h>
+#include <linux/arm-smccc.h>
 
 static int dbg_en;
 
@@ -42,22 +43,14 @@ void hd_set_reg_bits(unsigned long addr, unsigned long value,
 	hd_write_reg(addr, data);
 }
 
-#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
-
 unsigned int hdmitx_rd_reg(unsigned int addr)
 {
 	unsigned long offset = (addr & DWC_OFFSET_MASK) >> 24;
 	unsigned int data;
-	register long x0 asm("x0") = 0x82000018;
-	register long x1 asm("x1") = (unsigned long)addr;
+	struct arm_smccc_res res;
 
-	asm volatile(
-		__asmeq("%0", "x0")
-		__asmeq("%1", "x1")
-		"smc #0\n"
-		: "+r"(x0) : "r"(x1)
-	);
-	data = (unsigned)(x0&0xffffffff);
+	arm_smccc_smc(0x82000018, (unsigned long)addr, 0, 0, 0, 0, 0, 0, &res);
+	data = (unsigned int)(res.a0 & 0xffffffff);
 	if (dbg_en)
 		pr_info("%s rd[0x%x] 0x%x\n", offset ? "DWC" : "TOP",
 			addr, data);
@@ -67,17 +60,9 @@ unsigned int hdmitx_rd_reg(unsigned int addr)
 void hdmitx_wr_reg(unsigned int addr, unsigned int data)
 {
 	unsigned long offset = (addr & DWC_OFFSET_MASK) >> 24;
-	register long x0 asm("x0") = 0x82000019;
-	register long x1 asm("x1") = (unsigned long)addr;
-	register long x2 asm("x2") = data;
+	struct arm_smccc_res res;
 
-	asm volatile(
-		__asmeq("%0", "x0")
-		__asmeq("%1", "x1")
-		__asmeq("%2", "x2")
-		"smc #0\n"
-		: : "r"(x0), "r"(x1), "r"(x2)
-	);
+	arm_smccc_smc(0x82000019, (unsigned long)addr, data, 0, 0, 0, 0, 0, &res);
 	if (dbg_en)
 		pr_info("%s wr[0x%x] 0x%x\n", offset ? "DWC" : "TOP",
 			addr, data);

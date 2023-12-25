@@ -133,6 +133,9 @@
 	func(DHCP, dhcp, na)
 #endif
 
+/*smc*/
+#define CONFIG_ARM_SMCCC       1
+
 #include <config_distro_bootcmd.h>
 
 #ifndef CONFIG_BOOTCOMMAND

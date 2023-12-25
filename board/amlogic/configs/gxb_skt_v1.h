@@ -56,6 +56,9 @@
 #define CONFIG_IR_REMOTE_POWER_UP_KEY_VAL3 0xF20DFE01 //amlogic tv ir --- ch-
 #define CONFIG_IR_REMOTE_POWER_UP_KEY_VAL4 0xFFFFFFFF
 
+/*smc*/
+#define CONFIG_ARM_SMCCC       1
+
 #define CONFIG_IR_REMOTE_POWER_UP_KEY_VAL5 0x3ac5bd02
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64

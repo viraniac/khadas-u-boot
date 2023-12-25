@@ -12,7 +12,7 @@
 #include <asm/arch/cpu.h>
 #include <asm/arch/core.h>
 #include <asm/arch/timer.h>
-#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
+#include <linux/arm-smccc.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -229,13 +229,9 @@ unsigned long get_core_entry_fn(unsigned cpuidx)
 
 void invoke_psci_fn(unsigned fn, unsigned targetcpu, unsigned entry_point, unsigned arg)
 {
-	asm volatile(
-		__asmeq("%0", "x0")
-		__asmeq("%1", "x1")
-		__asmeq("%2", "x2")
-		__asmeq("%3", "x3")
-		"smc #0\n"
-		::"r"(fn), "r"(targetcpu), "r"(entry_point), "r"(arg));
+	struct arm_smccc_res res;
+
+	arm_smccc_smc(fn, targetcpu, entry_point, arg, 0, 0, 0, 0, &res);
 }
 
 void power_off_secondary_cpu(int cpuidx)

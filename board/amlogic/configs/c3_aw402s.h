@@ -66,7 +66,7 @@
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"firstboot=1\0"\
-	"silent=1\0"\
+	"silent=0\0"\
 	"upgrade_step=0\0"\
 	"initrd_high=0xF800000\0"\
 	"fdt_high=0xF800000\0"\
@@ -141,7 +141,8 @@
 		"store read 0x01a80000 system 0 0x300000;bootm ${loadaddr_kernel};"\
 		"\0" \
 	 "update="\
-		/*first usb burning, second sdc_burn, third ext-sd autoscr/recovery, last udisk autoscr/recovery*/\
+		/*first usb burning, second sdc_burn, third ext-sd autoscr/recovery,
+		last udisk autoscr/recovery*/\
 		"run usb_burning; "\
 		"run recovery_from_sdcard;"\
 		"run recovery_from_udisk;"\
@@ -151,7 +152,7 @@
 		"setenv loadaddr ${loadaddr_kernel};"\
 		"if fatload ${fatload_dev} 0 ${loadaddr} aml_autoscript; then autoscr ${loadaddr}; fi;"\
 		"if fatload ${fatload_dev} 0 ${loadaddr} recovery.img; then "\
-			"if fatload ${fatload_dev} 0 ${dtb_mem_addr} dtb.img; then echo ${fatload_dev} dtb.img loaded; fi;"\
+		"if fatload ${fatload_dev} 0 ${dtb_mem_addr} dtb.img; then echo ${fatload_dev} dtb.img loaded; fi;"\
 			"setenv bootargs ${bootargs} ${fs_type};"\
 			"bootm ${loadaddr};fi;"\
 		"\0"\
@@ -171,7 +172,8 @@
 		"if imgread dtb recovery ${dtb_mem_addr}; then "\
 			"else echo restore dtb; run common_dtb_load;"\
 		"fi;"\
-		"if imgread kernel ${recovery_part} ${loadaddr} ${recovery_offset}; then bootm ${loadaddr}; fi;"\
+		"if imgread kernel ${recovery_part} ${loadaddr} ${recovery_offset}; then "\
+		"bootm ${loadaddr}; fi;"\
 		"\0"\
 	"bcb_cmd="\
 		"get_valid_slot;"\
@@ -182,14 +184,6 @@
 		"\0"\
 	"\0"\
 
-/*
-#define CONFIG_PREBOOT  \
-		"run bcb_cmd; "\
-		"run upgrade_check;"\
-		"run storeargs;"\
-		"bcb uboot-command;"\
-		"run switch_bootmode;"
- */
 #define CONFIG_PREBOOT  \
 			"run storeargs;"
 
@@ -231,7 +225,7 @@
 /* fixme, need fix*/
 
 #if (defined(CONFIG_ENV_IS_IN_AMLNAND) || defined(CONFIG_ENV_IS_IN_MMC)) && \
- defined(CONFIG_STORE_COMPATIBLE)
+defined(CONFIG_STORE_COMPATIBLE)
 #error env in amlnand/mmc already be compatible;
 #endif
 
@@ -330,11 +324,11 @@
 
 //	#define CONFIG_RANDOM_ETHADDR  1		/* use random eth addr, or default */
 
-	#define CONFIG_ETHADDR         00:15:18:01:81:31   /* Ethernet address */
-	#define CONFIG_IPADDR          10.18.9.97          /* Our ip address */
-	#define CONFIG_GATEWAYIP       10.18.9.1           /* Our getway ip address */
-	#define CONFIG_SERVERIP        10.18.9.113         /* Tftp server ip address */
-	#define CONFIG_NETMASK         255.255.255.0
+	#define CONFIG_ETHADDR         ("00:15:18:01:81:31")   /* Ethernet address */
+	#define CONFIG_IPADDR          (10.18.9.97)          /* Our ip address */
+	#define CONFIG_GATEWAYIP       (10.18.9.1)           /* Our getway ip address */
+	#define CONFIG_SERVERIP        (10.18.9.113)         /* Tftp server ip address */
+	#define CONFIG_NETMASK         (255.255.255.0)
 #endif /* (CONFIG_CMD_NET) */
 
 #define MAC_ADDR_NEW  1

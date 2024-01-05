@@ -84,13 +84,13 @@ static void lcd_encl_tcon_set(struct lcd_config_s *pconf)
 	switch (pconf->lcd_basic.lcd_type) {
 	case LCD_LVDS:
 		lcd_vcbus_setb(reg_pol_ctrl, 1, 0, 1);
-		if (pconf->lcd_timing.vsync_pol)
+		if (pconf->lcd_timing.act_timing.vsync_pol)
 			lcd_vcbus_setb(reg_pol_ctrl, 1, 1, 1);
 		break;
 	case LCD_VBYONE:
-		if (pconf->lcd_timing.hsync_pol)
+		if (pconf->lcd_timing.act_timing.hsync_pol)
 			lcd_vcbus_setb(reg_pol_ctrl, 1, 0, 1);
-		if (pconf->lcd_timing.vsync_pol)
+		if (pconf->lcd_timing.act_timing.vsync_pol)
 			lcd_vcbus_setb(reg_pol_ctrl, 1, 1, 1);
 		break;
 	case LCD_MIPI:
@@ -124,7 +124,7 @@ static void lcd_encl_tcon_set(struct lcd_config_s *pconf)
 	lcd_vcbus_write(L_OEV1_VE_ADDR,  tcon_adr->de_ve_addr);
 
 	/* Hsync signal for TTL m8,m8m2 */
-	if (tcon_adr->hsync_pol == 0) {
+	if (tcon_adr->act_timing.hsync_pol == 0) {
 		lcd_vcbus_write(L_STH1_HS_ADDR, tcon_adr->hs_he_addr);
 		lcd_vcbus_write(L_STH1_HE_ADDR, tcon_adr->hs_hs_addr);
 	} else {
@@ -137,7 +137,7 @@ static void lcd_encl_tcon_set(struct lcd_config_s *pconf)
 	/* Vsync signal for TTL m8,m8m2 */
 	lcd_vcbus_write(L_STV1_HS_ADDR, tcon_adr->vs_hs_addr);
 	lcd_vcbus_write(L_STV1_HE_ADDR, tcon_adr->vs_he_addr);
-	if (tcon_adr->vsync_pol == 0) {
+	if (tcon_adr->act_timing.vsync_pol == 0) {
 		lcd_vcbus_write(L_STV1_VS_ADDR, tcon_adr->vs_ve_addr);
 		lcd_vcbus_write(L_STV1_VE_ADDR, tcon_adr->vs_vs_addr);
 	} else {
@@ -178,10 +178,10 @@ static void lcd_venc_set(struct lcd_config_s *pconf)
 	if (lcd_debug_print_flag)
 		LCDPR("%s\n", __func__);
 
-	h_active = pconf->lcd_basic.h_active;
-	v_active = pconf->lcd_basic.v_active;
-	video_on_pixel = pconf->lcd_timing.video_on_pixel;
-	video_on_line = pconf->lcd_timing.video_on_line;
+	h_active = pconf->lcd_timing.act_timing.h_active;
+	v_active = pconf->lcd_timing.act_timing.v_active;
+	video_on_pixel = pconf->lcd_timing.hstart;
+	video_on_line = pconf->lcd_timing.vstart;
 
 	lcd_vcbus_write(ENCL_VIDEO_EN, 0);
 
@@ -190,8 +190,8 @@ static void lcd_venc_set(struct lcd_config_s *pconf)
 
 	// bypass filter
 	lcd_vcbus_write(ENCL_VIDEO_FILT_CTRL, 0x1000);
-	lcd_vcbus_write(ENCL_VIDEO_MAX_PXCNT, pconf->lcd_basic.h_period - 1);
-	lcd_vcbus_write(ENCL_VIDEO_MAX_LNCNT, pconf->lcd_basic.v_period - 1);
+	lcd_vcbus_write(ENCL_VIDEO_MAX_PXCNT, pconf->lcd_timing.act_timing.h_period - 1);
+	lcd_vcbus_write(ENCL_VIDEO_MAX_LNCNT, pconf->lcd_timing.act_timing.v_period - 1);
 	lcd_vcbus_write(ENCL_VIDEO_HAVON_BEGIN, video_on_pixel);
 	lcd_vcbus_write(ENCL_VIDEO_HAVON_END,   h_active - 1 + video_on_pixel);
 	lcd_vcbus_write(ENCL_VIDEO_VAVON_BLINE, video_on_line);
@@ -752,8 +752,8 @@ static void lcd_vbyone_control_set(struct lcd_config_s *pconf)
 	if (lcd_debug_print_flag)
 		LCDPR("%s\n", __func__);
 
-	hsize = pconf->lcd_basic.h_active;
-	vsize = pconf->lcd_basic.v_active;
+	hsize = pconf->lcd_timing.act_timing.h_active;
+	vsize = pconf->lcd_timing.act_timing.v_active;
 	lane_count = pconf->lcd_control.vbyone_config->lane_count; /* 8 */
 	region_num = pconf->lcd_control.vbyone_config->region_num; /* 2 */
 	byte_mode = pconf->lcd_control.vbyone_config->byte_mode; /* 4 */
@@ -911,7 +911,7 @@ static void lcd_vbyone_config_set(struct lcd_config_s *pconf)
 	byte_mode = pconf->lcd_control.vbyone_config->byte_mode;
 	/* byte_mode * byte2bit * 8/10_encoding * pclk =
 	   byte_mode * 8 * 10 / 8 * pclk */
-	band_width = pconf->lcd_timing.lcd_clk;
+	band_width = pconf->lcd_timing.act_timing.pixel_clk;
 	band_width = byte_mode * 10 * band_width;
 
 	temp = VBYONE_BIT_RATE_MAX;
@@ -948,7 +948,7 @@ static void lcd_vbyone_config_set(struct lcd_config_s *pconf)
 
 	if (lcd_debug_print_flag) {
 		LCDPR("lane_count=%u, bit_rate = %lluHz, pclk=%uhz\n",
-			lane_count, bit_rate, pconf->lcd_timing.lcd_clk);
+			lane_count, bit_rate, pconf->lcd_timing.act_timing.pixel_clk);
 	}
 }
 

@@ -148,8 +148,8 @@ static void lcd_tcon_data_init_set(unsigned char *data_buf)
 	core_reg_table = data_buf + LCD_TCON_DATA_BLOCK_HEADER_SIZE;
 	switch (data_header->block_ctrl) {
 	case LCD_TCON_DATA_CTRL_FLAG_DLG:
-		if (lcd_drv->lcd_config->lcd_basic.h_active == data_header->h_active &&
-		    lcd_drv->lcd_config->lcd_basic.v_active == data_header->v_active) {
+		if (lcd_drv->lcd_config->lcd_timing.act_timing.h_active == data_header->h_active &&
+		    lcd_drv->lcd_config->lcd_timing.act_timing.v_active == data_header->v_active) {
 			lcd_tcon_init_data_version_update(data_header->version);
 			lcd_tcon_core_reg_set(tcon_conf, mm_table, core_reg_table);
 			if (lcd_debug_print_flag) {
@@ -1193,7 +1193,7 @@ int lcd_tcon_setting_check_t5(char *ferr_str, char *warn_str)
 		val = lcd_tcon_getb(0x26e, 21, 3);
 	else
 		val = (table32[0x26e] >> 21) & 0x7;
-	if (lcd_drv->lcd_config->lcd_basic.h_active == 1366) {
+	if (lcd_drv->lcd_config->lcd_timing.base_timing.h_active == 1366) {
 		if (val != 3) {
 			ferr_left = lcd_debug_info_len(ferr_len);
 			ferr_len += snprintf(ferr_str + ferr_len, ferr_left,
@@ -1277,7 +1277,7 @@ int lcd_tcon_setting_check_t5d(char *ferr_str, char *warn_str)
 		val = lcd_tcon_getb(0x26e, 21, 3);
 	else
 		val = (table32[0x26e] >> 21) & 0x7;
-	if (lcd_drv->lcd_config->lcd_basic.h_active == 1366) {
+	if (lcd_drv->lcd_config->lcd_timing.base_timing.h_active == 1366) {
 		if (val != 3) {
 			ferr_left = lcd_debug_info_len(ferr_len);
 			ferr_len += snprintf(ferr_str + ferr_len, ferr_left,

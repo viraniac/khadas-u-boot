@@ -90,13 +90,13 @@ static void lcd_encl_tcon_set(struct lcd_config_s *pconf)
 	switch (pconf->lcd_basic.lcd_type) {
 	case LCD_LVDS:
 		lcd_vcbus_setb(reg_pol_ctrl, 1, 0, 1);
-		if (pconf->lcd_timing.vsync_pol)
+		if (pconf->lcd_timing.act_timing.vsync_pol)
 			lcd_vcbus_setb(reg_pol_ctrl, 1, 1, 1);
 		break;
 	case LCD_VBYONE:
-		if (pconf->lcd_timing.hsync_pol)
+		if (pconf->lcd_timing.act_timing.hsync_pol)
 			lcd_vcbus_setb(reg_pol_ctrl, 1, 0, 1);
-		if (pconf->lcd_timing.vsync_pol)
+		if (pconf->lcd_timing.act_timing.vsync_pol)
 			lcd_vcbus_setb(reg_pol_ctrl, 1, 1, 1);
 		break;
 	default:
@@ -116,10 +116,10 @@ static void lcd_venc_set(struct lcd_config_s *pconf)
 	if (lcd_debug_print_flag)
 		LCDPR("%s\n", __func__);
 
-	h_active = pconf->lcd_basic.h_active;
-	v_active = pconf->lcd_basic.v_active;
-	video_on_pixel = pconf->lcd_timing.video_on_pixel;
-	video_on_line = pconf->lcd_timing.video_on_line;
+	h_active = pconf->lcd_timing.act_timing.h_active;
+	v_active = pconf->lcd_timing.act_timing.v_active;
+	video_on_pixel = pconf->lcd_timing.hstart;
+	video_on_line = pconf->lcd_timing.vstart;
 
 	lcd_vcbus_write(ENCL_VIDEO_EN, 0);
 
@@ -128,8 +128,8 @@ static void lcd_venc_set(struct lcd_config_s *pconf)
 
 	// bypass filter
 	lcd_vcbus_write(ENCL_VIDEO_FILT_CTRL, 0x1000);
-	lcd_vcbus_write(ENCL_VIDEO_MAX_PXCNT, pconf->lcd_basic.h_period - 1);
-	lcd_vcbus_write(ENCL_VIDEO_MAX_LNCNT, pconf->lcd_basic.v_period - 1);
+	lcd_vcbus_write(ENCL_VIDEO_MAX_PXCNT, pconf->lcd_timing.act_timing.h_period - 1);
+	lcd_vcbus_write(ENCL_VIDEO_MAX_LNCNT, pconf->lcd_timing.act_timing.v_period - 1);
 	lcd_vcbus_write(ENCL_VIDEO_HAVON_BEGIN, video_on_pixel);
 	lcd_vcbus_write(ENCL_VIDEO_HAVON_END,   h_active - 1 + video_on_pixel);
 	lcd_vcbus_write(ENCL_VIDEO_VAVON_BLINE, video_on_line);
@@ -807,8 +807,8 @@ static void lcd_vbyone_control_set(struct lcd_config_s *pconf)
 	if (lcd_debug_print_flag)
 		LCDPR("%s\n", __func__);
 
-	hsize = pconf->lcd_basic.h_active;
-	vsize = pconf->lcd_basic.v_active;
+	hsize = pconf->lcd_timing.act_timing.h_active;
+	vsize = pconf->lcd_timing.act_timing.v_active;
 	lane_count = pconf->lcd_control.vbyone_config->lane_count; /* 8 */
 	region_num = pconf->lcd_control.vbyone_config->region_num; /* 2 */
 	byte_mode = pconf->lcd_control.vbyone_config->byte_mode; /* 4 */
@@ -1174,7 +1174,7 @@ static void lcd_vbyone_config_set(struct lcd_config_s *pconf)
 	byte_mode = pconf->lcd_control.vbyone_config->byte_mode;
 	/* byte_mode * byte2bit * 8/10_encoding * pclk =
 	   byte_mode * 8 * 10 / 8 * pclk */
-	band_width = pconf->lcd_timing.lcd_clk;
+	band_width = pconf->lcd_timing.act_timing.pixel_clk;
 	band_width = byte_mode * 10 * band_width;
 
 	temp = VBYONE_BIT_RATE_MAX;
@@ -1211,7 +1211,7 @@ static void lcd_vbyone_config_set(struct lcd_config_s *pconf)
 
 	if (lcd_debug_print_flag) {
 		LCDPR("lane_count=%u, bit_rate = %lluHz, pclk=%uhz\n",
-			lane_count, bit_rate, pconf->lcd_timing.lcd_clk);
+			lane_count, bit_rate, pconf->lcd_timing.act_timing.pixel_clk);
 	}
 }
 
@@ -1229,7 +1229,7 @@ static void lcd_mlvds_config_set(struct lcd_config_s *pconf)
 
 	lcd_bits = pconf->lcd_basic.lcd_bits;
 	channel_num = pconf->lcd_control.mlvds_config->channel_num;
-	band_width = pconf->lcd_timing.lcd_clk;
+	band_width = pconf->lcd_timing.act_timing.pixel_clk;
 	band_width = lcd_bits * 3 * band_width;
 	bit_rate = lcd_do_div(band_width, channel_num);
 
@@ -1237,7 +1237,7 @@ static void lcd_mlvds_config_set(struct lcd_config_s *pconf)
 
 	if (lcd_debug_print_flag) {
 		LCDPR("channel_num=%u, bit_rate=%lluHz, pclk=%uhz\n",
-			channel_num, bit_rate, pconf->lcd_timing.lcd_clk);
+			channel_num, bit_rate, pconf->lcd_timing.act_timing.pixel_clk);
 	}
 
 	/* pi_clk select */
@@ -1336,11 +1336,11 @@ static void lcd_p2p_config_set(struct lcd_config_s *pconf)
 
 	lcd_bits = pconf->lcd_basic.lcd_bits;
 	lane_num = pconf->lcd_control.p2p_config->lane_num;
-	band_width = pconf->lcd_timing.lcd_clk;
+	band_width = pconf->lcd_timing.act_timing.pixel_clk;
 	p2p_type = pconf->lcd_control.p2p_config->p2p_type & 0x1f;
 	switch (p2p_type) {
 	case P2P_CEDS:
-		if (pconf->lcd_timing.lcd_clk >= 600000000)
+		if (pconf->lcd_timing.act_timing.pixel_clk >= 600000000)
 			band_width = band_width * 3 * lcd_bits;
 		else
 			band_width = band_width * (3 * lcd_bits + 4);
@@ -1357,7 +1357,7 @@ static void lcd_p2p_config_set(struct lcd_config_s *pconf)
 
 	if (lcd_debug_print_flag) {
 		LCDPR("lane_num=%u, bit_rate=%lluHz, pclk=%uhz\n",
-			lane_num, bit_rate, pconf->lcd_timing.lcd_clk);
+			lane_num, bit_rate, pconf->lcd_timing.act_timing.pixel_clk);
 	}
 }
 #endif

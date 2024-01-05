@@ -63,7 +63,8 @@
 /* 20230821: update lcd ss support*/
 /* 20230912: bypass phy data buffer */
 /* 20231205: add lcd config check*/
-#define LCD_DRV_VERSION    "20231205"
+/* 20231218: update timing management*/
+#define LCD_DRV_VERSION    "20231218"
 
 #define LCD_STATUS_IF_ON      (1 << 0)
 #define LCD_STATUS_ENCL_ON    (1 << 1)
@@ -87,14 +88,17 @@ extern char *lcd_type_type_to_str(int type);
 extern int lcd_mode_str_to_mode(const char *str);
 extern char *lcd_mode_mode_to_str(int mode);
 
+int lcd_config_check(void);
 extern int lcd_power_load_from_dts(struct lcd_config_s *pconf,
 		char *dt_addr, int child_offset);
 extern int lcd_power_load_from_unifykey(struct lcd_config_s *pconf,
 		unsigned char *buf, int key_len, int len);
 extern int lcd_pinmux_load_config(char *dt_addr, struct lcd_config_s *pconf);
-int lcd_config_check(void);
-extern void lcd_timing_init_config(struct lcd_config_s *pconf);
-extern int lcd_vmode_change(struct lcd_config_s *pconf);
+void lcd_fr_range_update(struct lcd_detail_timing_s *ptiming);
+void lcd_clk_frame_rate_init(struct lcd_detail_timing_s *ptiming);
+void lcd_default_to_basic_timing_init_config(struct lcd_config_s *pconf);
+void lcd_enc_timing_init_config(struct lcd_config_s *pconf);
+int lcd_frame_rate_change(struct lcd_config_s *pconf);
 
 /* lcd phy */
 unsigned int lcd_phy_vswing_level_to_value(struct aml_lcd_drv_s *pdrv, unsigned int level);

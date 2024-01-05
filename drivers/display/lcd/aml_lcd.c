@@ -309,12 +309,13 @@ static void lcd_module_enable(char *mode, unsigned int frac)
 		return;
 	}
 
-	sync_duration = pconf->lcd_timing.sync_duration_num;
+	sync_duration = pconf->lcd_timing.act_timing.sync_duration_num;
 	sync_duration = (sync_duration * 100 /
-			 pconf->lcd_timing.sync_duration_den);
+			 pconf->lcd_timing.act_timing.sync_duration_den);
 	LCDPR("enable: %s, %s, %ux%u@%u.%2uHz\n", pconf->lcd_basic.model_name,
 	      lcd_type_type_to_str(pconf->lcd_basic.lcd_type),
-	      pconf->lcd_basic.h_active, pconf->lcd_basic.v_active,
+	      pconf->lcd_timing.act_timing.h_active,
+	      pconf->lcd_timing.act_timing.v_active,
 	      (sync_duration / 100), (sync_duration % 100));
 
 	if ((lcd_drv->lcd_status & LCD_STATUS_ENCL_ON) == 0)
@@ -860,6 +861,7 @@ static void lcd_update_boot_ctrl_bootargs(void)
 
 	boot_ctrl.lcd_type = pconf->lcd_basic.lcd_type;
 	boot_ctrl.lcd_bits = pconf->lcd_basic.lcd_bits;
+	boot_ctrl.base_frame_rate = pconf->lcd_timing.base_timing.frame_rate;
 	switch (pconf->lcd_basic.lcd_type) {
 	case LCD_TTL:
 		boot_ctrl.advanced_flag = pconf->lcd_control.ttl_config->sync_valid;

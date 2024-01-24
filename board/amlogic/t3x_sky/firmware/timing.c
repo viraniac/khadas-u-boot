@@ -23,14 +23,18 @@
 #include "ddr_timing.c"
 
 /* board vmin_value defines */
-#define VMIN_FF_VALUE                           770
-#define VMIN_TT_VALUE                           800
-#define VMIN_SS_VALUE                           810
+#define VMIN_FF_VALUE                           800
+#define VMIN_TF_VALUE                           780
+#define VMIN_TT_VALUE                           830
+#define VMIN_ST_VALUE                           810
+#define VMIN_SS_VALUE                           830
 /* board vddee_value defines */
-/* 0x6000c=0.84V */
+/* 0x6000c=0.84V 0x3000f = 0.87V */
 #define VDDEE_FF_VALUE                          0x6000c
-#define VDDEE_TT_VALUE                          0x6000c
-#define VDDEE_SS_VALUE                          0x6000c
+#define VDDEE_TF_VALUE                          0x6000c
+#define VDDEE_TT_VALUE                          0x3000f
+#define VDDEE_ST_VALUE                          0x3000f
+#define VDDEE_SS_VALUE                          0x3000f
 
 board_clk_set_t __board_clk_setting
 __attribute__ ((section(".clk_param"))) = {
@@ -251,15 +255,18 @@ register_ops_t __bl2_ops_reg[MAX_REG_OPS_ENTRIES]
 __attribute__ ((section(".misc_param"))) = {
 	/* config vmin_ft value */
 	{ 0, VMIN_SS_VALUE, 0xffffffff, 0, BL2_INIT_STAGE_VMIN_FLAG_1, 0 },
-	{ 0, VMIN_TT_VALUE, 0xffffffff, 0, BL2_INIT_STAGE_VMIN_FLAG_2, 0 },
-	{ 0, VMIN_FF_VALUE, 0xffffffff, 0, BL2_INIT_STAGE_VMIN_FLAG_3, 0 },
-	/*config vddee and vcck pwm - pwm_a and pwm_b*/
+	{ 0, VMIN_ST_VALUE, 0xffffffff, 0, BL2_INIT_STAGE_VMIN_FLAG_2, 0 },
+	{ 0, VMIN_TT_VALUE, 0xffffffff, 0, BL2_INIT_STAGE_VMIN_FLAG_3, 0 },
+	{ 0, VMIN_TF_VALUE, 0xffffffff, 0, BL2_INIT_STAGE_VMIN_FLAG_4, 0 },
+	{ 0, VMIN_FF_VALUE, 0xffffffff, 0, BL2_INIT_STAGE_VMIN_FLAG_5, 0 },
 	/*config vddee and vcck pwm - pwm_a and pwm_b*/
 	/* PWM_A VDDEE_VAL_REG */
 #ifdef CONFIG_PDVFS_ENABLE
-	{PWMAB_PWM_A, VDDEE_SS_VALUE, 0xffffffff, 0, BL2_INIT_STAGE_VDDCORE_CONFIG_1, 0},
-	{PWMAB_PWM_A, VDDEE_TT_VALUE, 0xffffffff, 0, BL2_INIT_STAGE_VDDCORE_CONFIG_2, 0},
-	{PWMAB_PWM_A, VDDEE_FF_VALUE, 0xffffffff, 0, BL2_INIT_STAGE_VDDCORE_CONFIG_3, 0},
+	{PWMAB_PWM_A, VDDEE_SS_VALUE, 0xffffffff, 0, BL2_INIT_STAGE_VDDEE_FLAG_1, 0},
+	{PWMAB_PWM_A, VDDEE_ST_VALUE, 0xffffffff, 0, BL2_INIT_STAGE_VDDEE_FLAG_2, 0},
+	{PWMAB_PWM_A, VDDEE_TT_VALUE, 0xffffffff, 0, BL2_INIT_STAGE_VDDEE_FLAG_3, 0},
+	{PWMAB_PWM_A, VDDEE_TF_VALUE, 0xffffffff, 0, BL2_INIT_STAGE_VDDEE_FLAG_4, 0},
+	{PWMAB_PWM_A, VDDEE_FF_VALUE, 0xffffffff, 0, BL2_INIT_STAGE_VDDEE_FLAG_5, 0},
 #else
 	{PWMAB_PWM_A, VDDEE_VAL_REG, 0xffffffff, 0,	0, 0},
 #endif

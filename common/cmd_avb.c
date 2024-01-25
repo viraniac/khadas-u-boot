@@ -416,6 +416,37 @@ static AvbIOResult read_is_device_unlocked(AvbOps* ops, bool* out_is_unlocked)
 #endif
 }
 
+uint32_t create_csrs(void)
+{
+	int part_num = get_partition_num_by_name("factory");
+	char part_name[32] = {0};
+	char cmd[64] = {0};
+	uint8_t buf[1] = {0};
+
+	if (part_num >= 0)
+		strcpy(part_name, "factory");
+	else
+		strcpy(part_name, "rsv");
+
+	sprintf(cmd, "fatmkdir %s 0x%X:0x%X %s", "mmc", 1,
+		get_partition_num_by_name(part_name), "csrs");
+	if (run_command(cmd, 0)) {
+		printf("command[%s] failed\n", cmd);
+		return AVB_IO_RESULT_ERROR_IO;
+	}
+
+	memset(cmd, 0, sizeof(cmd));
+
+	sprintf(cmd, "fatwrite %s 0x%X:0x%X 0x%08X %s 0x%X", "mmc", 1,
+			get_partition_num_by_name(part_name),
+			(uint32_t)virt_to_phys((void *)buf), "csrs/csrs.json", 1);
+	if (run_command(cmd, 0)) {
+		printf("command[%s] failed\n", cmd);
+		return AVB_IO_RESULT_ERROR_IO;
+	}
+	return AVB_IO_RESULT_OK;
+}
+
 static int avb_init(void)
 {
 	memset(&avb_ops_, 0, sizeof(AvbOps));

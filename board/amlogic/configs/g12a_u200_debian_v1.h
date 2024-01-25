@@ -206,12 +206,29 @@
 	"boot_flag=0\0"\
 	"Irq_check_en=0\0"\
 	"reboot_mode_android=""normal""\0"\
+	"tftp_kernel_path=boot/Image \0" \
+	"tftp_dtb_path=boot/dtb/ \0" \
+	"tftp_initrd_path=boot/initrd.img \0" \
+	"nfsroot_path= \0" \
 	"initargs="\
 		"rootflags=data=writeback rw rootfstype=ext4 loglevel=4 "\
 		"console=tty0 console=ttyS0,115200 no_console_suspend "\
 		"earlycon=aml-uart,0xff803000 ramoops.pstore_en=1 "\
 		"ramoops.record_size=0x8000 ramoops.console_size=0x4000 "\
 		"scsi_mod.scan=async xhci_hcd.quirks=0x800000 gamma=0 "\
+		"\0"\
+	"nfs_boot="\
+		"dhcp;"\
+		"setenv nfs_para root=/dev/nfs rw "\
+			"nfsroot=${serverip}:${nfsroot_path} ip=:::::eth0:on;"\
+		"printenv nfs_para;"\
+		"setenv bootargs ${bootargs} ${nfs_para};"\
+		"tftp ${dtb_mem_addr} ${tftp_dtb_path}${fdtfile};"\
+		"tftp ${loadaddr_kernel} ${tftp_kernel_path};"\
+		"tftp ${ramdisk_addr_r} ${tftp_initrd_path};"\
+		"setenv ramdisk_size ${filesize};"\
+		"echo ramdisk_size=${ramdisk_size};"\
+		"booti ${loadaddr_kernel} ${ramdisk_addr_r}:${ramdisk_size} ${dtb_mem_addr};"\
 		"\0"\
 	"upgrade_check="\
 		"echo upgrade_step=${upgrade_step}; "\

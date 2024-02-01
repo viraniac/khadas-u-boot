@@ -1455,6 +1455,13 @@ config T3X_BC309
 	select TARGET_T3X_BC309
 	help
 		Select T3X BC309 config
+
+config T3X_BC303
+	bool "T3X_BC303"
+	select TARGET_T3X_BC303
+	help
+		Select T3X BC303 config
+
 endchoice
 
 config TARGET_T3X_SKY
@@ -1468,6 +1475,11 @@ config TARGET_T3X_BC302
 config TARGET_T3X_BC309
 	bool "T3X BC309 board"
 	depends on T3X_BC309
+
+config TARGET_T3X_BC303
+	bool "T3X BC303 board"
+	depends on T3X_BC303
+
 endif
 
 if MESON_T5M
@@ -1924,6 +1936,8 @@ source "board/amlogic/t3x_sky/Kconfig"
 source "board/amlogic/t3x_bc302/Kconfig"
 
 source "board/amlogic/t3x_bc309/Kconfig"
+
+source "board/amlogic/t3x_bc303/Kconfig"
 
 source "board/amlogic/txhd2_skt/Kconfig"
 

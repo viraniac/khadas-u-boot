@@ -419,6 +419,7 @@ struct lcd_pinmux_ctrl_s {
 	unsigned int pinmux_clr[LCD_PINMUX_NUM][2];
 };
 
+#define LCD_DURATION_MAX    8
 struct lcd_duration_s {
 	unsigned int frame_rate;
 	unsigned int duration_num;
@@ -426,10 +427,33 @@ struct lcd_duration_s {
 	unsigned int frac;
 };
 
+struct lcd_vmode_info_s {
+	char name[32];
+	unsigned int width;
+	unsigned int height;
+	unsigned int base_fr;
+	unsigned int duration_index;
+	unsigned int duration_cnt;
+	struct lcd_duration_s duration[LCD_DURATION_MAX];
+	struct lcd_detail_timing_s *dft_timing;
+};
+
+struct lcd_vmode_list_s {
+	struct lcd_vmode_info_s *info;
+	struct lcd_vmode_list_s *next;
+};
+
+struct lcd_vmode_mgr_s {
+	unsigned int vmode_cnt;
+	struct lcd_vmode_list_s *vmode_list_header;
+	struct lcd_vmode_info_s *cur_vmode_info;
+	struct lcd_vmode_info_s *next_vmode_info;
+};
+
 struct cus_ctrl_config_s {
 	unsigned int flag;
-	unsigned char dlg_flag;
-
+	unsigned char ufr_flag;
+	struct lcd_detail_timing_s dft_timing;
 };
 
 #define LCD_ENABLE_RETRY_MAX    3
@@ -620,6 +644,7 @@ struct aml_lcd_drv_s {
 	char version[15];
 	enum lcd_chip_e chip_type;
 	char rev_type;
+	unsigned char probe_done;
 	unsigned char lcd_status;
 	unsigned char config_check_glb;
 	unsigned char config_check_en;
@@ -627,9 +652,10 @@ struct aml_lcd_drv_s {
 	struct lcd_config_s *lcd_config;
 	struct bl_config_s *bl_config;
 	struct lcd_disp_tmg_req_s disp_req;
+	struct lcd_vmode_mgr_s vmode_mgr;
 
-	int  (*outputmode_check)(char *mode, unsigned int frac);
-	int  (*config_valid)(char *mode, unsigned int frac);
+	int  (*outputmode_check)(char *mode);
+	int  (*config_valid)(char *mode);
 	void (*driver_init_pre)(void);
 	int  (*driver_init)(void);
 	void (*driver_disable)(void);

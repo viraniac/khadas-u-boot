@@ -18,26 +18,6 @@
 #include "lcd_tablet.h"
 #include "mipi_dsi_util.h"
 
-static int check_lcd_output_mode(char *mode, unsigned int frac)
-{
-	if (frac) {
-		LCDERR("don't support frac\n");
-		return -1;
-	}
-
-	if (strcmp(mode, "panel") != 0) {
-		LCDERR("outputmode[%s] is not support\n", mode);
-		return -1;
-	}
-
-	return 0;
-}
-
-static void lcd_list_support_mode(void)
-{
-	printf("panel\n");
-}
-
 static void lcd_config_load_print(struct lcd_config_s *pconf)
 {
 	struct lcd_detail_timing_s *ptiming = &pconf->lcd_timing.dft_timing;
@@ -1086,23 +1066,42 @@ static int lcd_config_load_from_unifykey(struct lcd_config_s *pconf)
 	return 0;
 }
 
+/* ************************************************** *
+ * vout server api
+ * **************************************************
+ */
+static void lcd_list_support_mode(void)
+{
+	printf("panel\n");
+}
+
+static int lcd_outputmode_is_matched(char *mode)
+{
+	if (strcmp(mode, "panel")) {
+		LCDERR("outputmode[%s] is not support\n", mode);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int lcd_config_valid(char *mode)
+{
+	int ret;
+
+	ret = lcd_outputmode_is_matched(mode);
+	if (ret)
+		return -1;
+
+	return 0;
+}
+
 static void lcd_config_init(struct lcd_config_s *pconf)
 {
 	lcd_enc_timing_init_config(pconf);
 
 	lcd_tablet_config_update(pconf);
 	lcd_clk_generate_parameter(pconf);
-}
-
-static int lcd_config_valid(char *mode, unsigned int frac)
-{
-	int ret;
-
-	ret = check_lcd_output_mode(mode, frac);
-	if (ret)
-		return -1;
-
-	return 0;
 }
 
 int get_lcd_tablet_config(char *dt_addr, int load_id)
@@ -1112,7 +1111,7 @@ int get_lcd_tablet_config(char *dt_addr, int load_id)
 
 	strcpy(lcd_drv->version, LCD_DRV_VERSION);
 	lcd_drv->list_support_mode = lcd_list_support_mode;
-	lcd_drv->outputmode_check = check_lcd_output_mode;
+	lcd_drv->outputmode_check = lcd_outputmode_is_matched;
 	lcd_drv->config_valid = lcd_config_valid;
 	lcd_drv->driver_init_pre = lcd_tablet_driver_init_pre;
 	lcd_drv->driver_init = lcd_tablet_driver_init;
@@ -1135,6 +1134,7 @@ int get_lcd_tablet_config(char *dt_addr, int load_id)
 
 	lcd_config_init(lcd_drv->lcd_config);
 	lcd_config_load_print(lcd_drv->lcd_config);
+	lcd_drv->probe_done = 1;
 
 	return 0;
 }

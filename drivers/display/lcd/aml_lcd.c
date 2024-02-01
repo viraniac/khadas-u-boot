@@ -116,7 +116,7 @@ static void lcd_chip_detect(void)
 
 static int lcd_check_valid(void)
 {
-	if (!aml_lcd_driver.config_valid) {
+	if (aml_lcd_driver.probe_done == 0) {
 		LCDERR("invalid lcd config\n");
 		return -1;
 	}
@@ -303,7 +303,10 @@ static void lcd_module_enable(char *mode, unsigned int frac)
 	struct lcd_config_s *pconf = lcd_drv->lcd_config;
 	int ret;
 
-	ret = lcd_drv->config_valid(mode, frac);
+	if (!mode)
+		return;
+
+	ret = lcd_drv->config_valid(mode);
 	if (ret) {
 		LCDERR("init exit\n");
 		return;
@@ -352,7 +355,10 @@ static void lcd_module_prepare(char *mode, unsigned int frac)
 	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
 	int ret;
 
-	ret = lcd_drv->config_valid(mode, frac);
+	if (!mode)
+		return;
+
+	ret = lcd_drv->config_valid(mode);
 	if (ret) {
 		LCDERR("prepare exit\n");
 		return;
@@ -764,7 +770,7 @@ static int lcd_mode_probe(char *dt_addr, int load_id)
 		break;
 	}
 	if (ret) {
-		aml_lcd_driver.config_valid = NULL;
+		aml_lcd_driver.probe_done = 0;
 		LCDERR("invalid lcd config\n");
 		return -1;
 	}
@@ -1006,7 +1012,7 @@ void lcd_wait_vsync(void)
 static int lcd_outputmode_check(char *mode, unsigned int frac)
 {
 	if (aml_lcd_driver.outputmode_check)
-		return aml_lcd_driver.outputmode_check(mode, frac);
+		return aml_lcd_driver.outputmode_check(mode);
 
 	LCDERR("invalid lcd config\n");
 	return -1;
@@ -1227,6 +1233,7 @@ static void aml_lcd_debug_print_set(unsigned int flag)
 }
 
 static struct aml_lcd_drv_s aml_lcd_driver = {
+	.probe_done = 0,
 	.lcd_status = 0,
 	.lcd_config = &lcd_config_dft,
 	.bl_config = &bl_config_dft,

@@ -64,7 +64,8 @@
 /* 20230912: bypass phy data buffer */
 /* 20231205: add lcd config check*/
 /* 20231218: update timing management*/
-#define LCD_DRV_VERSION    "20231218"
+/* 20240129: update display mode management*/
+#define LCD_DRV_VERSION    "20240129"
 
 #define LCD_STATUS_IF_ON      (1 << 0)
 #define LCD_STATUS_ENCL_ON    (1 << 1)

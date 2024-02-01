@@ -75,11 +75,19 @@
 //USB_POWEROFF
 #define AMLOGIC_USB_POWER
 
+#ifdef CONFIG_NOVERBOSE_BUILD
+#define SILENT		"silent=1\0"
+#define KERNL_LOGLEVEL	"loglevel=2 "
+#else
+#define SILENT		"silent=0\0"
+#define KERNL_LOGLEVEL	"loglevel=7 "
+#endif
+
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	CONFIG_EXTRA_ENV_SETTINGS_BASE \
-		"silent=1\0"\
+		SILENT \
 		"systemsuspend_switch=0\0"\
 		"ddr_resume=0\0"\
 		"otg_device=1\0" \
@@ -135,7 +143,7 @@
 		"ramoops.pstore_en=1 ramoops.record_size=0x8000 "\
 		"ramoops.console_size=0x4000 loop.max_part=4 "\
 		"scsi_mod.scan=async xhci_hcd.quirks=0x800000 "\
-		"loglevel=7 aml_isolcpus=4 isolcpus_speedup_boot=1 "\
+		KERNL_LOGLEVEL "aml_isolcpus=4 isolcpus_speedup_boot=1 "\
             "\0"\
         "upgrade_check="\
 			"run upgrade_check_base;"\

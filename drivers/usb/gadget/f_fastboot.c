@@ -862,6 +862,11 @@ static void cb_getvar(struct usb_ep *ep, struct usb_request *req)
 			} else
 				strncat(response, "no", chars_left);
 		}
+	} else if (strcmp(cmd, "has-slot:vbmeta_system") == 0) {
+		if (has_boot_slot == 1)
+			strncat(response, "yes", chars_left);
+		else
+			strncat(response, "no", chars_left);
 	} else if (strcmp(cmd, "has-slot:vbmeta") == 0) {
 		if (has_boot_slot == 1) {
 			printf("has vbmeta slot\n");
@@ -879,15 +884,7 @@ static void cb_getvar(struct usb_ep *ep, struct usb_request *req)
 				strncat(response, "no", chars_left);
 		}
 	} else if (strcmp(cmd, "has-slot:super") == 0) {
-		if (!dynamic_partition) {
-			strncat(response, "no", chars_left);
-		} else {
-			if (has_boot_slot == 1) {
-				printf("has product slot\n");
-				strncat(response, "yes", chars_left);
-			} else
-				strncat(response, "no", chars_left);
-		}
+		strncat(response, "no", chars_left);
 	} else if (strcmp(cmd, "has-slot:metadata") == 0) {
 		strncat(response, "no", chars_left);
 	} else if (strcmp(cmd, "has-slot:dtbo") == 0) {
@@ -1512,6 +1509,8 @@ static void cb_flash(struct usb_ep *ep, struct usb_request *req)
 	char *cmd = req->buf;
 	char* response = response_str;
 	uint64_t size;
+	char *slot_name = NULL;
+	char partname[32] = {0};
 	int rc;
 
 	printf("cmd cb_flash is %s\n", cmd);
@@ -1590,14 +1589,58 @@ static void cb_flash(struct usb_ep *ep, struct usb_request *req)
 	}
 	printf("partition is %s\n", cmd);
 
+	slot_name = getenv("active_slot");
+	if (slot_name && (strcmp(slot_name, "_a") == 0))
+		strcpy((char *)partname, "bootloader_a");
+	else if (slot_name && (strcmp(slot_name, "_b") == 0))
+		strcpy((char *)partname, "bootloader_b");
+	else
+		strcpy((char *)partname, "bootloader_up");
+
 	//strcpy(response, "FAILno flash device defined");
 	if (is_mainstorage_emmc()) {
 #ifdef CONFIG_FASTBOOT_FLASH_MMC_DEV
+		if (strcmp(cmd, "bootloader") == 0) {
+			rc = store_get_partition_size((unsigned char *)partname,
+				&size);
+			if (rc == 0) {
+				fb_mmc_erase_write(partname,
+					(void *)CONFIG_USB_FASTBOOT_BUF_ADDR);
+				fb_mmc_flash_write(partname,
+					(void *)CONFIG_USB_FASTBOOT_BUF_ADDR,
+					download_bytes);
+			}
+
+			fb_mmc_flash_write("bootloader-boot0",
+				(void *)CONFIG_USB_FASTBOOT_BUF_ADDR,
+				download_bytes);
+			fb_mmc_flash_write("bootloader-boot1",
+				(void *)CONFIG_USB_FASTBOOT_BUF_ADDR,
+				download_bytes);
+			run_command("mmc dev 1 0;", 0);
+		}
 		fb_mmc_flash_write(cmd, (void *)CONFIG_USB_FASTBOOT_BUF_ADDR,
 				   download_bytes);
 #endif
 	} else if (is_mainstorage_nand()) {
 #ifdef CONFIG_FASTBOOT_FLASH_NAND_DEV
+		if (strcmp(cmd, "bootloader") == 0) {
+			rc = store_get_partition_size((unsigned char *)partname,
+				&size);
+			if (rc == 0) {
+				fb_nand_erase(partname, (void *)CONFIG_USB_FASTBOOT_BUF_ADDR);
+				fb_nand_flash_write(partname,
+					(void *)CONFIG_USB_FASTBOOT_BUF_ADDR,
+					download_bytes);
+			}
+
+			fb_nand_flash_write("bootloader-boot0",
+				(void *)CONFIG_USB_FASTBOOT_BUF_ADDR,
+				download_bytes);
+			fb_nand_flash_write("bootloader-boot1",
+				(void *)CONFIG_USB_FASTBOOT_BUF_ADDR,
+				download_bytes);
+		}
 		fb_nand_flash_write(cmd, (void *)CONFIG_USB_FASTBOOT_BUF_ADDR,
 					download_bytes);
 #else

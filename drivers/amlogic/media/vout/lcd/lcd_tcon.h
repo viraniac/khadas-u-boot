@@ -215,6 +215,7 @@ int lcd_tcon_enable_t3(struct aml_lcd_drv_s *pdrv);
 int lcd_tcon_enable_txhd2(struct aml_lcd_drv_s *pdrv);
 int lcd_tcon_disable_t5(struct aml_lcd_drv_s *pdrv);
 int lcd_tcon_disable_t3(struct aml_lcd_drv_s *pdrv);
+int lcd_tcon_disable_t3x(struct aml_lcd_drv_s *pdrv);
 int lcd_tcon_forbidden_check_t5(void);
 int lcd_tcon_forbidden_check_t5d(void);
 int lcd_tcon_setting_check_t5(struct aml_lcd_drv_s *pdrv, char *ferr_str, char *warn_str);

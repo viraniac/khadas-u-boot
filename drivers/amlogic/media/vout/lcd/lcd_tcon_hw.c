@@ -1350,6 +1350,29 @@ int lcd_tcon_disable_t3(struct aml_lcd_drv_s *pdrv)
 	return 0;
 }
 
+int lcd_tcon_disable_t3x(struct aml_lcd_drv_s *pdrv)
+{
+	/* disable unit(reg_func_enable) timing signal */
+	lcd_tcon_write(0x30e, 0);
+
+	/* disable od ddr_if */
+	lcd_tcon_setb(0x263, 0, 31, 1);
+	mdelay(100);
+
+	/* top reset */
+	lcd_tcon_write(TCON_RST_CTRL, 0x003f);
+
+	/* global reset tcon */
+	lcd_reset_setb(RESETCTRL_RESET2_MASK, 0, 3, 1);
+	lcd_reset_setb(RESETCTRL_RESET2_LEVEL, 0, 3, 1);
+	udelay(1);
+	lcd_reset_setb(RESETCTRL_RESET2_LEVEL, 1, 3, 1);
+	udelay(2);
+	LCDPR("reset tcon\n");
+
+	return 0;
+}
+
 int lcd_tcon_forbidden_check_t5(void)
 {
 	unsigned int val_tcon, val_tcon_UHD;

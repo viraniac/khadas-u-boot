@@ -258,6 +258,18 @@ static void lcd_gamma_init(void)
 static void lcd_encl_on(void)
 {
 	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
+	int ret;
+
+	if (lcd_drv->config_check_en == 0) {
+		if (lcd_debug_print_flag)
+			LCDPR("config_check disabled\n");
+	} else {
+		ret = lcd_config_timing_check(&lcd_drv->lcd_config->lcd_timing.act_timing);
+		if (ret & 0x55) {
+			LCDERR("%s: config timing check fatal error!\n", __func__);
+			return;
+		}
+	}
 
 	lcd_drv->driver_init_pre();
 	if (lcd_debug_test)
@@ -323,6 +335,10 @@ static void lcd_module_enable(char *mode, unsigned int frac)
 
 	if ((lcd_drv->lcd_status & LCD_STATUS_ENCL_ON) == 0)
 		lcd_encl_on();
+	if ((lcd_drv->lcd_status & LCD_STATUS_ENCL_ON) == 0) {
+		LCDERR("%s: encl_on failed!\n", __func__);
+		return;
+	}
 	if ((lcd_drv->lcd_status & LCD_STATUS_IF_ON) == 0) {
 		if (boot_ctrl.init_level == LCD_INIT_LEVEL_NORMAL) {
 			lcd_interface_on();
@@ -793,16 +809,6 @@ static int lcd_mode_probe(char *dt_addr, int load_id)
 		LCDPR("lcd_debug_check: %d\n", dbg_chk);
 		aml_lcd_driver.config_check_en = dbg_chk;
 	}
-	if (aml_lcd_driver.config_check_en == 0) {
-		if (lcd_debug_print_flag)
-			LCDPR("config_check disabled\n");
-	} else {
-		ret = lcd_config_check();
-		if (ret & 0x155) {
-			LCDERR("%s: lcd config check fatal error!\n", __func__);
-			return -1;
-		}
-	}
 
 #ifdef CONFIG_AML_LCD_EXTERN
 	lcd_extern_load_config(dt_addr, aml_lcd_driver.lcd_config);
@@ -1108,7 +1114,7 @@ static void aml_lcd_config_check(void)
 	if (lcd_check_valid())
 		return;
 
-	ret = lcd_config_check();
+	ret = lcd_config_timing_check(&aml_lcd_driver.lcd_config->lcd_timing.act_timing);
 	if (ret == 0)
 		printf("lcd_config_check: PASS\n");
 	printf("disp_tmg_min_req:\n"
@@ -1120,6 +1126,12 @@ static void aml_lcd_config_check(void)
 		aml_lcd_driver.disp_req.alert_level,
 		aml_lcd_driver.disp_req.hswbp_vid, aml_lcd_driver.disp_req.hfp_vid,
 		aml_lcd_driver.disp_req.vswbp_vid, aml_lcd_driver.disp_req.vfp_vid);
+#ifdef CONFIG_AML_LCD_TCON
+	if (aml_lcd_driver.lcd_config->lcd_basic.lcd_type == LCD_MLVDS ||
+	    aml_lcd_driver.lcd_config->lcd_basic.lcd_type == LCD_P2P) {
+		lcd_tcon_dbg_check(&aml_lcd_driver.lcd_config->lcd_timing.act_timing);
+	}
+#endif
 	printf("config_check_glb: %d, config_check: 0x%x, config_check_en: %d\n\n",
 		aml_lcd_driver.config_check_glb,
 		aml_lcd_driver.lcd_config->lcd_basic.config_check,

@@ -819,6 +819,8 @@ static int lcd_config_load_from_dts(char *dt_addr, struct lcd_config_s *pconf)
 		break;
 	}
 
+	lcd_config_timing_check(&pconf->lcd_timing.dft_timing);
+
 	/* check power_step */
 	lcd_power_load_from_dts(pconf, dt_addr, child_offset);
 
@@ -1096,6 +1098,8 @@ static int lcd_config_load_from_bsp(struct lcd_config_s *pconf)
 		LCDERR("unsupport lcd_type: %d\n", pconf->lcd_basic.lcd_type);
 	}
 
+	lcd_config_timing_check(&pconf->lcd_timing.dft_timing);
+
 	i = 0;
 	while (i < LCD_PWR_STEP_MAX) {
 		power_step = &ext_lcd->power_on_step[i];
@@ -1253,6 +1257,8 @@ static int lcd_config_load_from_unifykey_v2(struct lcd_config_s *pconf,
 		cus_ctrl->dft_timing.frame_rate_max = 0;
 
 		lcd_fr_range_update(&cus_ctrl->dft_timing);
+
+		lcd_config_timing_check(&cus_ctrl->dft_timing);
 	}
 
 	return 0;
@@ -1551,6 +1557,8 @@ static int lcd_config_load_from_unifykey(struct lcd_config_s *pconf)
 		vx1_conf->vx1_sw_cdr_detect_cnt = VX1_SW_CDR_DET_CNT_DFT;
 		vx1_conf->vx1_sw_cdr_timeout_cnt = VX1_SW_CDR_TIMEOUT_CNT_DFT;
 	}
+
+	lcd_config_timing_check(&pconf->lcd_timing.dft_timing);
 
 	/* step 3: check power sequence */
 	ret = lcd_power_load_from_unifykey(pconf, para, key_len, len);

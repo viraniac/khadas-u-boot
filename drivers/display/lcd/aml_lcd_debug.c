@@ -44,7 +44,7 @@ static void lcd_timing_info_print(struct lcd_config_s *pconf)
 {
 	int ret, herr, verr;
 
-	ret = lcd_config_check();
+	ret = lcd_config_timing_check(&pconf->lcd_timing.act_timing);
 	herr = ret & 0xf;
 	verr = (ret >> 4) & 0xf;
 

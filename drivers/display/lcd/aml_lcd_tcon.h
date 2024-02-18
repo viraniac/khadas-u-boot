@@ -56,7 +56,8 @@ struct lcd_tcon_config_s {
 	int (*tcon_enable)(struct lcd_config_s *pconf);
 	int (*tcon_disable)(struct lcd_config_s *pconf);
 	int (*tcon_forbidden_check)(void);
-	int (*tcon_check)(char *ferr_str, char *warn_str);
+	int (*tcon_check)(struct lcd_detail_timing_s *ptiming,
+			unsigned char *core_reg_table, char *ferr_str, char *warn_str);
 };
 
 struct tcon_rmem_config_s {
@@ -114,6 +115,7 @@ struct tcon_mem_map_table_s {
 #define TCON_BIN_VER_LEN    9
 struct lcd_tcon_local_cfg_s {
 	char bin_ver[TCON_BIN_VER_LEN];
+	unsigned char *cur_core_reg_table;
 };
 
 /* **********************************
@@ -217,8 +219,12 @@ int lcd_tcon_disable_t5(struct lcd_config_s *pconf);
 int lcd_tcon_forbidden_check_t5(void);
 int lcd_tcon_forbidden_check_t5d(void);
 
-int lcd_tcon_setting_check_t5(char *ferr_str, char *warn_str);
-int lcd_tcon_setting_check_t5d(char *ferr_str, char *warn_str);
+int lcd_tcon_init_setting_check(struct lcd_detail_timing_s *ptiming,
+		unsigned char *core_reg_table);
+int lcd_tcon_setting_check_t5(struct lcd_detail_timing_s *ptiming,
+		unsigned char *core_reg_table, char *ferr_str, char *warn_str);
+int lcd_tcon_setting_check_t5d(struct lcd_detail_timing_s *ptiming,
+		unsigned char *core_reg_table, char *ferr_str, char *warn_str);
 
 #endif
 

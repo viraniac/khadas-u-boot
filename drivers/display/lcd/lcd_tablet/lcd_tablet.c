@@ -489,6 +489,8 @@ static int lcd_config_load_from_dts(char *dt_addr, struct lcd_config_s *pconf)
 		break;
 	}
 
+	lcd_config_timing_check(&pconf->lcd_timing.dft_timing);
+
 	/* check power_step */
 	lcd_power_load_from_dts(pconf, dt_addr, child_offset);
 
@@ -717,6 +719,8 @@ static int lcd_config_load_from_bsp(struct lcd_config_s *pconf)
 		else
 			pconf->lcd_control.mipi_config->extern_init = ext_lcd->lcd_spc_val9;
 	}
+
+	lcd_config_timing_check(&pconf->lcd_timing.dft_timing);
 
 	i = 0;
 	while (i < LCD_PWR_STEP_MAX) {

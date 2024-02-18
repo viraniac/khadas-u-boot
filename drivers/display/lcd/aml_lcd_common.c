@@ -85,12 +85,9 @@ char *lcd_mode_mode_to_str(int mode)
 //     bit[5]:vfp: warning, only print warning message
 //     bit[6]:vswbp: fatal error, block driver
 //     bit[7]:vswbp: warning, only print warning message
-//     bit[8]:tcon: fatal error, block driver
-//     bit[9]:tcon: warning, only print warning message
-int lcd_config_check(void)
+int lcd_config_timing_check(struct lcd_detail_timing_s *ptiming)
 {
 	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
-	struct lcd_detail_timing_s *ptiming = &lcd_drv->lcd_config->lcd_timing.dft_timing;
 	short hpw = ptiming->hsync_width;
 	short hbp = ptiming->hsync_bp;
 	short hfp = ptiming->hsync_fp;
@@ -100,19 +97,7 @@ int lcd_config_check(void)
 	short hfp_min, vfp_min, vfp_cmpr_tail = 0, temp;
 	char *ferr_str = NULL, *warn_str = NULL;
 	int ferr_len = 0, warn_len = 0, ferr_left, warn_left;
-#ifdef CONFIG_AML_LCD_TCON
-	char *tcon_ferr_str = NULL, *tcon_warn_str = NULL;
-	int tcon_valid = 0;
-#endif
 	int ret = 0;
-
-	if (lcd_drv->lcd_config->lcd_basic.lcd_type == LCD_MLVDS ||
-	    lcd_drv->lcd_config->lcd_basic.lcd_type == LCD_P2P) {
-#ifdef CONFIG_AML_LCD_TCON
-		tcon_valid = 1;
-#endif
-		vfp_cmpr_tail = 3;
-	}
 
 	ferr_str = malloc(PR_BUF_MAX);
 	if (!ferr_str) {
@@ -127,27 +112,11 @@ int lcd_config_check(void)
 		return 0;
 	}
 	memset(warn_str, 0, PR_BUF_MAX);
-#ifdef CONFIG_AML_LCD_TCON
-	if (tcon_valid) {
-		tcon_ferr_str = malloc(PR_BUF_MAX);
-		if (!tcon_ferr_str) {
-			LCDERR("config_check fail for NOMEM\n");
-			free(ferr_str);
-			free(warn_str);
-			return 0;
-		}
-		memset(tcon_ferr_str, 0, PR_BUF_MAX);
-		tcon_warn_str = malloc(PR_BUF_MAX);
-		if (!tcon_warn_str) {
-			LCDERR("config_check fail for NOMEM\n");
-			free(ferr_str);
-			free(warn_str);
-			free(tcon_ferr_str);
-			return 0;
-		}
-		memset(tcon_warn_str, 0, PR_BUF_MAX);
+
+	if (lcd_drv->lcd_config->lcd_basic.lcd_type == LCD_MLVDS ||
+	    lcd_drv->lcd_config->lcd_basic.lcd_type == LCD_P2P) {
+		vfp_cmpr_tail = 3;
 	}
-#endif
 
 	if (hfp <= 0) {
 		ferr_left = lcd_debug_info_len(ferr_len);
@@ -200,7 +169,7 @@ int lcd_config_check(void)
 	//display timing check
 	//hswbp
 	if (lcd_drv->disp_req.hswbp_vid == 0)
-		goto lcd_config_valid_check_vid_hfp;
+		goto lcd_config_timing_check_vid_hfp;
 	temp = hpw + hbp;
 	if (temp < lcd_drv->disp_req.hswbp_vid) {
 		if (lcd_drv->disp_req.alert_level == 1) {
@@ -218,10 +187,10 @@ int lcd_config_check(void)
 		}
 	}
 
-lcd_config_valid_check_vid_hfp:
+lcd_config_timing_check_vid_hfp:
 	//hfp
 	if (lcd_drv->disp_req.hfp_vid == 0)
-		goto lcd_config_valid_check_vid_vswbp;
+		goto lcd_config_timing_check_vid_vswbp;
 	if (hfp < lcd_drv->disp_req.hfp_vid) {
 		if (lcd_drv->disp_req.alert_level == 1) {
 			warn_left = lcd_debug_info_len(warn_len);
@@ -238,10 +207,10 @@ lcd_config_valid_check_vid_hfp:
 		}
 	}
 
-lcd_config_valid_check_vid_vswbp:
+lcd_config_timing_check_vid_vswbp:
 	//vswbp
 	if (lcd_drv->disp_req.vswbp_vid == 0)
-		goto lcd_config_valid_check_vid_vfp;
+		goto lcd_config_timing_check_vid_vfp;
 	temp = vpw + vbp;
 	if (temp < lcd_drv->disp_req.vswbp_vid) {
 		if (lcd_drv->disp_req.alert_level == 1) {
@@ -259,10 +228,10 @@ lcd_config_valid_check_vid_vswbp:
 		}
 	}
 
-lcd_config_valid_check_vid_vfp:
+lcd_config_timing_check_vid_vfp:
 	//vfp
 	if (lcd_drv->disp_req.vfp_vid == 0)
-		goto lcd_config_valid_check_next;
+		goto lcd_config_timing_check_end;
 	temp = lcd_drv->disp_req.vfp_vid + vfp_cmpr_tail;
 	if (vfp < temp) {
 		if (lcd_drv->disp_req.alert_level == 1) {
@@ -280,16 +249,9 @@ lcd_config_valid_check_vid_vfp:
 		}
 	}
 
-lcd_config_valid_check_next:
-#ifdef CONFIG_AML_LCD_TCON
-	if (tcon_valid) {
-		temp = lcd_tcon_check(tcon_ferr_str, tcon_warn_str);
-		ret |= ((temp & 0x3) << 8);
-	}
-#endif
-
+lcd_config_timing_check_end:
 	if (ret) {
-		printf("**************** lcd config check ****************\n");
+		printf("**************** lcd config timing check ****************\n");
 		if (ret & 0x55) {
 			printf("lcd: FATAL ERROR:\n"
 				"%s\n", ferr_str);
@@ -298,33 +260,12 @@ lcd_config_valid_check_next:
 			printf("lcd: WARNING:\n"
 				"%s\n", warn_str);
 		}
-
-#ifdef CONFIG_AML_LCD_TCON
-		if (tcon_valid) {
-			if (ret & 0x100) {
-				printf("lcd: tcon: FATAL ERROR:\n"
-					"%s\n", tcon_ferr_str);
-			}
-			if (ret & 0x200) {
-				printf("lcd: tcon: WARNING:\n"
-					"%s\n", tcon_warn_str);
-			}
-		}
-#endif
-		printf("************** lcd config check end ****************\n");
+		printf("************** lcd config timing check end ****************\n");
 	}
 	memset(ferr_str, 0, PR_BUF_MAX);
 	memset(warn_str, 0, PR_BUF_MAX);
 	free(ferr_str);
 	free(warn_str);
-#ifdef CONFIG_AML_LCD_TCON
-	if (tcon_valid) {
-		memset(tcon_ferr_str, 0, PR_BUF_MAX);
-		memset(tcon_warn_str, 0, PR_BUF_MAX);
-		free(tcon_ferr_str);
-		free(tcon_warn_str);
-	}
-#endif
 
 	return ret;
 }

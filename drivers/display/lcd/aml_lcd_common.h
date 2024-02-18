@@ -65,7 +65,8 @@
 /* 20231205: add lcd config check*/
 /* 20231218: update timing management*/
 /* 20240129: update display mode management*/
-#define LCD_DRV_VERSION    "20240129"
+/* 20240218: optimize lcd config check sequence*/
+#define LCD_DRV_VERSION    "20240218"
 
 #define LCD_STATUS_IF_ON      (1 << 0)
 #define LCD_STATUS_ENCL_ON    (1 << 1)
@@ -89,7 +90,7 @@ extern char *lcd_type_type_to_str(int type);
 extern int lcd_mode_str_to_mode(const char *str);
 extern char *lcd_mode_mode_to_str(int mode);
 
-int lcd_config_check(void);
+int lcd_config_timing_check(struct lcd_detail_timing_s *ptiming);
 extern int lcd_power_load_from_dts(struct lcd_config_s *pconf,
 		char *dt_addr, int child_offset);
 extern int lcd_power_load_from_unifykey(struct lcd_config_s *pconf,
@@ -113,11 +114,13 @@ extern int lcd_phy_probe(void);
 extern void lcd_phy_tcon_chpi_bbc_init_tl1(struct lcd_config_s *pconf);
 
 /* lcd tcon */
+#ifdef CONFIG_AML_LCD_TCON
 extern void lcd_tcon_info_print(void);
 extern int lcd_tcon_enable(struct lcd_config_s *pconf);
 extern void lcd_tcon_disable(struct lcd_config_s *pconf);
 extern int lcd_tcon_probe(char *dt_addr, struct aml_lcd_drv_s *lcd_drv, int load_id);
-int lcd_tcon_check(char *ferr_str, char *warn_str);
+void lcd_tcon_dbg_check(struct lcd_detail_timing_s *ptiming);
+#endif
 
 /* lcd pinctrl */
 int lcd_pinmux_probe(unsigned int cpu_type);

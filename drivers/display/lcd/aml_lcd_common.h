@@ -67,8 +67,8 @@
 /* 20240129: update display mode management*/
 /* 20240218: optimize lcd config check sequence*/
 /* 20240222: update custom control support*/
-/* 20240226: add tcon init_table pre_proc*/
-#define LCD_DRV_VERSION    "20240226"
+/* 20240307: update swpdf support*/
+#define LCD_DRV_VERSION    "20240307"
 
 #define LCD_STATUS_IF_ON      (1 << 0)
 #define LCD_STATUS_ENCL_ON    (1 << 1)

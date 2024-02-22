@@ -15,6 +15,7 @@
 #include <asm/arch/bl31_apis.h>
 #include <asm/arch/secure_apb.h>
 #include <libfdt.h>
+#include <linux/compat.h>
 #include <partition_table.h>
 #include <malloc.h>
 #include <emmc_partitions.h>
@@ -33,6 +34,10 @@
 #define IMG_PRELOAD_SZ  (1U<<20) //Total read 1M at first to read the image header
 #define PIC_PRELOAD_SZ  (8U<<10) //Total read 4k at first to read the image header
 #define RES_OLD_FMT_READ_SZ (8U<<20)
+
+#define MAX_RAMDISK_SIZE	SZ_64M
+#define MAX_KERNEL_SIZE		SZ_64M
+#define MAX_DTB_SIZE		SZ_16M
 
 typedef struct __aml_enc_blk{
         unsigned int  nOffset;
@@ -205,7 +210,7 @@ static int do_image_read_dtb(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
     unsigned int nFlashLoadLen = 0;
     unsigned secureKernelImgSz = 0;
     const int preloadSz = 4096;
-    int pageSz = 0;
+    unsigned int pageSz = 0;
 
     if (2 < argc) {
         loadaddr = (unsigned char*)simple_strtoul(argv[2], NULL, 16);
@@ -295,10 +300,22 @@ static int do_image_read_dtb(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
     }
     debugP("lflashReadOff=0x%llx, nFlashLoadLen=0x%x\n", lflashReadOff, nFlashLoadLen);
     debugP("page sz %u\n", hdr_addr->page_size);
-    if (!nFlashLoadLen) {
-        errorP("NO second part in kernel image\n");
+
+    if (pageSz > PAGE_SIZE) {
+        errorP("Wrong pageSz:%d\n", pageSz);
         return __LINE__;
     }
+
+    if (!nFlashLoadLen || nFlashLoadLen > MAX_DTB_SIZE) {
+        errorP("Wrong nFlashLoadLen:%d\n", nFlashLoadLen);
+        return __LINE__;
+    }
+
+    if (lflashReadOff > (MAX_RAMDISK_SIZE + MAX_KERNEL_SIZE)) {
+        errorP("Wrong lflashReadOff:%lld\n", lflashReadOff);
+        return __LINE__;
+    }
+
     unsigned long rdOffAlign = lflashReadOff;
     unsigned char* dtImgAddr = (unsigned char*)loadaddr + lflashReadOff;
 #ifdef CONFIG_AML_MTD
@@ -356,6 +373,12 @@ static int do_image_read_dtb(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
         return CMD_RET_FAILURE;
     }
     const unsigned fdtsz    = fdt_totalsize((char*)fdtAddr);
+
+    if (fdtsz >= SZ_1M) {
+        errorP("bad fdt size:%d\n", fdtsz);
+        return CMD_RET_FAILURE;
+    }
+
     memmove(dtDestAddr, (char*)fdtAddr, fdtsz);
 
     return nReturn;

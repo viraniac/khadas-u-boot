@@ -432,6 +432,7 @@
             "else "\
                 "run init_display; "\
             "fi;fi; "\
+			"setenv initargs ${initargs} androidboot.bootreason=${reboot_mode};"\
             "\0"\
         "cmdline_keys="\
             "if keyman init 0x1234; then "\

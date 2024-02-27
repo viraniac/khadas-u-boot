@@ -49,7 +49,7 @@ static void lcd_config_load_print(struct lcd_config_s *pconf)
 	LCDPR("vsync_pol = %d\n", ptiming->vsync_pol);
 
 	LCDPR("fr_adjust_type = %d\n", ptiming->fr_adjust_type);
-	LCDPR("ss_level = 0x%x\n", pconf->lcd_timing.ss_level);
+	LCDPR("ss_level = %d\n", pconf->lcd_timing.ss_level);
 	LCDPR("pll_flag = %d\n", pconf->lcd_timing.pll_flag);
 	LCDPR("clk = %dHz\n", ptiming->pixel_clk);
 
@@ -241,7 +241,10 @@ static int lcd_config_load_from_dts(char *dt_addr, struct lcd_config_s *pconf)
 		ptiming->pixel_clk = 60;
 	} else {
 		ptiming->fr_adjust_type = (unsigned char)(be32_to_cpup((u32 *)propdata));
-		pconf->lcd_timing.ss_level = be32_to_cpup((((u32 *)propdata) + 1));
+		temp = be32_to_cpup((((u32 *)propdata) + 1));
+		pconf->lcd_timing.ss_level = temp & 0xff;
+		pconf->lcd_timing.ss_freq = (temp >> 8) & 0xf;
+		pconf->lcd_timing.ss_mode = (temp >> 12) & 0xf;
 		pconf->lcd_timing.pll_flag = (unsigned char)(be32_to_cpup((((u32 *)propdata) + 2)));
 		ptiming->pixel_clk = be32_to_cpup((((u32 *)propdata) + 3));
 	}
@@ -577,10 +580,13 @@ static int lcd_config_load_from_bsp(struct lcd_config_s *pconf)
 		ptiming->fr_adjust_type = (unsigned char)temp;
 	/* ss_level */
 	temp = ext_lcd->customer_val_1;
-	if (temp == Rsv_val)
+	if (temp == Rsv_val) {
 		pconf->lcd_timing.ss_level = 0;
-	else
-		pconf->lcd_timing.ss_level = temp;
+	} else {
+		pconf->lcd_timing.ss_level = temp & 0xff;
+		pconf->lcd_timing.ss_freq = (temp >> 8) & 0xf;
+		pconf->lcd_timing.ss_mode = (temp >> 12) & 0xf;
+	}
 	/* clk_auto_generate */
 	temp = ext_lcd->customer_val_2;
 	if (temp == Rsv_val)
@@ -775,7 +781,7 @@ static int lcd_config_load_from_unifykey(struct lcd_config_s *pconf)
 	int key_len, len;
 	unsigned char *p;
 	const char *str;
-	struct aml_lcd_unifykey_header_s lcd_header;
+	struct aml_lcd_unifykey_header_s *lcd_header;
 	struct aml_lcd_drv_s *pdrv = aml_lcd_get_driver();
 	struct lcd_detail_timing_s *ptiming = &pconf->lcd_timing.dft_timing;
 	struct lvds_config_s *lvdsconf = pconf->lcd_control.lvds_config;
@@ -784,31 +790,28 @@ static int lcd_config_load_from_unifykey(struct lcd_config_s *pconf)
 	int i, ret;
 	unsigned int temp;
 
-	para = (unsigned char *)malloc(sizeof(unsigned char) * LCD_UKEY_LCD_SIZE);
+	ret = aml_lcd_unifykey_get_size("lcd", &key_len);
+	if (ret)
+		return -1;
+	if (lcd_debug_print_flag)
+		LCDPR("%s: size: 0x%x\n", __func__, key_len);
+	para = (unsigned char *)malloc(sizeof(unsigned char) * key_len);
 	if (!para) {
 		LCDERR("%s: Not enough memory\n", __func__);
 		return -1;
 	}
-	key_len = LCD_UKEY_LCD_SIZE;
 	memset(para, 0, (sizeof(unsigned char) * key_len));
-	ret = aml_lcd_unifykey_get("lcd", para, &key_len);
+
+	ret = aml_lcd_unifykey_get("lcd", para, key_len);
 	if (ret) {
 		free(para);
 		return -1;
 	}
 
 	/* step 1: check header */
-	len = LCD_UKEY_HEAD_SIZE;
-	ret = aml_lcd_unifykey_len_check(key_len, len);
-	if (ret) {
-		LCDERR("unifykey header length is incorrect\n");
-		free(para);
-		return -1;
-	}
-
-	aml_lcd_unifykey_header_check(para, &lcd_header);
-	LCDPR("unifykey version: 0x%04x\n", lcd_header.version);
-	switch (lcd_header.version) {
+	lcd_header = (struct aml_lcd_unifykey_header_s *)para;
+	LCDPR("unifykey version: 0x%04x\n", lcd_header->version);
+	switch (lcd_header->version) {
 	case 2:
 		len = LCD_UKEY_DATA_LEN_V2; /*10+36+18+31+20+44+10*/
 		break;
@@ -818,10 +821,10 @@ static int lcd_config_load_from_unifykey(struct lcd_config_s *pconf)
 	}
 	if (lcd_debug_print_flag) {
 		LCDPR("unifykey header:\n");
-		LCDPR("crc32             = 0x%08x\n", lcd_header.crc32);
-		LCDPR("data_len          = %d\n", lcd_header.data_len);
-		LCDPR("block_next_flag   = %d\n", lcd_header.block_next_flag);
-		LCDPR("block_cur_size    = 0x%04x\n", lcd_header.block_cur_size);
+		LCDPR("crc32             = 0x%08x\n", lcd_header->crc32);
+		LCDPR("data_len          = %d\n", lcd_header->data_len);
+		LCDPR("block_next_flag   = %d\n", lcd_header->block_next_flag);
+		LCDPR("block_cur_size    = 0x%04x\n", lcd_header->block_cur_size);
 	}
 
 	/* step 2: check lcd parameters */
@@ -907,7 +910,7 @@ static int lcd_config_load_from_unifykey(struct lcd_config_s *pconf)
 			free(para);
 			return -1;
 		}
-		if (lcd_header.version == 2) {
+		if (lcd_header->version == 2) {
 			pconf->lcd_control.lvds_config->lvds_repack =
 					(*(p + LCD_UKEY_IF_ATTR_0) |
 					((*(p + LCD_UKEY_IF_ATTR_0 + 1)) << 8)) & 0xff;
@@ -989,7 +992,7 @@ static int lcd_config_load_from_unifykey(struct lcd_config_s *pconf)
 			free(para);
 			return -1;
 		}
-		if (lcd_header.version == 2) {
+		if (lcd_header->version == 2) {
 			pconf->lcd_control.vbyone_config->lane_count =
 				(*(p + LCD_UKEY_IF_ATTR_0) |
 				((*(p + LCD_UKEY_IF_ATTR_0 + 1)) << 8)) & 0xff;
@@ -1042,7 +1045,7 @@ static int lcd_config_load_from_unifykey(struct lcd_config_s *pconf)
 	} else
 		LCDERR("unsupport lcd_type: %d\n", pconf->lcd_basic.lcd_type);
 
-	if (lcd_header.version == 2) {
+	if (lcd_header->version == 2) {
 		/* phy: 10byte */ /* v2 */
 		if (pconf->lcd_basic.lcd_type == LCD_LVDS) {
 			pconf->lcd_control.lvds_config->phy_vswing = *(p +LCD_UKEY_PHY_ATTR_0);

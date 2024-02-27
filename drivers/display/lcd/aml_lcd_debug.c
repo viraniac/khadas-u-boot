@@ -1068,7 +1068,9 @@ void aml_lcd_info_print(void)
 	LCDPR("%s, %s %ubit, %ux%u@%u.%2uHz\n"
 		"fr_adj_type       %d\n"
 		"pixel_clk         %uHz\n"
-		"ss_level          0x%x\n\n",
+		"ss_level          %d\n"
+		"ss_freq           %d\n"
+		"ss_mode           %d\n\n",
 		pconf->lcd_basic.model_name,
 		lcd_type_type_to_str(pconf->lcd_basic.lcd_type),
 		pconf->lcd_basic.lcd_bits,
@@ -1077,7 +1079,9 @@ void aml_lcd_info_print(void)
 		(sync_duration / 100), (sync_duration % 100),
 		pconf->lcd_timing.act_timing.fr_adjust_type,
 		pconf->lcd_timing.act_timing.pixel_clk,
-		pconf->lcd_timing.ss_level);
+		pconf->lcd_timing.ss_level,
+		pconf->lcd_timing.ss_freq,
+		pconf->lcd_timing.ss_mode);
 
 	lcd_timing_info_print(pconf);
 
@@ -1091,6 +1095,8 @@ void aml_lcd_info_print(void)
 	}
 
 	lcd_phy_print(pconf);
+
+	lcd_cus_ctrl_dump_info(pconf);
 
 	lcd_power_info_print(lcd_drv, 1);
 	lcd_power_info_print(lcd_drv, 0);

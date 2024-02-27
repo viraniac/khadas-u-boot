@@ -306,18 +306,13 @@ struct aml_lcd_tcon_spi_unifykey_header_s {
  * API
  * ********************************* */
 int aml_lcd_unifykey_len_check(int key_len, int len);
-int aml_lcd_unifykey_header_check(unsigned char *buf,
-				  struct aml_lcd_unifykey_header_s *header);
 int aml_lcd_unifykey_check_exist(const char *key_name);
 int aml_lcd_unifykey_check(const char *key_name);
-int aml_lcd_unifykey_get(const char *key_name, unsigned char *buf, int *len);
-int aml_lcd_unifykey_get_tcon(const char *key_name, unsigned char *buf, int *len);
-int aml_lcd_unifykey_check_no_header(const char *key_name);
-int aml_lcd_unifykey_get_no_header(const char *key_name, unsigned char *buf, int *len);
+int aml_lcd_unifykey_get_size(const char *key_name, int *len);
+int aml_lcd_unifykey_get(const char *key_name, unsigned char *buf, int len);
+int aml_lcd_unifykey_get_tcon(const char *key_name, unsigned char *buf, int len);
+int aml_lcd_unifykey_get_no_header(const char *key_name, unsigned char *buf, int len);
 int aml_lcd_unifykey_write(const char *key_name, unsigned char *buf, int len);
-
-void aml_lcd_unifykey_test(void);
-void aml_lcd_unifykey_tcon_test(int n);
 void aml_lcd_unifykey_dump(unsigned int flag);
 
 #endif

@@ -66,7 +66,8 @@
 /* 20231218: update timing management*/
 /* 20240129: update display mode management*/
 /* 20240218: optimize lcd config check sequence*/
-#define LCD_DRV_VERSION    "20240218"
+/* 20240222: update custom control support*/
+#define LCD_DRV_VERSION    "20240222"
 
 #define LCD_STATUS_IF_ON      (1 << 0)
 #define LCD_STATUS_ENCL_ON    (1 << 1)
@@ -101,6 +102,19 @@ void lcd_clk_frame_rate_init(struct lcd_detail_timing_s *ptiming);
 void lcd_default_to_basic_timing_init_config(struct lcd_config_s *pconf);
 void lcd_enc_timing_init_config(struct lcd_config_s *pconf);
 int lcd_frame_rate_change(struct lcd_config_s *pconf);
+
+/* lcd cus_ctrl */
+void lcd_cus_ctrl_dump_raw_data(struct lcd_config_s *pconf);
+void lcd_cus_ctrl_dump_info(struct lcd_config_s *pconf);
+int lcd_cus_ctrl_load_from_dts(struct lcd_config_s *pconf, char *dt_addr);
+int lcd_cus_ctrl_load_from_unifykey(struct lcd_config_s *pconf, unsigned char *buf,
+		unsigned int max_size);
+void lcd_cus_ctrl_config_remove(struct lcd_config_s *pconf);
+int lcd_cus_ctrl_config_update(struct lcd_config_s *pconf, void *param, unsigned int mask_sel);
+void lcd_cus_ctrl_state_clear(struct lcd_config_s *pconf, unsigned int mask_sel);
+int lcd_cus_ctrl_timing_is_valid(struct lcd_config_s *pconf);
+int lcd_cus_ctrl_timing_is_activated(struct lcd_config_s *pconf);
+struct lcd_detail_timing_s **lcd_cus_ctrl_timing_match_get(struct lcd_config_s *pconf);
 
 /* lcd phy */
 unsigned int lcd_phy_vswing_level_to_value(struct aml_lcd_drv_s *pdrv, unsigned int level);

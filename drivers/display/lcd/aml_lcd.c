@@ -1057,30 +1057,19 @@ static void lcd_disable(void)
 static void aml_lcd_set_ss(unsigned int level, unsigned int freq, unsigned int mode)
 {
 	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
-	unsigned int temp;
 	int ret;
 
 	if (lcd_check_valid())
 		return;
 	if (aml_lcd_driver.lcd_status) {
-		temp = lcd_drv->lcd_config->lcd_timing.ss_level;
 		ret = lcd_set_ss(level, freq, mode);
 		if (ret == 0) {
-			if (level < 0xff) {
-				temp &= ~(0xff);
-				temp |= level;
-				lcd_drv->lcd_config->lcd_timing.ss_level = temp;
-			}
-			if (freq < 0xff) {
-				temp &= ~((0xf << LCD_CLK_SS_BIT_FREQ) << 8);
-				temp |= ((freq << LCD_CLK_SS_BIT_FREQ) << 8);
-				lcd_drv->lcd_config->lcd_timing.ss_level = temp;
-			}
-			if (mode < 0xff) {
-				temp &= ~((0xf << LCD_CLK_SS_BIT_MODE) << 8);
-				temp |= ((mode << LCD_CLK_SS_BIT_MODE) << 8);
-				lcd_drv->lcd_config->lcd_timing.ss_level = temp;
-			}
+			if (level < 0xff)
+				lcd_drv->lcd_config->lcd_timing.ss_level = level;
+			if (freq < 0xff)
+				lcd_drv->lcd_config->lcd_timing.ss_freq = freq;
+			if (mode < 0xff)
+				lcd_drv->lcd_config->lcd_timing.ss_mode = mode;
 		}
 	} else {
 		LCDPR("already disabled\n");
@@ -1200,16 +1189,6 @@ static void aml_backlight_power_off(void)
 	aml_bl_power_ctrl(0, 1);
 }
 
-static void aml_lcd_key_test(void)
-{
-	if (aml_lcd_driver.unifykey_test_flag) {
-		aml_lcd_unifykey_test();
-		lcd_config_probe();
-	} else {
-		printf("lcd unifykey test disabled\n");
-	}
-}
-
 static void aml_lcd_key_dump(unsigned int flag)
 {
 	unsigned int key_flag = LCD_UKEY_DEBUG_NORMAL;
@@ -1284,7 +1263,6 @@ static struct aml_lcd_drv_s aml_lcd_driver = {
 	.get_bl_level = aml_get_backlight_level,
 	.bl_config_print = aml_bl_config_print,
 	.unifykey_test_flag = 0, /* default disable unifykey test */
-	.unifykey_test = aml_lcd_key_test,
 	.unifykey_dump = aml_lcd_key_dump,
 	.debug_print_set = aml_lcd_debug_print_set,
 

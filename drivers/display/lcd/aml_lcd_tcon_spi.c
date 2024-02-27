@@ -415,7 +415,7 @@ static int lcd_tcon_spi_data_parse(void)
 	unsigned int data_buf_size;
 #endif
 #endif
-	struct aml_lcd_tcon_spi_unifykey_header_s spi_header;
+	struct aml_lcd_tcon_spi_unifykey_header_s *spi_header;
 	unsigned int i, j, n, block_size;
 	int key_len, len, ret;
 
@@ -425,20 +425,22 @@ static int lcd_tcon_spi_data_parse(void)
 	ret = aml_lcd_unifykey_check_exist("lcd_tcon_spi");
 	if (ret)
 		return -1;
+	ret = aml_lcd_unifykey_get_size("lcd_tcon_spi", &key_len);
+	if (ret)
+		return -1;
 
-	para = (unsigned char *)malloc(sizeof(unsigned char) * LCD_UKEY_TCON_SPI_SIZE);
+	para = (unsigned char *)malloc(sizeof(unsigned char) * key_len);
 	if (!para) {
 		LCDERR("%s: Not enough memory\n", __func__);
 		return -1;
 	}
-	key_len = LCD_UKEY_TCON_SPI_SIZE;
 	memset(para, 0, (sizeof(unsigned char) * key_len));
-	ret = aml_lcd_unifykey_get("lcd_tcon_spi", para, &key_len);
+	ret = aml_lcd_unifykey_get("lcd_tcon_spi", para, key_len);
 	if (ret)
 		goto lcd_tcon_spi_data_parse_err0;
 
 	/* check lcd_tcon_spi unifykey length */
-	len = 10;
+	len = 16;
 	ret = aml_lcd_unifykey_len_check(key_len, len);
 	if (ret) {
 		LCDERR("lcd_tcon_spi unifykey length is not correct\n");
@@ -446,16 +448,16 @@ static int lcd_tcon_spi_data_parse(void)
 	}
 
 	/* header: 16byte */
-	memcpy(&spi_header, para, LCD_UKEY_TCON_SPI_HEAD_SIZE);
+	spi_header = (struct aml_lcd_tcon_spi_unifykey_header_s *)para;
 	if (lcd_debug_print_flag) {
 		LCDPR("lcd_tcon_spi unifykey header:\n");
-		LCDPR("crc32             = 0x%08x\n", spi_header.crc32);
-		LCDPR("data_size         = %d\n", spi_header.data_size);
-		LCDPR("version           = %d\n", spi_header.version);
-		LCDPR("block_cnt         = %d\n", spi_header.block_cnt);
+		LCDPR("crc32             = 0x%08x\n", spi_header->crc32);
+		LCDPR("data_size         = %d\n", spi_header->data_size);
+		LCDPR("version           = %d\n", spi_header->version);
+		LCDPR("block_cnt         = %d\n", spi_header->block_cnt);
 	}
-	tcon_spi.version = spi_header.version;
-	tcon_spi.block_cnt = spi_header.block_cnt;
+	tcon_spi.version = spi_header->version;
+	tcon_spi.block_cnt = spi_header->block_cnt;
 	if (tcon_spi.version == 0) {
 		free(para);
 		return 0;

@@ -1966,6 +1966,14 @@ static int lcd_tcon_load_init_data_from_unifykey(void)
 	int key_len, data_len, ret;
 
 	data_len = tcon_mm_table.core_reg_table_size;
+	ret = aml_lcd_unifykey_get_size("lcd_tcon", &key_len);
+	if (ret)
+		return -1;
+	if (key_len < data_len) {
+		LCDERR("%s: key_len %d is not enough, need %d\n",
+			__func__, key_len, data_len);
+		return -1;
+	}
 	if (!tcon_mm_table.core_reg_table) {
 		tcon_mm_table.core_reg_table =
 			(unsigned char *)malloc(sizeof(unsigned char) * data_len);
@@ -1973,13 +1981,10 @@ static int lcd_tcon_load_init_data_from_unifykey(void)
 			return -1;
 	}
 	memset(tcon_mm_table.core_reg_table, 0, (sizeof(unsigned char) * data_len));
-	key_len = data_len;
 	ret = aml_lcd_unifykey_get_no_header("lcd_tcon",
 					     tcon_mm_table.core_reg_table,
-					     &key_len);
+					     key_len);
 	if (ret)
-		goto lcd_tcon_load_init_data_err;
-	if (key_len != data_len)
 		goto lcd_tcon_load_init_data_err;
 
 	memset(tcon_local_cfg.bin_ver, 0, TCON_BIN_VER_LEN);
@@ -2013,6 +2018,14 @@ static int lcd_tcon_load_init_data_from_unifykey_new(void)
 
 	data_len = tcon_mm_table.core_reg_table_size +
 		LCD_TCON_DATA_BLOCK_HEADER_SIZE;
+	ret = aml_lcd_unifykey_get_size("lcd_tcon", &key_len);
+	if (ret)
+		return -1;
+	if (key_len < data_len) {
+		LCDERR("%s: key_len %d is not enough, need %d\n",
+			__func__, key_len, data_len);
+		return -1;
+	}
 	buf = (unsigned char *)malloc(data_len * sizeof(unsigned char));
 	if (!buf)
 		return -1;
@@ -2025,11 +2038,8 @@ static int lcd_tcon_load_init_data_from_unifykey_new(void)
 	memset(data_header, 0, LCD_TCON_DATA_BLOCK_HEADER_SIZE);
 	tcon_mm_table.core_reg_header = data_header;
 
-	key_len = data_len;
-	ret = aml_lcd_unifykey_get_tcon("lcd_tcon", buf, &key_len);
+	ret = aml_lcd_unifykey_get_tcon("lcd_tcon", buf, key_len);
 	if (ret)
-		goto lcd_tcon_load_init_data_new_err;
-	if (key_len != data_len)
 		goto lcd_tcon_load_init_data_new_err;
 
 	memcpy(data_header, buf, LCD_TCON_DATA_BLOCK_HEADER_SIZE);

@@ -136,7 +136,16 @@ obj-$(CONFIG_CMD_IDE) += cmd_ide.o
 obj-$(CONFIG_CMD_IMMAP) += cmd_immap.o
 
 ifdef CONFIG_CMD_INI
-obj-y += ini/model.o ini/model_data_check.o ini/ini_proxy.o ini/UnifyKey.o ini/ini_platform.o ini/ini_io.o ini/ini_handler.o ini/ini_core.o ini/ini_log.o
+obj-y += ini/model.o
+obj-y += ini/model_lcd_cus_ctrl.o
+obj-y += ini/model_data_check.o
+obj-y += ini/ini_proxy.o
+obj-y += ini/UnifyKey.o
+obj-y += ini/ini_platform.o
+obj-y += ini/ini_io.o
+obj-y += ini/ini_handler.o
+obj-y += ini/ini_core.o
+obj-y += ini/ini_log.o
 endif
 obj-$(CONFIG_CMD_INI) += cmd_ini.o
 

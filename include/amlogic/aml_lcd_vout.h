@@ -12,6 +12,7 @@
 #include <common.h>
 #include <linux/list.h>
 #include <amlogic/aml_lcd_timing.h>
+#include <amlogic/aml_lcd_cus_ctrl.h>
 #ifdef CONFIG_AML_LCD_TCON
 #include <amlogic/aml_lcd_tcon_data.h>
 #endif
@@ -118,9 +119,9 @@ struct lcd_timing_s {
 
 	unsigned char pll_flag;
 	unsigned char clk_change; /* internal used */
-	unsigned int ss_level; /* [15:12]: ss_freq, [11:8]: ss_mode,
-				* [7:0]: ss_level
-				*/
+	unsigned int ss_level;
+	unsigned int ss_freq;
+	unsigned int ss_mode;
 	unsigned int enc_clk;
 	unsigned long long bit_rate; /* Hz */
 
@@ -451,9 +452,14 @@ struct lcd_vmode_mgr_s {
 };
 
 struct cus_ctrl_config_s {
-	unsigned int flag;
-	unsigned char ufr_flag;
-	struct lcd_detail_timing_s dft_timing;
+	unsigned int ctrl_en;
+	unsigned int ctrl_cnt;
+	unsigned int timing_cnt;
+	unsigned int active_timing_type;
+	unsigned char timing_switch_flag;
+	unsigned char timing_ctrl_valid;
+
+	struct lcd_cus_ctrl_attr_config_s *attr_config;
 };
 
 #define LCD_ENABLE_RETRY_MAX    3
@@ -696,7 +702,6 @@ struct aml_lcd_drv_s {
 	int  (*get_bl_level)(void);
 	void (*bl_config_print)(void);
 	int unifykey_test_flag;
-	void (*unifykey_test)(void);
 	void (*unifykey_dump)(unsigned int);
 	void (*debug_print_set)(unsigned int flag);
 

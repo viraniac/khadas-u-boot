@@ -586,11 +586,6 @@ static int do_lcd_key(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		} else {
 			return -1;
 		}
-	} else if (strcmp(argv[1], "test") == 0) {
-		if (lcd_drv->unifykey_test)
-			lcd_drv->unifykey_test();
-		else
-			printf("no lcd unifykey_test\n");
 	} else if (strcmp(argv[1], "dump") == 0) {
 		if (argc == 3) {
 			if (strcmp(argv[2], "tcon") == 0)

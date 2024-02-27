@@ -2896,15 +2896,12 @@ void lcd_clk_generate_parameter(struct lcd_config_s *pconf)
 	if (clk_conf.data->clk_generate_parameter)
 		clk_conf.data->clk_generate_parameter(pconf);
 
-	ss_level = pconf->lcd_timing.ss_level & 0xff;
-	clk_conf.ss_level = (ss_level >= clk_conf.data->ss_level_max) ?
-				0 : ss_level;
-	ss_freq = (pconf->lcd_timing.ss_level >> 8) & 0xf;
-	clk_conf.ss_freq = (ss_freq >= clk_conf.data->ss_freq_max) ?
-				0 : ss_freq;
-	ss_mode = (pconf->lcd_timing.ss_level >> 12) & 0xf;
-	clk_conf.ss_mode = (ss_mode >= clk_conf.data->ss_mode_max) ?
-				0 : ss_mode;
+	ss_level = pconf->lcd_timing.ss_level;
+	clk_conf.ss_level = (ss_level >= clk_conf.data->ss_level_max) ? 0 : ss_level;
+	ss_freq = pconf->lcd_timing.ss_freq;
+	clk_conf.ss_freq = (ss_freq >= clk_conf.data->ss_freq_max) ? 0 : ss_freq;
+	ss_mode = pconf->lcd_timing.ss_mode;
+	clk_conf.ss_mode = (ss_mode >= clk_conf.data->ss_mode_max) ? 0 : ss_mode;
 }
 
 void lcd_get_ss(void)
@@ -2993,8 +2990,7 @@ int lcd_set_ss(unsigned int level, unsigned int freq, unsigned int mode)
 			clk_conf.ss_freq = freq;
 		if (mode < 0xff)
 			clk_conf.ss_mode = mode;
-		clk_conf.data->set_ss_advance(clk_conf.ss_freq,
-			clk_conf.ss_mode);
+		clk_conf.data->set_ss_advance(clk_conf.ss_freq, clk_conf.ss_mode);
 	}
 
 lcd_set_ss_end:

@@ -21,26 +21,6 @@
 #include "aml_lcd_common.h"
 #include "aml_lcd_tcon.h"
 
-void lcd_tcon_od_pre_disable(unsigned char *table)
-{
-	struct lcd_tcon_config_s *tcon_conf = get_lcd_tcon_config();
-	unsigned char *table8;
-	unsigned int *table32;
-	unsigned int reg = 0, bit = 0;
-
-	if (!tcon_conf)
-		return;
-
-	table32 = (unsigned int *)(table);
-	table8 = (unsigned char *)(table);
-	reg = tcon_conf->reg_core_od;
-	bit = tcon_conf->bit_od_en;
-	if (tcon_conf->reg_table_width == 32 && tcon_conf->core_reg_width != 8)
-		table32[reg] &= ~(1 << bit);
-	else
-		table8[reg] &= ~(1 << bit);
-}
-
 static void lcd_tcon_core_reg_pre_od(struct lcd_tcon_config_s *tcon_conf,
 				     struct tcon_mem_map_table_s *mm_table)
 {
@@ -96,6 +76,38 @@ static void lcd_tcon_core_reg_pre_od(struct lcd_tcon_config_s *tcon_conf,
 	}
 }
 
+void lcd_tcon_init_table_pre_proc(unsigned char *table)
+{
+	struct lcd_tcon_config_s *tcon_conf = get_lcd_tcon_config();
+	struct tcon_rmem_s *tcon_rmem = get_lcd_tcon_rmem();
+	unsigned int reg = 0, paddr, i;
+	unsigned int *table32;
+
+	if (!table || !tcon_conf || !tcon_rmem)
+		return;
+	table32 = (unsigned int *)table;
+
+	//od ddrif disable
+	table32[0x263] &= ~(1 << 31);
+	//demura ddrif disable
+	table32[0x1a3] &= ~(1 << 31);
+
+	//update axi paddr
+	if (tcon_rmem->flag == 0 || !tcon_rmem->axi_rmem || !tcon_conf->axi_reg) {
+		LCDPR("%s: invalid axi_rmem\n", __func__);
+	} else {
+		for (i = 0; i < tcon_conf->axi_bank; i++) {
+			reg = tcon_conf->axi_reg[i];
+			paddr = tcon_rmem->axi_rmem[i].mem_paddr;
+			table32[reg] = paddr;
+			if (lcd_debug_print_flag) {
+				LCDPR("%s: axi[%d] reg: 0x%08x, paddr: 0x%08x\n",
+					__func__, i, reg, paddr);
+			}
+		}
+	}
+}
+
 static void lcd_tcon_core_reg_set(struct lcd_tcon_config_s *tcon_conf,
 				  struct tcon_mem_map_table_s *mm_table,
 				  unsigned char *core_reg_table)
@@ -103,10 +115,10 @@ static void lcd_tcon_core_reg_set(struct lcd_tcon_config_s *tcon_conf,
 	struct aml_lcd_drv_s *pdrv = aml_lcd_get_driver();
 	unsigned char *table8;
 	unsigned int *table32;
-	unsigned int len, offset, reg, bit;
+	unsigned int len, offset;
 	int i, ret;
 
-	if (!core_reg_table) {
+	if (!tcon_conf || !mm_table || !core_reg_table) {
 		LCDERR("%s: table is NULL\n", __func__);
 		return;
 	}
@@ -125,35 +137,18 @@ static void lcd_tcon_core_reg_set(struct lcd_tcon_config_s *tcon_conf,
 
 	len = mm_table->core_reg_table_size;
 	offset = tcon_conf->core_reg_start;
-	reg = tcon_conf->reg_core_od;
-	bit = tcon_conf->bit_od_en;
 	if (tcon_conf->core_reg_width == 8) {
 		table8 = core_reg_table;
-		if (mm_table->version) {
-			//pre disable od, enable od in lut bin
-			table8[reg] &= ~(1 << bit);
-		}
 		for (i = offset; i < len; i++)
 			lcd_tcon_write_byte(i, table8[i]);
 	} else {
 		if (tcon_conf->reg_table_width == 32) {
 			len /= 4;
 			table32 = (unsigned int *)core_reg_table;
-			if (mm_table->version) {
-				//pre disable od, enable od in lut bin
-				table32[reg] &= ~(1 << bit);
-			}
-			//only valid in 32bit core reg
-			if (tcon_conf->tcon_axi_mem_update)
-				tcon_conf->tcon_axi_mem_update(table32);
 			for (i = offset; i < len; i++)
 				lcd_tcon_write(i, table32[i]);
 		} else {
 			table8 = core_reg_table;
-			if (mm_table->version) {
-				//pre disable od, enable od in lut bin
-				table8[reg] &= ~(1 << bit);
-			}
 			for (i = offset; i < len; i++)
 				lcd_tcon_write(i, table8[i]);
 		}
@@ -1191,6 +1186,8 @@ int lcd_tcon_disable_t5(struct lcd_config_s *pconf)
 
 	/* disable od ddr_if */
 	lcd_tcon_setb(0x263, 0, 31, 1);
+	/* disable demura ddr_if */
+	lcd_tcon_setb(0x1a3, 0, 31, 1);
 	mdelay(100);
 
 	/* top reset */

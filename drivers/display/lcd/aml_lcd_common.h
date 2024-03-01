@@ -97,7 +97,6 @@ extern int lcd_power_load_from_dts(struct lcd_config_s *pconf,
 extern int lcd_power_load_from_unifykey(struct lcd_config_s *pconf,
 		unsigned char *buf, int key_len, int len);
 extern int lcd_pinmux_load_config(char *dt_addr, struct lcd_config_s *pconf);
-void lcd_fr_range_update(struct lcd_detail_timing_s *ptiming);
 void lcd_clk_frame_rate_init(struct lcd_detail_timing_s *ptiming);
 void lcd_default_to_basic_timing_init_config(struct lcd_config_s *pconf);
 void lcd_enc_timing_init_config(struct lcd_config_s *pconf);

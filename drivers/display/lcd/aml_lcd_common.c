@@ -938,7 +938,7 @@ int lcd_pinmux_load_config(char *dt_addr, struct lcd_config_s *pconf)
 	return ret;
 }
 
-void lcd_fr_range_update(struct lcd_detail_timing_s *ptiming)
+static void lcd_fr_range_update(struct lcd_detail_timing_s *ptiming)
 {
 	unsigned int htotal, vmin, vmax, hfreq;
 	unsigned long long temp;
@@ -1281,8 +1281,13 @@ int lcd_frame_rate_change(struct lcd_config_s *pconf)
 		pconf->lcd_timing.enc_clk = pclk;
 	}
 	if (lcd_debug_print_flag) {
-		if (len > 0)
-			LCDPR("%s: %s\n", __func__, str);
+		if (len > 0) {
+			LCDPR("%s: sync_duration: %d/%d, %s\n",
+				__func__,
+				pconf->lcd_timing.act_timing.sync_duration_num,
+				pconf->lcd_timing.act_timing.sync_duration_den,
+				str);
+		}
 	}
 
 	return 0;

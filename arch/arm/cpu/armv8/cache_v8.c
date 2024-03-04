@@ -256,6 +256,23 @@ static void add_map(struct mm_region *map)
 	}
 }
 
+extern unsigned long __RO_END__;
+#define _RO_END (unsigned long)(&__RO_END__)
+void mmu_update_text_attr(void)
+{
+	struct mm_region mem_map;
+
+	dcache_disable();
+	mem_map.virt = gd->reloc_off + CONFIG_SYS_TEXT_BASE; //first 0x1000000 are used for malloc
+	mem_map.phys = gd->reloc_off + CONFIG_SYS_TEXT_BASE;
+	mem_map.size = _RO_END - gd->reloc_off - CONFIG_SYS_TEXT_BASE; //_RO_END relocated too
+	mem_map.attrs = PTE_BLOCK_MEMTYPE(MT_NORMAL) |
+			 PTE_BLOCK_INNER_SHARE | PTE_BLOCK_RO;
+
+	add_map(&mem_map);
+	dcache_enable();
+}
+
 void setup_pgtables(void)
 {
 	int i;

@@ -29,7 +29,8 @@ SECTIONS
 		*(.__rodata_start)
 	}
 	.rodata : { *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.rodata*))) }
-
+	. = ALIGN(4096);
+	__RO_END__ = .;
 #if	1
 	/* uasan global register */
 	.init_array :

@@ -94,8 +94,11 @@ static AvbIOResult read_from_partition(AvbOps* ops, const char* partition, int64
 		uint32_t filesize = 0;
 
 		if (filesize_str) {
-			/* The filesize is needed because this is from uboot command */
-			/* coverity[tainted_scalar] */
+			/* There is no risk in using the value to index _ctype through isxdigit
+			 * because _ctype is an array of 256 elements
+			 * and every value would fall into a posisition of _ctype.
+			 */
+			/* coverity[tainted_data] */
 			filesize = simple_strtoul(filesize_str, NULL, 16);
 		} else {
 			return AVB_IO_RESULT_ERROR_IO;
@@ -203,8 +206,11 @@ static AvbIOResult get_size_of_partition(AvbOps* ops, const char* partition,
 		uint32_t filesize = 0;
 
 		if (filesize_str) {
-			/* The filesize is needed because this is from uboot command */
-			/* coverity[tainted_scalar] */
+			/* There is no risk in using the value to index _ctype
+			 * because _ctype is an array of 256 elements
+			 * and every value would fall into a posisition of _ctype.
+			 */
+			/* coverity[tainted_data] */
 			filesize = simple_strtoul(filesize_str, NULL, 16);
 		} else {
 			return AVB_IO_RESULT_ERROR_IO;

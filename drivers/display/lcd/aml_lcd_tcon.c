@@ -1806,8 +1806,8 @@ int lcd_tcon_mem_tee_protect(int mem_flag, int protect_en)
 	unsigned int *data, sec_protect, sec_handle;
 	int ret;
 
-	if (!tcon_rmem.axi_rmem) {
-		LCDERR("%s: axi_rmem is null\n", __func__);
+	if (tcon_rmem.flag == 0 || !tcon_rmem.axi_rmem) {
+		LCDERR("%s: no axi_rmem\n", __func__);
 		return -1;
 	}
 

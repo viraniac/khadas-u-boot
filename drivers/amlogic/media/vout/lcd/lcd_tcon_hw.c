@@ -147,6 +147,9 @@ void lcd_tcon_init_table_pre_proc(unsigned char *table)
 		return;
 	table32 = (unsigned int *)table;
 
+	//pre_proc_clk disable
+	table32[0x207] &= ~(1 << 4);
+
 	//od ddrif disable
 	table32[0x263] &= ~(1 << 31);
 	//demura ddrif disable
@@ -1082,6 +1085,36 @@ static int lcd_tcon_top_set_txhd2(struct lcd_config_s *pconf)
 	return 0;
 }
 
+void lcd_tcon_global_reset_t5(struct aml_lcd_drv_s *pdrv)
+{
+	lcd_reset_setb(RESET1_MASK, 0, 4, 1);
+	lcd_reset_setb(RESET1_LEVEL, 0, 4, 1);
+	udelay(1);
+	lcd_reset_setb(RESET1_LEVEL, 1, 4, 1);
+	udelay(2);
+	LCDPR("reset tcon\n");
+}
+
+void lcd_tcon_global_reset_t3(struct aml_lcd_drv_s *pdrv)
+{
+	lcd_reset_setb(RESETCTRL_RESET2_MASK, 0, 5, 1);
+	lcd_reset_setb(RESETCTRL_RESET2_LEVEL, 0, 5, 1);
+	udelay(1);
+	lcd_reset_setb(RESETCTRL_RESET2_LEVEL, 1, 5, 1);
+	udelay(2);
+	LCDPR("reset tcon\n");
+}
+
+void lcd_tcon_global_reset_t3x(struct aml_lcd_drv_s *pdrv)
+{
+	lcd_reset_setb(RESETCTRL_RESET2_MASK, 0, 3, 1);
+	lcd_reset_setb(RESETCTRL_RESET2_LEVEL, 0, 3, 1);
+	udelay(1);
+	lcd_reset_setb(RESETCTRL_RESET2_LEVEL, 1, 3, 1);
+	udelay(2);
+	LCDPR("reset tcon\n");
+}
+
 int lcd_tcon_enable_tl1(struct aml_lcd_drv_s *pdrv)
 {
 	struct lcd_config_s *pconf = &pdrv->config;
@@ -1207,7 +1240,9 @@ int lcd_tcon_enable_t5(struct aml_lcd_drv_s *pdrv)
 	if (!tcon_conf || !mm_table || !local_cfg)
 		return -1;
 
-	lcd_vcbus_write(ENCL_VIDEO_EN, 0);
+	//don't disable encl for system continuous vsync,
+	//  just disable tcon pre_proc_clk in tcon bin
+	//lcd_venc_enable(pdrv, 0);
 
 	/* step 1: tcon top */
 	lcd_tcon_top_set_t5(pconf);
@@ -1229,7 +1264,8 @@ int lcd_tcon_enable_t5(struct aml_lcd_drv_s *pdrv)
 	lcd_tcon_write(TCON_OUT_CH_SEL0, 0x76543210);
 	lcd_tcon_write(TCON_OUT_CH_SEL1, 0xba98);
 
-	lcd_vcbus_write(ENCL_VIDEO_EN, 1);
+	//lcd_venc_enable(pdrv, 1);
+	lcd_tcon_setb(0x207, 1, 4, 1);//enable pre_proc_clk
 
 	return 0;
 }
@@ -1248,7 +1284,9 @@ int lcd_tcon_enable_t3(struct aml_lcd_drv_s *pdrv)
 	if (!tcon_conf || !mm_table || !local_cfg)
 		return -1;
 
-	lcd_vcbus_write(ENCL_VIDEO_EN, 0);
+	//don't disable encl for system continuous vsync,
+	//  just disable tcon pre_proc_clk in tcon bin
+	//lcd_venc_enable(pdrv, 0);
 
 	/* step 1: tcon top */
 	lcd_tcon_top_set_t5(pconf);
@@ -1270,7 +1308,9 @@ int lcd_tcon_enable_t3(struct aml_lcd_drv_s *pdrv)
 	lcd_tcon_write(TCON_OUT_CH_SEL0, 0x76543210);
 	lcd_tcon_write(TCON_OUT_CH_SEL1, 0xba98);
 
-	lcd_vcbus_write(ENCL_VIDEO_EN, 1);
+	//lcd_venc_enable(pdrv, 1);
+	lcd_tcon_setb(0x207, 1, 4, 1);//enable pre_proc_clk
+
 	if (tcon_conf->lut_dma_data_init_trans)
 		lcd_tcon_dma_data_init_trans(pdrv);
 
@@ -1291,7 +1331,9 @@ int lcd_tcon_enable_txhd2(struct aml_lcd_drv_s *pdrv)
 	if (!tcon_conf || !mm_table || !local_cfg)
 		return -1;
 
-	lcd_vcbus_write(ENCL_VIDEO_EN, 0);
+	//don't disable encl for system continuous vsync,
+	//  just disable tcon pre_proc_clk in tcon bin
+	//lcd_venc_enable(pdrv, 0);
 
 	/* step 1: tcon top */
 	lcd_tcon_top_set_txhd2(pconf);
@@ -1313,7 +1355,8 @@ int lcd_tcon_enable_txhd2(struct aml_lcd_drv_s *pdrv)
 	lcd_tcon_write(TCON_OUT_CH_SEL0, 0x76543210);
 	lcd_tcon_write(TCON_OUT_CH_SEL1, 0xba98);
 
-	lcd_vcbus_write(ENCL_VIDEO_EN, 1);
+	//lcd_venc_enable(pdrv, 1);
+	lcd_tcon_setb(0x207, 1, 4, 1);//enable pre_proc_clk
 
 	return 0;
 }
@@ -1332,63 +1375,8 @@ int lcd_tcon_disable_t5(struct aml_lcd_drv_s *pdrv)
 	/* top reset */
 	lcd_tcon_write(TCON_RST_CTRL, 0x003f);
 
-	/* global reset tcon */
-	lcd_reset_setb(RESET1_MASK, 0, 4, 1);
-	lcd_reset_setb(RESET1_LEVEL, 0, 4, 1);
-	udelay(1);
-	lcd_reset_setb(RESET1_LEVEL, 1, 4, 1);
-	udelay(2);
-	LCDPR("reset tcon\n");
-
-	return 0;
-}
-
-int lcd_tcon_disable_t3(struct aml_lcd_drv_s *pdrv)
-{
-	/* disable unit(reg_func_enable) timing signal */
-	lcd_tcon_write(0x30e, 0);
-
-	/* disable od ddr_if */
-	lcd_tcon_setb(0x263, 0, 31, 1);
-	/* disable demura ddr_if */
-	lcd_tcon_setb(0x1a3, 0, 31, 1);
-	mdelay(100);
-
-	/* top reset */
-	lcd_tcon_write(TCON_RST_CTRL, 0x003f);
-
-	/* global reset tcon */
-	lcd_reset_setb(RESETCTRL_RESET2_MASK, 0, 5, 1);
-	lcd_reset_setb(RESETCTRL_RESET2_LEVEL, 0, 5, 1);
-	udelay(1);
-	lcd_reset_setb(RESETCTRL_RESET2_LEVEL, 1, 5, 1);
-	udelay(2);
-	LCDPR("reset tcon\n");
-
-	return 0;
-}
-
-int lcd_tcon_disable_t3x(struct aml_lcd_drv_s *pdrv)
-{
-	/* disable unit(reg_func_enable) timing signal */
-	lcd_tcon_write(0x30e, 0);
-
-	/* disable od ddr_if */
-	lcd_tcon_setb(0x263, 0, 31, 1);
-	/* disable demura ddr_if */
-	lcd_tcon_setb(0x1a3, 0, 31, 1);
-	mdelay(100);
-
-	/* top reset */
-	lcd_tcon_write(TCON_RST_CTRL, 0x003f);
-
-	/* global reset tcon */
-	lcd_reset_setb(RESETCTRL_RESET2_MASK, 0, 3, 1);
-	lcd_reset_setb(RESETCTRL_RESET2_LEVEL, 0, 3, 1);
-	udelay(1);
-	lcd_reset_setb(RESETCTRL_RESET2_LEVEL, 1, 3, 1);
-	udelay(2);
-	LCDPR("reset tcon\n");
+	//move to tcon_disable api for common flow
+	//lcd_tcon_global_reset_t5(pdrv);
 
 	return 0;
 }

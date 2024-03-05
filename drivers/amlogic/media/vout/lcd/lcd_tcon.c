@@ -797,6 +797,8 @@ void lcd_tcon_disable(struct aml_lcd_drv_s *pdrv)
 
 	if (lcd_tcon_conf->tcon_disable)
 		lcd_tcon_conf->tcon_disable(pdrv);
+	if (lcd_tcon_conf->tcon_global_reset)
+		lcd_tcon_conf->tcon_global_reset(pdrv);
 }
 
 static int lcd_tcon_forbidden_check(void)
@@ -2288,6 +2290,7 @@ static struct lcd_tcon_config_s tcon_data_tl1 = {
 	.axi_reg = NULL,
 	.tcon_axi_mem_config = lcd_tcon_axi_mem_config_tl1,
 	.tcon_init_table_pre_proc = NULL,
+	.tcon_global_reset = NULL,
 	.tcon_enable = lcd_tcon_enable_tl1,
 	.tcon_disable = lcd_tcon_disable_tl1,
 	.tcon_forbidden_check = NULL,
@@ -2330,6 +2333,7 @@ static struct lcd_tcon_config_s tcon_data_t5 = {
 
 	.axi_reg = NULL,
 	.tcon_init_table_pre_proc = lcd_tcon_init_table_pre_proc,
+	.tcon_global_reset = lcd_tcon_global_reset_t5,
 	.tcon_enable = lcd_tcon_enable_t5,
 	.tcon_disable = lcd_tcon_disable_t5,
 	.tcon_forbidden_check = lcd_tcon_forbidden_check_t5,
@@ -2372,6 +2376,7 @@ static struct lcd_tcon_config_s tcon_data_t5d = {
 
 	.axi_reg = NULL,
 	.tcon_init_table_pre_proc = lcd_tcon_init_table_pre_proc,
+	.tcon_global_reset = lcd_tcon_global_reset_t5,
 	.tcon_enable = lcd_tcon_enable_t5,
 	.tcon_disable = lcd_tcon_disable_t5,
 	.tcon_forbidden_check = lcd_tcon_forbidden_check_t5d,
@@ -2414,8 +2419,9 @@ static struct lcd_tcon_config_s tcon_data_t3 = {
 
 	.axi_reg = NULL,
 	.tcon_init_table_pre_proc = lcd_tcon_init_table_pre_proc,
+	.tcon_global_reset = lcd_tcon_global_reset_t3,
 	.tcon_enable = lcd_tcon_enable_t3,
-	.tcon_disable = lcd_tcon_disable_t3,
+	.tcon_disable = lcd_tcon_disable_t5,
 	.tcon_forbidden_check = lcd_tcon_forbidden_check_t5,
 	.tcon_check = lcd_tcon_setting_check_t5,
 	.lut_dma_data_init_trans = NULL,
@@ -2456,8 +2462,9 @@ static struct lcd_tcon_config_s tcon_data_t5m = {
 
 	.axi_reg = NULL,
 	.tcon_init_table_pre_proc = lcd_tcon_init_table_pre_proc,
+	.tcon_global_reset = lcd_tcon_global_reset_t3,
 	.tcon_enable = lcd_tcon_enable_t3,
-	.tcon_disable = lcd_tcon_disable_t3,
+	.tcon_disable = lcd_tcon_disable_t5,
 	.tcon_forbidden_check = lcd_tcon_forbidden_check_t5,
 	.tcon_check = lcd_tcon_setting_check_t5,
 	.lut_dma_data_init_trans = lcd_tcon_dma_data_init_trans,
@@ -2501,6 +2508,7 @@ static struct lcd_tcon_config_s tcon_data_t5w = {
 
 	.axi_reg = NULL,
 	.tcon_init_table_pre_proc = lcd_tcon_init_table_pre_proc,
+	.tcon_global_reset = lcd_tcon_global_reset_t3,
 	.tcon_enable = lcd_tcon_enable_t3,
 	.tcon_disable = lcd_tcon_disable_t5,
 	.tcon_forbidden_check = lcd_tcon_forbidden_check_t5,
@@ -2543,8 +2551,9 @@ static struct lcd_tcon_config_s tcon_data_t3x = {
 
 	.axi_reg = NULL,
 	.tcon_init_table_pre_proc = lcd_tcon_init_table_pre_proc,
+	.tcon_global_reset = lcd_tcon_global_reset_t3x,
 	.tcon_enable = lcd_tcon_enable_t3,
-	.tcon_disable = lcd_tcon_disable_t3x,
+	.tcon_disable = lcd_tcon_disable_t5,
 	.tcon_forbidden_check = lcd_tcon_forbidden_check_t5,
 	.tcon_check = lcd_tcon_setting_check_t5,
 	.lut_dma_data_init_trans = NULL,
@@ -2585,6 +2594,7 @@ static struct lcd_tcon_config_s tcon_data_txhd2 = {
 
 	.axi_reg = NULL,
 	.tcon_init_table_pre_proc = lcd_tcon_init_table_pre_proc,
+	.tcon_global_reset = lcd_tcon_global_reset_t5,
 	.tcon_enable = lcd_tcon_enable_txhd2,
 	.tcon_disable = lcd_tcon_disable_t5,
 	.tcon_forbidden_check = lcd_tcon_forbidden_check_t5d,

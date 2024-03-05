@@ -64,7 +64,8 @@
 /* 20240226: add tcon init_table pre_proc*/
 /* 20240307: update swpdf support*/
 /* 20240318: optimize tcon reserved memory */
-#define LCD_DRV_VERSION    "20240318"
+/* 20240319: add tcon pre_proc_clk_en control*/
+#define LCD_DRV_VERSION    "20240319"
 
 extern unsigned long clk_util_clk_msr(unsigned long clk_mux);
 

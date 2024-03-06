@@ -568,6 +568,16 @@ static int do_image_read_kernel(cmd_tbl_t *cmdtp, int flag, int argc, char * con
         ramdisk_size   = ALIGN(hdr_addr_v3->ramdisk_size,0x1000);
 		MsgP("kernel_size 0x%x, totalSz 0x%x\n", hdr_addr_v3->kernel_size, kernel_size);
 		MsgP("ramdisk_size 0x%x, totalSz 0x%x\n", hdr_addr_v3->ramdisk_size, ramdisk_size);
+		if (kernel_size > MAX_KERNEL_SIZE) {
+			errorP("kernel size limit 0x%x,0x%x\n", kernel_size,
+					MAX_KERNEL_SIZE);
+			return __LINE__;
+		}
+		if (ramdisk_size > MAX_RAMDISK_SIZE) {
+			errorP("ramdisk size limit 0x%x,0x%x\n", ramdisk_size,
+					MAX_RAMDISK_SIZE);
+			return __LINE__;
+		}
 
         actualBootImgSz = kernel_size + ramdisk_size + 0x1000;
 
@@ -879,6 +889,20 @@ load_left_r:
             debugP("kernel_size 0x%x, page_size 0x%x, totalSz 0x%x\n", hdr_addr->kernel_size, hdr_addr->page_size, kernel_size);
             debugP("ramdisk_size 0x%x, totalSz 0x%x\n", hdr_addr->ramdisk_size, ramdisk_size);
             debugP("dtbSz 0x%x, Total actualBootImgSz 0x%x\n", dtbSz, actualBootImgSz);
+			if (kernel_size > MAX_KERNEL_SIZE) {
+				errorP("kernel size limit 0x%x,0x%x\n", kernel_size,
+					MAX_KERNEL_SIZE);
+				return __LINE__;
+			}
+			if (ramdisk_size > MAX_RAMDISK_SIZE) {
+				errorP("ramdisk size limit 0x%x,0x%x\n", ramdisk_size,
+					MAX_RAMDISK_SIZE);
+				return __LINE__;
+			}
+			if (dtbSz > MAX_DTB_SIZE) {
+				errorP("dtb size limit 0x%x,0x%x\n", dtbSz, MAX_DTB_SIZE);
+				return __LINE__;
+			}
         }
 
 #if defined(CONFIG_IMAGE_FORMAT_LEGACY) || defined(CONFIG_FIT)

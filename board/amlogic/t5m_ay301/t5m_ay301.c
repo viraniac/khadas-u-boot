@@ -54,7 +54,9 @@
 #ifdef CONFIG_RX_RTERM
 #include <amlogic/aml_hdmirx.h>
 #endif
-
+#ifdef CONFIG_ARMV8_MULTIENTRY
+#include <asm/arch-meson/smp.h>
+#endif
 DECLARE_GLOBAL_DATA_PTR;
 
 void sys_led_init(void)
@@ -75,7 +77,7 @@ int dram_init(void)
 /* secondary_boot_func
  * this function should be write with asm, here, is is only for compiling pass
  * */
-void secondary_boot_func(void)
+__weak void secondary_boot_func(void)
 {
 }
 
@@ -129,6 +131,13 @@ void board_init_mem(void) {
 	#endif
 }
 
+void smp_test(unsigned long param)
+{
+	printf("smp booted, start to run test %lx\n", param);
+	do {
+	} while (1);
+}
+
 int board_init(void)
 {
 	printf("board init\n");
@@ -137,6 +146,10 @@ int board_init(void)
 	run_command("watchdog off", 0);
 	printf("watchdog disable\n");
 
+#ifdef CONFIG_ARMV8_MULTIENTRY
+	cpu_smp_init_r();
+	run_smp_function(1, &smp_test, 0xaa); //only for example
+#endif
 	run_command("gpio set GPIO_TEST_N0", 0);
 	run_command("gpio clr GPIOD_11", 0);
 	aml_set_bootsequence(0);

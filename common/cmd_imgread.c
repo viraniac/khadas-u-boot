@@ -962,6 +962,7 @@ typedef struct {
 #pragma pack(pop)
 
 #define LOGO_OLD_FMT_READ_SZ (8U<<20)//if logo format old, read 8M
+#define LOGO_TOTAL_ITEM		(16)
 
 static int img_res_check_log_header(const AmlResImgHead_t* pResImgHead)
 {
@@ -976,6 +977,11 @@ static int img_res_check_log_header(const AmlResImgHead_t* pResImgHead)
         errorP("res version 0x%x != 0x%x\n", pResImgHead->version, AML_RES_IMG_VERSION_V2);
         return 2;
     }
+	if (pResImgHead->imgItemNum > LOGO_TOTAL_ITEM) {
+		errorP("logo size err 0x%x != 0x%x\n", pResImgHead->imgItemNum,
+				LOGO_TOTAL_ITEM);
+		return 3;
+	}
 
     return 0;
 }
@@ -1154,6 +1160,19 @@ static int do_image_read_pic(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
                 errorP("item magic 0x%x != 0x%x\n", pItem->magic, IH_MAGIC);
                 return __LINE__;
             }
+
+			if (pItem->start > CONFIG_MAX_PIC_LEN) {
+				errorP("item data offset err 0x%x != 0x%x\n", pItem->start,
+					CONFIG_MAX_PIC_LEN);
+				return __LINE__;
+			}
+
+			if (pItem->size > CONFIG_MAX_PIC_LEN) {
+				errorP("item data size err 0x%x != 0x%x\n", pItem->size,
+					CONFIG_MAX_PIC_LEN);
+				return __LINE__;
+			}
+
             const char* itemName = pItem->name;
             if (!strcmp(thisName, itemName)) {
                 itemFound = pItem;
@@ -1171,8 +1190,8 @@ static int do_image_read_pic(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
         char env_name[IH_NMLEN*2];
         char env_data[IH_NMLEN*2];
         unsigned long picLoadAddr = (unsigned long)loadaddr + (unsigned)pItem->start;
-        int         itemSz      = pItem->size;
-        int         uncompSz    = 0;
+		unsigned int  itemSz      = pItem->size;
+		unsigned long uncompSz    = 0;
 
         if (pItem->start + itemSz > flashReadOff)
         {
@@ -1190,8 +1209,8 @@ static int do_image_read_pic(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
         //uncompress supported format
         unsigned long uncompLoadaddr = picLoadAddr + itemSz + 7;
         uncompLoadaddr &= ~(0x7U);
-        rc = imgread_uncomp_pic((unsigned char*)picLoadAddr, itemSz, (unsigned char*)uncompLoadaddr,
-                CONFIG_MAX_PIC_LEN, (unsigned long*)&uncompSz);
+		rc = imgread_uncomp_pic((unsigned char *)picLoadAddr, itemSz,
+				(unsigned char *)uncompLoadaddr, CONFIG_MAX_PIC_LEN, &uncompSz);
         if (rc) {
             errorP("Fail in uncomp pic,rc[%d]\n", rc);
             return __LINE__;

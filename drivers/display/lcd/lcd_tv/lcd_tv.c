@@ -1620,9 +1620,11 @@ static void lcd_vmode_update(struct lcd_config_s *pconf)
 {
 	struct aml_lcd_drv_s *pdrv = aml_lcd_get_driver();
 	struct lcd_detail_timing_s *ptiming;
+	unsigned int pre_pclk;
 	int dur_index;
 
 	if (pdrv->vmode_mgr.next_vmode_info) {
+		pre_pclk = pconf->lcd_timing.base_timing.pixel_clk;
 		pdrv->vmode_mgr.cur_vmode_info = pdrv->vmode_mgr.next_vmode_info;
 		pdrv->vmode_mgr.next_vmode_info = NULL;
 
@@ -1630,6 +1632,8 @@ static void lcd_vmode_update(struct lcd_config_s *pconf)
 		ptiming = pdrv->vmode_mgr.cur_vmode_info->dft_timing;
 		memcpy(&pconf->lcd_timing.base_timing, ptiming,
 			sizeof(struct lcd_detail_timing_s));
+		if (pconf->lcd_timing.base_timing.pixel_clk != pre_pclk)
+			pconf->lcd_timing.clk_change |= LCD_CLK_PLL_RESET;
 		lcd_cus_ctrl_config_update(pconf, (void *)ptiming, LCD_CUS_CTRL_SEL_TIMMING);
 
 		//update base_timing to act_timing

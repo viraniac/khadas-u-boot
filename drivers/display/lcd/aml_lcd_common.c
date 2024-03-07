@@ -1103,14 +1103,13 @@ int lcd_frame_rate_change(struct lcd_config_s *pconf)
 	char str[100];
 	int len = 0;
 
-	pconf->lcd_timing.clk_change = 0; /* clear clk flag */
 	switch (type) {
 	case 0: /* pixel clk adjust */
 		temp = duration_num;
 		temp = temp * h_period * v_period;
 		pclk = lcd_do_div(temp, duration_den);
 		if (pconf->lcd_timing.act_timing.pixel_clk != pclk)
-			pconf->lcd_timing.clk_change = LCD_CLK_PLL_CHANGE;
+			pconf->lcd_timing.clk_change |= LCD_CLK_PLL_CHANGE;
 		break;
 	case 1: /* htotal adjust */
 		temp = pclk;
@@ -1125,7 +1124,7 @@ int lcd_frame_rate_change(struct lcd_config_s *pconf)
 			pclk = lcd_do_div(temp, duration_den);
 		}
 		if (pconf->lcd_timing.act_timing.pixel_clk != pclk)
-			pconf->lcd_timing.clk_change = LCD_CLK_FRAC_UPDATE;
+			pconf->lcd_timing.clk_change |= LCD_CLK_FRAC_UPDATE;
 		break;
 	case 2: /* vtotal adjust */
 		temp = pclk;
@@ -1140,7 +1139,7 @@ int lcd_frame_rate_change(struct lcd_config_s *pconf)
 			pclk = lcd_do_div(temp, duration_den);
 		}
 		if (pconf->lcd_timing.act_timing.pixel_clk != pclk)
-			pconf->lcd_timing.clk_change = LCD_CLK_FRAC_UPDATE;
+			pconf->lcd_timing.clk_change |= LCD_CLK_FRAC_UPDATE;
 		break;
 	case 3: /* free adjust, use min/max range to calculate */
 		temp = pclk;
@@ -1163,7 +1162,7 @@ int lcd_frame_rate_change(struct lcd_config_s *pconf)
 					return -1;
 				}
 				if (pconf->lcd_timing.act_timing.pixel_clk != pclk) {
-					pconf->lcd_timing.clk_change =
+					pconf->lcd_timing.clk_change |=
 						LCD_CLK_PLL_CHANGE;
 				}
 			}
@@ -1182,7 +1181,7 @@ int lcd_frame_rate_change(struct lcd_config_s *pconf)
 					return -1;
 				}
 				if (pconf->lcd_timing.act_timing.pixel_clk != pclk) {
-					pconf->lcd_timing.clk_change =
+					pconf->lcd_timing.clk_change |=
 						LCD_CLK_PLL_CHANGE;
 				}
 			}
@@ -1193,7 +1192,7 @@ int lcd_frame_rate_change(struct lcd_config_s *pconf)
 			temp = temp * h_period * v_period;
 			pclk = lcd_do_div(temp, duration_den);
 			if (pconf->lcd_timing.act_timing.pixel_clk != pclk) {
-				pconf->lcd_timing.clk_change =
+				pconf->lcd_timing.clk_change |=
 					LCD_CLK_FRAC_UPDATE;
 			}
 		}
@@ -1206,7 +1205,7 @@ int lcd_frame_rate_change(struct lcd_config_s *pconf)
 			temp = temp * h_period * v_period;
 			pclk = lcd_do_div(temp, duration_den);
 			if (pconf->lcd_timing.act_timing.pixel_clk != pclk)
-				pconf->lcd_timing.clk_change = LCD_CLK_PLL_CHANGE;
+				pconf->lcd_timing.clk_change |= LCD_CLK_PLL_CHANGE;
 		} else if ((duration_num / duration_den) == 47) {
 			/* htotal adjust */
 			temp = pclk;
@@ -1219,7 +1218,7 @@ int lcd_frame_rate_change(struct lcd_config_s *pconf)
 				pclk = lcd_do_div(temp, duration_den);
 			}
 			if (pconf->lcd_timing.act_timing.pixel_clk != pclk)
-				pconf->lcd_timing.clk_change = LCD_CLK_PLL_CHANGE;
+				pconf->lcd_timing.clk_change |= LCD_CLK_PLL_CHANGE;
 		} else if ((duration_num / duration_den) == 95) {
 			/* htotal adjust */
 			temp = pclk;
@@ -1232,7 +1231,7 @@ int lcd_frame_rate_change(struct lcd_config_s *pconf)
 				pclk = lcd_do_div(temp, duration_den);
 			}
 			if (pconf->lcd_timing.act_timing.pixel_clk != pclk)
-				pconf->lcd_timing.clk_change = LCD_CLK_PLL_CHANGE;
+				pconf->lcd_timing.clk_change |= LCD_CLK_PLL_CHANGE;
 		} else {
 			/* htotal adjust */
 			temp = pclk;
@@ -1247,7 +1246,7 @@ int lcd_frame_rate_change(struct lcd_config_s *pconf)
 				pclk = lcd_do_div(temp, duration_den);
 			}
 			if (pconf->lcd_timing.act_timing.pixel_clk != pclk)
-				pconf->lcd_timing.clk_change = LCD_CLK_FRAC_UPDATE;
+				pconf->lcd_timing.clk_change |= LCD_CLK_FRAC_UPDATE;
 		}
 		break;
 	default:
@@ -1272,7 +1271,7 @@ int lcd_frame_rate_change(struct lcd_config_s *pconf)
 	if (pconf->lcd_timing.act_timing.pixel_clk != pclk) {
 		if (len > 0)
 			len += sprintf(str+len, ", ");
-		len += sprintf(str + len, "pclk %u.%03uMHz->%u.%03uMHz, clk_change:%d",
+		len += sprintf(str + len, "pclk %u.%03uMHz->%u.%03uMHz, clk_change:0x%x",
 			(pconf->lcd_timing.act_timing.pixel_clk / 1000000),
 			((pconf->lcd_timing.act_timing.pixel_clk / 1000) % 1000),
 			(pclk / 1000000), ((pclk / 1000) % 1000),

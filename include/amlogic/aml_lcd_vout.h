@@ -112,6 +112,7 @@ struct lcd_basic_s {
 
 #define LCD_CLK_FRAC_UPDATE     (1 << 0)
 #define LCD_CLK_PLL_CHANGE      (1 << 1)
+#define LCD_CLK_PLL_RESET       (1 << 2)
 struct lcd_timing_s {
 	struct lcd_detail_timing_s dft_timing; //panel parameter probe stage
 	struct lcd_detail_timing_s base_timing; //panel parameter init stage

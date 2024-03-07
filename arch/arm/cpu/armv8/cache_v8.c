@@ -257,15 +257,17 @@ static void add_map(struct mm_region *map)
 }
 
 extern unsigned long __RO_END__;
-#define _RO_END (unsigned long)(&__RO_END__)
+extern unsigned long __RO_START__;
+#define _text_end (unsigned long)(&__RO_END__)
+#define _text_start (unsigned long)(&__RO_START__)
 void mmu_update_text_attr(void)
 {
 	struct mm_region mem_map;
 
 	dcache_disable();
-	mem_map.virt = gd->reloc_off + CONFIG_SYS_TEXT_BASE; //first 0x1000000 are used for malloc
-	mem_map.phys = gd->reloc_off + CONFIG_SYS_TEXT_BASE;
-	mem_map.size = _RO_END - gd->reloc_off - CONFIG_SYS_TEXT_BASE; //_RO_END relocated too
+	mem_map.virt = _text_start;
+	mem_map.phys = _text_start;
+	mem_map.size = _text_end -  _text_start;
 	mem_map.attrs = PTE_BLOCK_MEMTYPE(MT_NORMAL) |
 			 PTE_BLOCK_INNER_SHARE | PTE_BLOCK_RO;
 

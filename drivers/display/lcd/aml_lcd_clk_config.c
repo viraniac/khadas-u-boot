@@ -3032,7 +3032,9 @@ void lcd_clk_update(struct lcd_config_s *pconf)
 		i++;
 	}
 
-	LCDPR("%s: pll_frac=0x%x\n", __func__, clk_conf.pll_frac);
+	pconf->lcd_timing.clk_change = 0; /* clear clk_change flag */
+	LCDPR("%s: pll_frac=0x%x, clk_change=0x%x\n",
+		__func__, clk_conf.pll_frac, pconf->lcd_timing.clk_change);
 }
 
 /* for timing change */
@@ -3063,8 +3065,9 @@ lcd_clk_set_retry:
 		goto lcd_clk_set_retry;
 	}
 
+	pconf->lcd_timing.clk_change = 0; /* clear clk_change flag */
 	if (lcd_debug_print_flag)
-		LCDPR("%s\n", __func__);
+		LCDPR("%s: clk_change=0x%x\n", __func__, pconf->lcd_timing.clk_change);
 }
 
 void lcd_clk_disable(void)

@@ -1109,6 +1109,7 @@ static void lcd_config_init(struct lcd_config_s *pconf)
 
 	lcd_tablet_config_update(pconf);
 	lcd_clk_generate_parameter(pconf);
+	pconf->lcd_timing.clk_change = 0; /* clear clk_change flag */
 }
 
 int get_lcd_tablet_config(char *dt_addr, int load_id)

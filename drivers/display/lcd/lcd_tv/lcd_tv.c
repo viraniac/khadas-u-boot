@@ -1623,6 +1623,8 @@ static void lcd_vmode_update(struct lcd_config_s *pconf)
 	unsigned int pre_pclk;
 	int dur_index;
 
+	/* clear clk flag */
+	pconf->lcd_timing.clk_change &= ~(LCD_CLK_PLL_RESET);
 	if (pdrv->vmode_mgr.next_vmode_info) {
 		pre_pclk = pconf->lcd_timing.base_timing.pixel_clk;
 		pdrv->vmode_mgr.cur_vmode_info = pdrv->vmode_mgr.next_vmode_info;
@@ -1632,9 +1634,9 @@ static void lcd_vmode_update(struct lcd_config_s *pconf)
 		ptiming = pdrv->vmode_mgr.cur_vmode_info->dft_timing;
 		memcpy(&pconf->lcd_timing.base_timing, ptiming,
 			sizeof(struct lcd_detail_timing_s));
+		lcd_cus_ctrl_config_update(pconf, (void *)ptiming, LCD_CUS_CTRL_SEL_TIMMING);
 		if (pconf->lcd_timing.base_timing.pixel_clk != pre_pclk)
 			pconf->lcd_timing.clk_change |= LCD_CLK_PLL_RESET;
-		lcd_cus_ctrl_config_update(pconf, (void *)ptiming, LCD_CUS_CTRL_SEL_TIMMING);
 
 		//update base_timing to act_timing
 		lcd_enc_timing_init_config(pconf);
@@ -1655,13 +1657,13 @@ static void lcd_vmode_update(struct lcd_config_s *pconf)
 	lcd_frame_rate_change(pconf);
 
 	if (lcd_debug_print_flag) {
-		LCDPR("%s: %dx%d, duration=%d:%d, dur_index=%d\n",
+		LCDPR("%s: %dx%d, duration=%d:%d, dur_index=%d, clk_change=0x%x\n",
 			__func__,
 			pconf->lcd_timing.act_timing.h_active,
 			pconf->lcd_timing.act_timing.v_active,
 			pconf->lcd_timing.act_timing.sync_duration_num,
 			pconf->lcd_timing.act_timing.sync_duration_den,
-			dur_index);
+			dur_index, pconf->lcd_timing.clk_change);
 	}
 }
 
@@ -1687,6 +1689,7 @@ static void lcd_config_init(struct lcd_config_s *pconf)
 {
 	lcd_enc_timing_init_config(pconf);
 	lcd_output_vmode_init(pconf);
+	pconf->lcd_timing.clk_change = 0; /* clear clk_change flag */
 }
 
 int get_lcd_tv_config(char *dt_addr, int load_id)

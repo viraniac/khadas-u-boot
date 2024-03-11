@@ -20,7 +20,6 @@
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm-generic/gpio.h>
-#include <dm/device_compat.h>
 #include <linux/iopoll.h>
 #include <linux/delay.h>
 #include <linux/log2.h>
@@ -406,7 +405,7 @@ static int meson_pcie_probe(struct udevice *dev)
 	struct pci_controller *hose = dev_get_uclass_priv(ctlr);
 	int ret = 0;
 
-	priv->dw.first_busno = dev_seq(dev);
+	priv->dw.first_busno = dev->seq;
 	priv->dw.dev = dev;
 
 	ret = meson_pcie_parse_dt(dev);
@@ -420,7 +419,7 @@ static int meson_pcie_probe(struct udevice *dev)
 	}
 
 	printf("PCIE-%d: Link up (Gen%d-x%d, Bus%d)\n",
-	       dev_seq(dev), pcie_dw_get_link_speed(&priv->dw),
+	       dev->seq, pcie_dw_get_link_speed(&priv->dw),
 	       pcie_dw_get_link_width(&priv->dw),
 	       hose->first_busno);
 
@@ -449,5 +448,5 @@ U_BOOT_DRIVER(meson_dw_pcie) = {
 	.of_match		= meson_pcie_ids,
 	.ops			= &meson_pcie_ops,
 	.probe			= meson_pcie_probe,
-	.priv_auto		= sizeof(struct meson_pcie),
+	.priv_auto_alloc_size	= sizeof(struct meson_pcie),
 };

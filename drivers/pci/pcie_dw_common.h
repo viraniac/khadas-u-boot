@@ -133,7 +133,7 @@ int pcie_dw_get_link_width(struct pcie_dw *pci);
 int pcie_dw_prog_outbound_atu_unroll(struct pcie_dw *pci, int index, int type, u64 cpu_addr,
 				     u64 pci_addr, u32 size);
 
-int pcie_dw_read_config(const struct udevice *bus, pci_dev_t bdf, uint offset, ulong *valuep,
+int pcie_dw_read_config(struct udevice *bus, pci_dev_t bdf, uint offset, ulong *valuep,
 			enum pci_size_t size);
 
 int pcie_dw_write_config(struct udevice *bus, pci_dev_t bdf, uint offset, ulong value,

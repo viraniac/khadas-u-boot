@@ -12,7 +12,6 @@
 #include <dm.h>
 #include <log.h>
 #include <pci.h>
-#include <dm/device_compat.h>
 #include <asm/io.h>
 #include <linux/delay.h>
 #include "pcie_dw_common.h"
@@ -196,7 +195,7 @@ static int pcie_dw_addr_valid(pci_dev_t d, int first_busno)
  *
  * Return: 0 on success
  */
-int pcie_dw_read_config(const struct udevice *bus, pci_dev_t bdf,
+int pcie_dw_read_config(struct udevice *bus, pci_dev_t bdf,
 			uint offset, ulong *valuep,
 			enum pci_size_t size)
 {

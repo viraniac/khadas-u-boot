@@ -152,7 +152,7 @@
 		"kernel_comp_size=0x2000000\0"\
 		"pxeuuid=00000000-0000-0000-0000-000000000000\0"\
 		"bootfile=\0"\
-		"fdtfile=g12b_a311d_w400_debian.dtb\0" \
+		"fdtfile=g12b_a311d_w400_linux.dtb\0" \
 		"silent=1\0"\
 		"lcd_ctrl=0x00000000\0" \
 		"outputmode=1080p60hz\0" \

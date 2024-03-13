@@ -252,9 +252,13 @@ static int lcd_tcon_spi_data_load(void)
 	unsigned int i, j, size, new_size;
 	int ret;
 
+	if (lcd_debug_print_flag)
+		LCDPR("%s start\n", __func__);
 	if (tcon_spi.version == 0)
 		return 0;
 
+	if (!mm_table)
+		return -2;
 	if (mm_table->version == 0)
 		return 0;
 

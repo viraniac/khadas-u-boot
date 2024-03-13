@@ -1098,6 +1098,9 @@ int lcd_tcon_disable_tl1(struct lcd_config_s *pconf)
 	struct lcd_tcon_config_s *tcon_conf = get_lcd_tcon_config();
 	unsigned int reg, i, cnt, offset, bit;
 
+	if (!tcon_conf)
+		return -1;
+
 	/* disable over_drive */
 	if (tcon_conf->reg_core_od != REG_LCD_TCON_MAX) {
 		reg = tcon_conf->reg_core_od;

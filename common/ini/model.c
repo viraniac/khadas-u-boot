@@ -2348,15 +2348,10 @@ static int parse_panel_ini(const char *file_name, unsigned char *lcd_buf,
 			   unsigned char *tcon_spi_buf,
 			   struct lcd_optical_attr_s *optical_attr)
 {
-	struct lcd_attr_s lcd_attr;
-	struct lcd_v2_attr_s lcd_v2_attr;
+	struct lcd_attr_s *lcd_attr;
+	struct lcd_v2_attr_s *lcd_v2_attr;
 	unsigned short lcd_size = 0;
 	struct lcd_header_s *header;
-
-	memset((void *)&lcd_attr, 0, sizeof(struct lcd_attr_s));
-	memset((void *)&lcd_v2_attr, 0, sizeof(struct lcd_v2_attr_s));
-	memset((void *)bl_attr, 0, sizeof(struct bl_attr_s));
-	memset((void *)optical_attr, 0, sizeof(struct lcd_optical_attr_s));
 
 	IniParserInit();
 
@@ -2373,24 +2368,38 @@ static int parse_panel_ini(const char *file_name, unsigned char *lcd_buf,
 		return -1;
 	}
 
-	/* handle lcd attr */
-	handle_lcd_basic(&lcd_attr);
-	handle_lcd_timming(&lcd_attr);
-	handle_lcd_customer(&lcd_attr);
-	handle_lcd_interface(&lcd_attr);
-	handle_lcd_pwr(&lcd_attr);
-	handle_lcd_header(&lcd_attr);
+	lcd_attr = (struct lcd_attr_s *)malloc(sizeof(struct lcd_attr_s));
+	if (!lcd_attr) {
+		IniParserUninit();
+		return -1;
+	}
+	memset(lcd_attr, 0, sizeof(struct lcd_attr_s));
+	lcd_v2_attr = (struct lcd_v2_attr_s *)malloc(sizeof(struct lcd_v2_attr_s));
+	if (!lcd_v2_attr) {
+		free(lcd_attr);
+		IniParserUninit();
+		return -1;
+	}
+	memset(lcd_v2_attr, 0, sizeof(struct lcd_v2_attr_s));
 
-	lcd_size = lcd_attr.head.block_cur_size;
-	memcpy((void *)lcd_buf, (void *)&lcd_attr, lcd_attr.head.block_cur_size);
+	/* handle lcd attr */
+	handle_lcd_basic(lcd_attr);
+	handle_lcd_timming(lcd_attr);
+	handle_lcd_customer(lcd_attr);
+	handle_lcd_interface(lcd_attr);
+	handle_lcd_pwr(lcd_attr);
+	handle_lcd_header(lcd_attr);
+
+	lcd_size = lcd_attr->head.block_cur_size;
+	memcpy((void *)lcd_buf, (void *)lcd_attr, lcd_attr->head.block_cur_size);
 	/* handle lcd_v2 attr*/
-	if (lcd_attr.head.version == 2) {
-		handle_lcd_phy(&lcd_v2_attr);
-		handle_lcd_cus_ctrl(&lcd_v2_attr);
-		handle_lcd_v2_header(&lcd_v2_attr);
-		lcd_size += lcd_v2_attr.head.block_cur_size;
-		memcpy((void *)(lcd_buf + lcd_attr.head.block_cur_size),
-			(void *)&lcd_v2_attr, lcd_v2_attr.head.block_cur_size);
+	if (lcd_attr->head.version == 2) {
+		handle_lcd_phy(lcd_v2_attr);
+		handle_lcd_cus_ctrl(lcd_v2_attr);
+		handle_lcd_v2_header(lcd_v2_attr);
+		lcd_size += lcd_v2_attr->head.block_cur_size;
+		memcpy((void *)(lcd_buf + lcd_attr->head.block_cur_size),
+			(void *)lcd_v2_attr, lcd_v2_attr->head.block_cur_size);
 	}
 
 	header = (struct lcd_header_s *)lcd_buf;
@@ -2400,8 +2409,8 @@ static int parse_panel_ini(const char *file_name, unsigned char *lcd_buf,
 	if (model_debug_flag & DEBUG_LCD) {
 		ALOGD("%s: data_len=%d, glcd_dcnt=%d, block1_size=%d, block2_size=%d\n",
 			__func__, header->data_len, gLcdDataCnt,
-			lcd_attr.head.block_cur_size,
-			lcd_v2_attr.head.block_cur_size);
+			lcd_attr->head.block_cur_size,
+			lcd_v2_attr->head.block_cur_size);
 	}
 
 	if (g_lcd_if == LCD_MLVDS ||
@@ -2445,6 +2454,11 @@ static int parse_panel_ini(const char *file_name, unsigned char *lcd_buf,
 	handle_lcd_optical_header(optical_attr);
 
 	IniParserUninit();
+
+	memset(lcd_v2_attr, 0, sizeof(struct lcd_v2_attr_s));
+	free(lcd_v2_attr);
+	memset(lcd_attr, 0, sizeof(struct lcd_attr_s));
+	free(lcd_attr);
 
 	return 0;
 }
@@ -2540,12 +2554,6 @@ static int handle_tcon_bin(void)
 	// start handle tcon bin name
 	if (model_debug_flag & DEBUG_TCON)
 		ALOGD("%s: model_tcon: %s\n", __func__, file_name);
-	if (!iniIsFileExist(file_name)) {
-		ALOGE("%s, file name \"%s\" not exist.\n", __func__, file_name);
-		free(tmp_buf);
-		tmp_buf = NULL;
-		return -1;
-	}
 
 	if (header)
 		size = read_bin_file_with_header(file_name, CC_MAX_TCON_BIN_SIZE);
@@ -2741,10 +2749,6 @@ int handle_tcon_vac(unsigned char *vac_data, unsigned int vac_mem_size)
 
 	if (model_debug_flag & DEBUG_NORMAL)
 		ALOGD("%s: model_tcon_vac: %s\n", __func__, file_name);
-	if (!iniIsFileExist(file_name)) {
-		ALOGE("%s, file name \"%s\" not exist.\n", __func__, file_name);
-		return -1;
-	}
 
 	if ((vac_data == NULL) || (!vac_mem_size)) {
 		ALOGE("%s, buffer memory or data size error!!!\n", __func__);
@@ -3014,10 +3018,6 @@ int handle_tcon_demura_set(unsigned char *demura_set_data,
 
 	if (model_debug_flag & DEBUG_NORMAL)
 		ALOGD("%s: model_tcon_demura_set: %s\n", __func__, file_name);
-	if (!iniIsFileExist(file_name)) {
-		ALOGE("%s, file name \"%s\" not exist.\n", __func__, file_name);
-		return -1;
-	}
 
 	bin_size = read_bin_file(file_name, CC_MAX_TCON_DEMURA_SET_SIZE);
 	if (!bin_size || (bin_size > demura_set_size)) {
@@ -3068,10 +3068,6 @@ int handle_tcon_demura_lut(unsigned char *demura_lut_data,
 
 	if (model_debug_flag & DEBUG_NORMAL)
 		ALOGD("%s: model_tcon_demura_lut: %s\n", __func__, file_name);
-	if (!iniIsFileExist(file_name)) {
-		ALOGE("%s, file name \"%s\" not exist.\n", __func__, file_name);
-		return -1;
-	}
 
 	bin_size = read_bin_file(file_name, CC_MAX_TCON_DEMURA_LUT_SIZE);
 	if (!bin_size || (bin_size > demura_lut_size)) {
@@ -3119,14 +3115,8 @@ int handle_tcon_acc_lut(unsigned char *acc_lut_data, unsigned int acc_lut_size)
 		return -1;
 	}
 
-	if (!iniIsFileExist(file_name)) {
-		ALOGE("%s, model_tcon_acc_lut file name \"%s\" not exist.\n",
-			__func__, file_name);
-		return -1;
-	}
 	if (model_debug_flag & DEBUG_NORMAL)
 		ALOGD("%s: model_tcon_acc_lut: %s\n", __func__, file_name);
-
 	bin_size = read_bin_file(file_name, CC_MAX_TCON_ACC_LUT_SIZE);
 	if (!bin_size || (bin_size > acc_lut_size)) {
 		ALOGE("%s, bin_size 0x%lx error!(memory_size 0x%x)\n",
@@ -3171,11 +3161,6 @@ int handle_tcon_data_load(unsigned char **buf, unsigned int index)
 	file_name = handle_tcon_path_file_name_get(index);
 	if (!file_name)
 		return -1;
-	if (!iniIsFileExist(file_name)) {
-		ALOGE("%s, tcon_data[%d] file name \"%s\" not exist.\n",
-			__func__, index, file_name);
-		return -1;
-	}
 	if (model_debug_flag & DEBUG_TCON)
 		ALOGD("%s: tcon_data[%d] file name: %s\n", __func__, index, file_name);
 
@@ -3254,7 +3239,7 @@ int handle_panel_ini(void)
 	int tmp_len = 0;
 	unsigned char *tmp_buf = NULL;
 	unsigned char *lcd_buf = NULL;
-	struct bl_attr_s bl_attr;
+	struct bl_attr_s *bl_attr = NULL;
 	struct panel_misc_s misc_attr;
 	unsigned char *tcon_spi = NULL;
 	struct lcd_optical_attr_s *optical_attr = NULL;
@@ -3278,12 +3263,14 @@ int handle_panel_ini(void)
 		ALOGE("%s, malloc buffer memory error!!!\n", __func__);
 		return -1;
 	}
+	memset((void *)tmp_buf, 0, CC_MAX_DATA_SIZE);
 
 	lcd_buf = (unsigned char *)malloc(CC_MAX_DATA_SIZE);
 	if (!lcd_buf) {
 		ALOGE("%s, malloc lcd buffer memory error!!!\n", __func__);
 		goto handle_panel_ini_err0;
 	}
+	memset((void *)lcd_buf, 0, CC_MAX_DATA_SIZE);
 
 	if (!lcd_ext_attr) {
 		lcd_ext_attr = (struct lcd_ext_attr_s *) malloc(sizeof(struct lcd_ext_attr_s));
@@ -3292,31 +3279,33 @@ int handle_panel_ini(void)
 			goto handle_panel_ini_err1;
 		}
 	}
+	memset((void *)lcd_ext_attr, 0, sizeof(struct lcd_ext_attr_s));
+
+	bl_attr = (struct bl_attr_s *)malloc(sizeof(struct bl_attr_s));
+	if (!bl_attr) {
+		ALOGE("%s, malloc buffer memory error!!!\n", __func__);
+		goto handle_panel_ini_err1;
+	}
+	memset((void *)bl_attr, 0, sizeof(struct bl_attr_s));
 
 #ifdef CONFIG_AML_LCD_TCON
 	tcon_spi = (unsigned char *) malloc(CC_MAX_TCON_SPI_SIZE);
 	if (!tcon_spi) {
 		ALOGE("%s, malloc buffer memory error!!!\n", __func__);
-		goto handle_panel_ini_err1;
+		goto handle_panel_ini_err2;
 	}
+	memset(tcon_spi, 0, CC_MAX_TCON_SPI_SIZE);
 #endif
 
 	optical_attr = (struct lcd_optical_attr_s *)malloc(sizeof(struct lcd_optical_attr_s));
 	if (!optical_attr) {
 		ALOGE("%s, malloc buffer memory error!!!\n", __func__);
-		goto handle_panel_ini_err2;
+		goto handle_panel_ini_err3;
 	}
-
-	memset((void *)lcd_buf, 0, CC_MAX_DATA_SIZE);
-	memset((void *)lcd_ext_attr, 0, sizeof(struct lcd_ext_attr_s));
-	memset((void *)&bl_attr, 0, sizeof(struct bl_attr_s));
-	memset((void *)&misc_attr, 0, sizeof(struct panel_misc_s));
 	memset((void *)optical_attr, 0, sizeof(struct lcd_optical_attr_s));
-#ifdef CONFIG_AML_LCD_TCON
-	memset(tcon_spi, 0, CC_MAX_TCON_SPI_SIZE);
-#endif
 
 	//init misc attr as default
+	memset((void *)&misc_attr, 0, sizeof(struct panel_misc_s));
 	strcpy(misc_attr.version, "V001");
 	strcpy(misc_attr.outputmode, "1080p60hz");
 	misc_attr.panel_reverse = 0;
@@ -3324,16 +3313,11 @@ int handle_panel_ini(void)
 	// start handle panel ini name
 	if (model_debug_flag & DEBUG_NORMAL)
 		ALOGD("%s: model_panel: %s\n", __func__, file_name);
-	if (!iniIsFileExist(file_name)) {
-		ALOGE("%s, file name \"%s\" not exist.\n", __func__, file_name);
-		goto handle_panel_ini_err3;
-	}
-
-	if (parse_panel_ini(file_name, lcd_buf, lcd_ext_attr, &bl_attr, &misc_attr,
+	if (parse_panel_ini(file_name, lcd_buf, lcd_ext_attr, bl_attr, &misc_attr,
 		tcon_spi, optical_attr) < 0) {
 		ALOGE("%s, parse_panel_ini file name \"%s\" fail.\n",
 		      __func__, file_name);
-		goto handle_panel_ini_err3;
+		goto handle_panel_ini_err4;
 	}
 
 	// start handle lcd param
@@ -3364,11 +3348,11 @@ int handle_panel_ini(void)
 	memset((void *)tmp_buf, 0, CC_MAX_DATA_SIZE);
 	tmp_len = ReadBackLightParam(tmp_buf);
 	//ALOGD("%s, start check backlight param data (0x%x).\n", __func__, tmp_len);
-	if (check_param_valid(0, gBlDataCnt, (unsigned char *)&bl_attr, tmp_len, tmp_buf) ==
+	if (check_param_valid(0, gBlDataCnt, (unsigned char *)bl_attr, tmp_len, tmp_buf) ==
 		CC_PARAM_CHECK_ERROR_NEED_UPDATE_PARAM) {
 		ALOGD("%s, check backlight param data diff (0x%x), save new param.\n",
 			__func__, tmp_len);
-		SaveBackLightParam(gBlDataCnt, (unsigned char*)&bl_attr);
+		SaveBackLightParam(gBlDataCnt, (unsigned char *)bl_attr);
 	}
 	// end handle backlight param
 
@@ -3394,8 +3378,7 @@ int handle_panel_ini(void)
 		tmp_len = ReadLcdOpticalParam(tmp_buf);
 		//ALOGD("%s, start check lcd_tcon_spi param data (0x%x).\n", __func__, tmp_len);
 		if (check_param_valid(0, glcd_optical_dcnt, (unsigned char *)optical_attr,
-				     tmp_len, tmp_buf) ==
-		    CC_PARAM_CHECK_ERROR_NEED_UPDATE_PARAM) {
+			tmp_len, tmp_buf) == CC_PARAM_CHECK_ERROR_NEED_UPDATE_PARAM) {
 			ALOGD("%s, check lcd_optical param data diff (0x%x), save new param.\n",
 			      __func__, tmp_len);
 			SaveLcdOpticalParam(glcd_optical_dcnt, (unsigned char *)optical_attr);
@@ -3403,14 +3386,18 @@ int handle_panel_ini(void)
 	}
 	// end handle lcd_optical param
 
+	memset((void *)optical_attr, 0, sizeof(struct lcd_optical_attr_s));
 	free(optical_attr);
-	optical_attr = NULL;
+#ifdef CONFIG_AML_LCD_TCON
+	memset(tcon_spi, 0, CC_MAX_TCON_SPI_SIZE);
 	free(tcon_spi);
-	tcon_spi = NULL;
-	free(tmp_buf);
-	tmp_buf = NULL;
+#endif
+	memset((void *)bl_attr, 0, sizeof(struct bl_attr_s));
+	free(bl_attr);
+	memset((void *)lcd_buf, 0, CC_MAX_DATA_SIZE);
 	free(lcd_buf);
-	lcd_buf = NULL;
+	memset((void *)tmp_buf, 0, CC_MAX_DATA_SIZE);
+	free(tmp_buf);
 
 #ifdef CONFIG_AML_LCD_TCON
 	if (g_lcd_tcon_valid)
@@ -3419,18 +3406,23 @@ int handle_panel_ini(void)
 
 	return 0;
 
-handle_panel_ini_err3:
+handle_panel_ini_err4:
+	memset((void *)optical_attr, 0, sizeof(struct lcd_optical_attr_s));
 	free(optical_attr);
-	optical_attr = NULL;
-handle_panel_ini_err2:
+handle_panel_ini_err3:
+#ifdef CONFIG_AML_LCD_TCON
+	memset(tcon_spi, 0, CC_MAX_TCON_SPI_SIZE);
 	free(tcon_spi);
-	tcon_spi = NULL;
+handle_panel_ini_err2:
+#endif
+	memset((void *)bl_attr, 0, sizeof(struct bl_attr_s));
+	free(bl_attr);
 handle_panel_ini_err1:
+	memset((void *)lcd_buf, 0, CC_MAX_DATA_SIZE);
 	free(lcd_buf);
-	lcd_buf = NULL;
 handle_panel_ini_err0:
+	memset((void *)tmp_buf, 0, CC_MAX_DATA_SIZE);
 	free(tmp_buf);
-	tmp_buf = NULL;
 
 	return -1;
 }

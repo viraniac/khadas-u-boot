@@ -802,10 +802,6 @@ int lcd_tcon_enable(struct lcd_config_s *pconf)
 	if (lcd_tcon_conf->tcon_enable)
 		lcd_tcon_conf->tcon_enable(pconf);
 
-#ifdef CONFIG_CMD_INI
-	lcd_tcon_bin_path_resv_mem_set();
-#endif
-
 	return 0;
 }
 
@@ -1594,6 +1590,86 @@ static int lcd_tcon_mm_table_config_v1(void)
 	return 0;
 }
 
+#ifdef CONFIG_AMLOGIC_TEE
+static int lcd_tcon_mem_tee_protect(int mem_flag, int protect_en)
+{
+	unsigned char *secure_cfg_vaddr;
+	unsigned int *data, sec_protect, sec_handle;
+	int ret;
+
+	if (tcon_rmem.flag == 0 || !tcon_rmem.axi_rmem) {
+		LCDPR("%s: no axi_rmem\n", __func__);
+		return 0;
+	}
+
+	if (mem_flag >= lcd_tcon_conf->axi_bank) {
+		LCDPR("no need protect\n");
+		return 0;
+	}
+
+	/* mem_flag: 0 = od secure mem(default secure)
+	 * 1 = demura_lut mem(default unsecure)
+	 */
+	secure_cfg_vaddr = tcon_rmem.secure_cfg_rmem.mem_vaddr;
+	if (!secure_cfg_vaddr) {
+		LCDERR("%s: secure_cfg_vaddr is null\n", __func__);
+		return 0;
+	}
+	data = (unsigned int *)secure_cfg_vaddr;
+
+	if (protect_en) {
+		if (tcon_rmem.axi_rmem[mem_flag].sec_protect)
+			return 0;
+
+		ret = tee_protect_mem_by_type(TEE_MEM_TYPE_TCON,
+					      tcon_rmem.axi_rmem[mem_flag].mem_paddr,
+					      tcon_rmem.axi_rmem[mem_flag].mem_size,
+					      &tcon_rmem.axi_rmem[mem_flag].sec_handle);
+
+		if (ret) {
+			LCDERR("%s: protect failed! mem[%d], start: 0x%08x, size: 0x%x, ret: %d\n",
+			       __func__, mem_flag,
+			      tcon_rmem.axi_rmem[mem_flag].mem_paddr,
+			      tcon_rmem.axi_rmem[mem_flag].mem_size, ret);
+			return -1;
+		}
+		tcon_rmem.axi_rmem[mem_flag].sec_protect = 1;
+		LCDPR("%s: protect OK. mem[%d], start: 0x%08x, size: 0x%x\n",
+			__func__, mem_flag,
+			tcon_rmem.axi_rmem[mem_flag].mem_paddr,
+			tcon_rmem.axi_rmem[mem_flag].mem_size);
+	} else {
+		if (!tcon_rmem.axi_rmem[mem_flag].sec_protect)
+			return 0;
+		tee_unprotect_mem(tcon_rmem.axi_rmem[mem_flag].sec_handle);
+		tcon_rmem.axi_rmem[mem_flag].sec_protect = 0;
+		tcon_rmem.axi_rmem[mem_flag].sec_handle = 0;
+		LCDPR("%s: unprotect OK. mem[%d], start: 0x%08x, size: 0x%x\n",
+			__func__, mem_flag,
+			tcon_rmem.axi_rmem[mem_flag].mem_paddr,
+			tcon_rmem.axi_rmem[mem_flag].mem_size);
+	}
+	//update secure_cfg_vaddr
+	*data = tcon_rmem.axi_rmem[mem_flag].sec_protect;
+	*(data + 1) = tcon_rmem.axi_rmem[mem_flag].sec_handle;
+	if (lcd_debug_print_flag == 2) {
+		sec_protect = secure_cfg_vaddr[0 + mem_flag * 8] |
+				(secure_cfg_vaddr[1 + mem_flag * 8] << 8) |
+				(secure_cfg_vaddr[2 + mem_flag * 8] << 16) |
+				(secure_cfg_vaddr[3 + mem_flag * 8] << 24);
+		sec_handle = secure_cfg_vaddr[4 + mem_flag * 8] |
+				(secure_cfg_vaddr[5 + mem_flag * 8] << 8) |
+				(secure_cfg_vaddr[6 + mem_flag * 8] << 16) |
+				(secure_cfg_vaddr[7 + mem_flag * 8] << 24);
+		LCDPR("mem[%d] sec_handle: %d, secure_cfg_rmem protect: %d, handle: %d\n",
+			mem_flag, tcon_rmem.axi_rmem[mem_flag].sec_handle,
+			sec_protect, sec_handle);
+	}
+
+	return 0;
+}
+#endif
+
 static void lcd_tcon_axi_mem_config_txhd(void)
 {
 	unsigned int size = 0x1fe000;
@@ -1721,7 +1797,7 @@ static void lcd_tcon_axi_mem_config_t5d(void)
 	*lcd_tcon_conf->axi_reg = reg;
 }
 
-static void lcd_tcon_axi_mem_secure_tl1(void)
+__maybe_unused static void lcd_tcon_axi_mem_secure_tl1(void)
 {
 #ifdef CONFIG_AMLOGIC_TEE
 	unsigned int sec_handle = 0;
@@ -1759,86 +1835,6 @@ static void lcd_tcon_axi_mem_secure_t5(void)
 	lcd_tcon_mem_tee_protect(0, 1);
 #endif
 }
-
-#ifdef CONFIG_AMLOGIC_TEE
-int lcd_tcon_mem_tee_protect(int mem_flag, int protect_en)
-{
-	unsigned char *secure_cfg_vaddr;
-	unsigned int *data, sec_protect, sec_handle;
-	int ret;
-
-	if (tcon_rmem.flag == 0 || !tcon_rmem.axi_rmem) {
-		LCDERR("%s: no axi_rmem\n", __func__);
-		return -1;
-	}
-
-	if (mem_flag > lcd_tcon_conf->axi_bank) {
-		LCDPR("no need protect\n");
-		return 0;
-	}
-
-	/* mem_flag: 0 = od secure mem(default secure)
-	 * 1 = demura_lut mem(default unsecure)
-	 */
-	secure_cfg_vaddr = tcon_rmem.secure_cfg_rmem.mem_vaddr;
-	if (!secure_cfg_vaddr) {
-		LCDERR("%s: secure_cfg_vaddr is null\n", __func__);
-		return 0;
-	}
-	data = (unsigned int *)secure_cfg_vaddr;
-
-	if (protect_en) {
-		if (tcon_rmem.axi_rmem[mem_flag].sec_protect)
-			return 0;
-
-		ret = tee_protect_mem_by_type(TEE_MEM_TYPE_TCON,
-					      tcon_rmem.axi_rmem[mem_flag].mem_paddr,
-					      tcon_rmem.axi_rmem[mem_flag].mem_size,
-					      &tcon_rmem.axi_rmem[mem_flag].sec_handle);
-
-		if (ret) {
-			LCDERR("%s: protect failed! mem[%d], start: 0x%08x, size: 0x%x, ret: %d\n",
-			       __func__, mem_flag,
-			      tcon_rmem.axi_rmem[mem_flag].mem_paddr,
-			      tcon_rmem.axi_rmem[mem_flag].mem_size, ret);
-			return -1;
-		}
-		tcon_rmem.axi_rmem[mem_flag].sec_protect = 1;
-		LCDPR("%s: protect OK. mem[%d], start: 0x%08x, size: 0x%x\n",
-			__func__, mem_flag,
-			tcon_rmem.axi_rmem[mem_flag].mem_paddr,
-			tcon_rmem.axi_rmem[mem_flag].mem_size);
-	} else {
-		if (!tcon_rmem.axi_rmem[mem_flag].sec_protect)
-			return 0;
-		tee_unprotect_mem(tcon_rmem.axi_rmem[mem_flag].sec_handle);
-		tcon_rmem.axi_rmem[mem_flag].sec_protect = 0;
-		tcon_rmem.axi_rmem[mem_flag].sec_handle = 0;
-		LCDPR("%s: unprotect OK. mem[%d], start: 0x%08x, size: 0x%x\n",
-			__func__, mem_flag,
-			tcon_rmem.axi_rmem[mem_flag].mem_paddr,
-			tcon_rmem.axi_rmem[mem_flag].mem_size);
-	}
-	//update secure_cfg_vaddr
-	*data = tcon_rmem.axi_rmem[mem_flag].sec_protect;
-	*(data + 1) = tcon_rmem.axi_rmem[mem_flag].sec_handle;
-	if (lcd_debug_print_flag == 2) {
-		sec_protect = secure_cfg_vaddr[0 + mem_flag * 8] |
-				(secure_cfg_vaddr[1 + mem_flag * 8] << 8) |
-				(secure_cfg_vaddr[2 + mem_flag * 8] << 16) |
-				(secure_cfg_vaddr[3 + mem_flag * 8] << 24);
-		sec_handle = secure_cfg_vaddr[4 + mem_flag * 8] |
-				(secure_cfg_vaddr[5 + mem_flag * 8] << 8) |
-				(secure_cfg_vaddr[6 + mem_flag * 8] << 16) |
-				(secure_cfg_vaddr[7 + mem_flag * 8] << 24);
-		LCDPR("mem[%d] sec_handle: %d, secure_cfg_rmem protect: %d, handle: %d\n",
-			mem_flag, tcon_rmem.axi_rmem[mem_flag].sec_handle,
-			sec_protect, sec_handle);
-	}
-
-	return 0;
-}
-#endif
 
 static int lcd_tcon_mem_config(void)
 {
@@ -2137,6 +2133,8 @@ static int lcd_tcon_get_config(char *dt_addr, struct lcd_config_s *pconf, int lo
 #ifdef CONFIG_CMD_INI
 	lcd_tcon_bin_path_resv_mem_set();
 #endif
+	if (lcd_tcon_conf->tcon_axi_mem_secure)
+		lcd_tcon_conf->tcon_axi_mem_secure();
 
 	return 0;
 }
@@ -2238,7 +2236,7 @@ static struct lcd_tcon_config_s tcon_data_tl1 = {
 
 	.axi_reg = NULL,
 	.tcon_axi_mem_config = lcd_tcon_axi_mem_config_tl1,
-	.tcon_axi_mem_secure = lcd_tcon_axi_mem_secure_tl1,
+	.tcon_axi_mem_secure = NULL, //lcd_tcon_axi_mem_secure_tl1,
 	.tcon_init_table_pre_proc = NULL,
 	.tcon_enable = lcd_tcon_enable_tl1,
 	.tcon_disable = lcd_tcon_disable_tl1,

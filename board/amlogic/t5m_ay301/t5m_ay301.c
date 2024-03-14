@@ -39,24 +39,6 @@
 #include <asm/arch/stick_mem.h>
 #include <amlogic/board.h>
 
-#ifdef CONFIG_AML_VPU
-#include <amlogic/media/vpu/vpu.h>
-#endif
-#ifdef CONFIG_AML_VPP
-#include <amlogic/media/vpp/vpp.h>
-#endif
-#ifdef CONFIG_AML_VOUT
-#include <amlogic/media/vout/aml_vout.h>
-#endif
-#ifdef CONFIG_AML_LCD
-#include <amlogic/media/vout/lcd/lcd_vout.h>
-#endif
-#ifdef CONFIG_RX_RTERM
-#include <amlogic/aml_hdmirx.h>
-#endif
-#ifdef CONFIG_ARMV8_MULTIENTRY
-#include <asm/arch-meson/smp.h>
-#endif
 DECLARE_GLOBAL_DATA_PTR;
 
 void sys_led_init(void)
@@ -131,12 +113,6 @@ void board_init_mem(void) {
 	#endif
 }
 
-void smp_test(unsigned long param)
-{
-	printf("smp booted, start to run test %lx\n", param);
-	do {
-	} while (1);
-}
 
 int board_init(void)
 {
@@ -146,10 +122,6 @@ int board_init(void)
 	run_command("watchdog off", 0);
 	printf("watchdog disable\n");
 
-#ifdef CONFIG_ARMV8_MULTIENTRY
-	cpu_smp_init_r();
-	run_smp_function(1, &smp_test, 0xaa); //only for example
-#endif
 	run_command("gpio set GPIO_TEST_N0", 0);
 	run_command("gpio clr GPIOD_11", 0);
 	aml_set_bootsequence(0);
@@ -180,22 +152,7 @@ int board_late_init(void)
 	aml_board_late_init_front(NULL);
 	get_stick_reboot_flag_mbx();
 
-#ifdef CONFIG_AML_VPU
-	vpu_probe();
-#endif
-#ifdef CONFIG_AML_VPP
-	vpp_init();
-#endif
-#ifdef CONFIG_RX_RTERM
-	rx_set_phy_rterm();
-#endif
-	run_command("ini_model", 0);
-#ifdef CONFIG_AML_VOUT
-	vout_probe();
-#endif
-#ifdef CONFIG_AML_LCD
-	lcd_probe();
-#endif
+	aml_board_display_init(0x01);
 
 	aml_board_late_init_tail(NULL);
 	return 0;

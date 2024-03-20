@@ -2,7 +2,7 @@
  * When changing CPU, DSU may need to be changed,
  * please confirm with dvfs owner.
  */
-#define CPU_CLK                                 1920
+#define CPU_CLK                                 1860
 
 /* ddr config support multiple configs for boards which use same bootloader:
  * config steps:
@@ -39,7 +39,7 @@
 board_clk_set_t __board_clk_setting
 __attribute__ ((section(".clk_param"))) = {
 	/* clock settings for bl2 */
-	.cpu_clk		= CPU_CLK / 24 * 24,
+	.cpu_clk		= CPU_CLK,
 #ifdef CONFIG_PXP_EMULATOR
 	.pxp			= 1,
 #else

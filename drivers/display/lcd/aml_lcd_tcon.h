@@ -19,6 +19,13 @@
 
 #define REG_LCD_TCON_MAX    0xffff
 
+struct lcd_tcon_axi_mem_cfg_s {
+	unsigned int mem_type;
+	unsigned int mem_size;
+	unsigned int axi_reg;  //ddrif reg
+	unsigned int mem_valid;
+};
+
 struct lcd_tcon_config_s {
 	unsigned char tcon_valid;
 
@@ -48,6 +55,9 @@ struct lcd_tcon_config_s {
 	unsigned int demura_set_size;
 	unsigned int demura_lut_size;
 	unsigned int acc_lut_size;
+
+	unsigned int axi_tbl_len;
+	struct lcd_tcon_axi_mem_cfg_s *axi_mem_cfg_tbl;
 
 	unsigned int *axi_reg;
 	void (*tcon_axi_mem_config)(void);
@@ -224,6 +234,9 @@ int lcd_tcon_setting_check_t5(struct lcd_detail_timing_s *ptiming,
 		unsigned char *core_reg_table, char *ferr_str, char *warn_str);
 int lcd_tcon_setting_check_t5d(struct lcd_detail_timing_s *ptiming,
 		unsigned char *core_reg_table, char *ferr_str, char *warn_str);
+
+int lcd_tcon_mem_od_is_valid(void);
+int lcd_tcon_mem_demura_is_valid(void);
 
 #endif
 

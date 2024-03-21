@@ -393,6 +393,12 @@ export CFLAGS_UASAN
 
 endif
 
+ifeq ("$(CONFIG_NOVERBOSE_BUILD)", "1")
+KBUILD_CFLAGS += -DCONFIG_NOVERBOSE_BUILD
+CFLAGS += -DCONFIG_NOVERBOSE_BUILD
+export CFLAGS
+endif
+
 # Read UBOOTRELEASE from include/config/uboot.release (if it exists)
 UBOOTRELEASE = $(shell cat include/config/uboot.release 2> /dev/null)
 UBOOTVERSION = $(VERSION)$(if $(PATCHLEVEL),.$(PATCHLEVEL)$(if $(SUBLEVEL),.$(SUBLEVEL)))$(EXTRAVERSION)

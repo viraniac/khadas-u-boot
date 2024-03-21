@@ -91,9 +91,19 @@
 /* config keypad(aocpu) */
 #define CONFIG_CMD_KEYPAD		1
 
+#define CONFIG_SILENT_CONSOLE
+#ifdef CONFIG_NOVERBOSE_BUILD
+#define SILENT		"silent=on\0"
+#define KERNL_LOGLEVEL	"loglevel=2 "
+#else
+#define SILENT		"silent=off\0"
+#define KERNL_LOGLEVEL	"loglevel=7 "
+#endif
+
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \
+		SILENT \
         "firstboot=1\0"\
 	"write_boot=0\0"\
         "upgrade_step=0\0"\
@@ -156,6 +166,7 @@
 	"disable_ir=0\0"\
         "initargs="\
             "init=/init " CONFIG_KNL_LOG_LEVEL " console=ttyS0,921600 no_console_suspend earlycon=aml-uart,0xffd23000 printk.devkmsg=on ramoops.pstore_en=1 ramoops.record_size=0x8000 ramoops.console_size=0x4000 loop.max_part=4 scramble_reg=0xff6345c4 "\
+            KERNL_LOGLEVEL \
 	    "cma_first_wm_low=on "\
             "\0"\
         "upgrade_check="\

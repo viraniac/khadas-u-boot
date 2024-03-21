@@ -87,11 +87,19 @@
 #define CONFIG_ADC_POWER_KEY_VAL    0  /*sample value range: 0-1023*/
 
 #define CONFIG_SILENT_CONSOLE
+#ifdef CONFIG_NOVERBOSE_BUILD
+#define SILENT		"silent=1\0"
+#define KERNL_LOGLEVEL	"loglevel=2 "
+#else
+#define SILENT		"silent=0\0"
+#define KERNL_LOGLEVEL	"loglevel=7 "
+#endif
+
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	CONFIG_EXTRA_ENV_SETTINGS_BASE \
-		"silent=0\0"\
+		SILENT \
 		"systemsuspend_switch=0\0"\
 		"ddr_resume=0\0"\
 		"otg_device=1\0" \
@@ -149,7 +157,7 @@
 		"\0"\
         "initargs="\
 		"init=/init console=ttyS0,115200 no_console_suspend "\
-			"earlycon=aml_uart,0xff803000 loglevel=7 "\
+			"earlycon=aml_uart,0xff803000 " KERNL_LOGLEVEL \
 			"printk.devkmsg=on ramoops.pstore_en=1 ramoops.record_size=0x8000 "\
 			"ramoops.console_size=0x4000 loop.max_part=4 scramble_reg=0xff6345c4 "\
             "\0"\

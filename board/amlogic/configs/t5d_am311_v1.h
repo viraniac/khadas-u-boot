@@ -102,14 +102,15 @@
 #define CONFIG_EXTRA_ENV_SETTINGS \
 		SILENT \
         "firstboot=1\0"\
-	"write_boot=0\0"\
+        "write_boot=0\0"\
+        "androidboot.dtbo_idx=0\0"\
         "upgrade_step=0\0"\
         "jtag=disable\0"\
         "loadaddr=1080000\0"\
         "model_name=FHD2HDMI\0" \
         "panel_type=lvds_1\0" \
         "lcd_ctrl=0x00000000\0" \
-	"lcd_debug=0x00000000\0" \
+        "lcd_debug=0x00000000\0" \
         "outputmode=1080p60hz\0" \
         "hdmimode=1080p60hz\0" \
         "cvbsmode=576cvbs\0" \
@@ -137,13 +138,13 @@
         "recovery_part=recovery\0"\
         "recovery_offset=0\0"\
         "cvbs_drv=0\0"\
-	"lock=10101000\0"\
+        "lock=10101000\0"\
         "osd_reverse=0\0"\
         "video_reverse=0\0"\
         "active_slot=normal\0"\
         "boot_part=boot\0"\
 		"rollback_flag=0\0"\
-	"boot_flag=0\0"\
+        "boot_flag=0\0"\
         "vendor_boot_part=vendor_boot\0"\
         "suspend=off\0"\
         "powermode=on\0"\
@@ -160,7 +161,7 @@
         "cec_ac_wakeup=1\0" \
         "Irq_check_en=0\0"\
         "fs_type=""rootfstype=ramfs""\0"\
-	"disable_ir=0\0"\
+        "disable_ir=0\0"\
         "initargs="\
             "init=/init " CONFIG_KNL_LOG_LEVEL " console=ttyS0,921600 no_console_suspend earlycon=aml-uart,0xffd23000 printk.devkmsg=on ramoops.pstore_en=1 ramoops.record_size=0x8000 ramoops.console_size=0x4000 loop.max_part=4 scramble_reg=0xff6345c4 "\
             KERNL_LOGLEVEL \

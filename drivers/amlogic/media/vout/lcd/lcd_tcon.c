@@ -797,8 +797,24 @@ void lcd_tcon_disable(struct aml_lcd_drv_s *pdrv)
 
 	if (lcd_tcon_conf->tcon_disable)
 		lcd_tcon_conf->tcon_disable(pdrv);
-	if (lcd_tcon_conf->tcon_global_reset)
+	if (lcd_tcon_conf->tcon_global_reset) {
 		lcd_tcon_conf->tcon_global_reset(pdrv);
+		LCDPR("reset tcon\n");
+	}
+}
+
+void lcd_tcon_global_reset(struct aml_lcd_drv_s *pdrv)
+{
+	int ret;
+
+	ret = lcd_tcon_valid_check();
+	if (ret)
+		return;
+
+	if (lcd_tcon_conf->tcon_global_reset) {
+		lcd_tcon_conf->tcon_global_reset(pdrv);
+		LCDPR("reset tcon\n");
+	}
 }
 
 static int lcd_tcon_forbidden_check(void)

@@ -305,6 +305,7 @@
 		"\0"\
 	"check_display="\
 		"echo check_display reboot_mode : ${reboot_mode} ,powermode : ${powermode};"\
+		"setenv ddr_resume 0; "\
 		"if test ${reboot_mode} = ffv_reboot; then "\
 			"if test ${ffv_wake} = on; then "\
 				"echo ffv reboot no display; "\

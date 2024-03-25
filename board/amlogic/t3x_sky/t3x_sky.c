@@ -261,10 +261,11 @@ struct mm_region *mem_map = bd_mem_map;
 int mach_cpu_init(void)
 {
 	//printf("\nmach_cpu_init\n");
-	unsigned long nddrSize = (readl(SYSCTRL_SEC_STATUS_REG4) & ~0xfffffUL) << 4;
 
-	if (nddrSize <= 0xe0000000)
-		bd_mem_map[0].size = nddrSize;
+	ulong nddrSize = ((readl(SYSCTRL_SEC_STATUS_REG4) & ~0xfffffUL) << 4) >= 0xe0000000 ?
+		0xe0000000 : (readl(SYSCTRL_SEC_STATUS_REG4) & ~0xfffffUL) << 4;
+
+	bd_mem_map[0].size = nddrSize;
 
 	return 0;
 }

@@ -104,7 +104,7 @@
 	"kernel_comp_size=0x2000000\0"\
 	"pxeuuid=00000000-0000-0000-0000-000000000000\0"\
 	"bootfile=\0"\
-	"fdtfile=sc2_s905x4_ah212_debian.dtb\0"\
+	"fdtfile=sc2_s905x4_ah212_linux.dtb\0"\
 	"silent=0\0"\
 	"dv_fw_addr=0xa00000\0"\
 	"otg_device=1\0" \

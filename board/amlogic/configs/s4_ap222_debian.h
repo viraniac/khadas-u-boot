@@ -123,7 +123,7 @@
 	"kernel_comp_size=0x2000000\0"\
 	"pxeuuid=00000000-0000-0000-0000-000000000000\0"\
 	"bootfile=\0"\
-	"fdtfile=s4_s905y4_ap222_debian.dtb\0" \
+	"fdtfile=s4_s905y4_ap222_linux.dtb\0" \
 	"fb_width=1920\0" \
 	"fb_height=1080\0" \
 	"hdmichecksum=0x00000000\0" \

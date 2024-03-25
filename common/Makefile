@@ -384,6 +384,7 @@ obj-y += cmd_avb.o
 obj-$(CONFIG_AML_FACTORY_PROVISION) += cmd_factory_provision.o
 obj-$(CONFIG_AML_WATERMARK) += cmd_watermark.o
 obj-$(CONFIG_AML_POWER_DOMAIN_SEC) += cmd_power.o
+obj-$(CONFIG_NOVERBOSE_BUILD) += cmd_bl30_print_set.o
 
 # zircon commands
 obj-$(CONFIG_ZIRCON_BOOT_IMAGE) += cmd_zircon_bootconfig.o

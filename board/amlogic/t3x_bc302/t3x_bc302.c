@@ -383,16 +383,9 @@ int checkhw(char *name)
 {
 	char loc_name[64] = {0};
 	unsigned long ddr_size = 0;
-	int i;
 	cpu_id_t cpu_id = get_cpu_id();
 
-	for (i = 0; i < CONFIG_NR_DRAM_BANKS; i++) {
-		ddr_size += gd->bd->bi_dram[i].size;
-		//
-	}
-#if defined(CONFIG_SYS_MEM_TOP_HIDE)
-	ddr_size += CONFIG_SYS_MEM_TOP_HIDE;
-#endif
+	ddr_size = (readl(SYSCTRL_SEC_STATUS_REG4) & ~0xfffffUL) << 4;
 
 	int sipinfo = ((((readl(SYSCTRL_SEC_STATUS_REG4)) & 0xFFFF0000) >> 19) & 0x1);
 	if ((sipinfo == 1) && (ddr_size == 0x80000000)) // sip package

@@ -437,7 +437,7 @@ int checkhw(char *name)
 			else if (cpu_id.chip_rev == 0xB)
 				strcpy(loc_name, "t3x_t968d4_sky-3g\0");
 			break;
-		case 0xe0000000:
+		case 0x100000000:
 			if (cpu_id.chip_rev == 0xA)
 				strcpy(loc_name, "t3x-reva_t968d4_sky\0");
 			else if (cpu_id.chip_rev == 0xB)

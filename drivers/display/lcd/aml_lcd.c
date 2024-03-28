@@ -928,12 +928,12 @@ static void lcd_update_boot_ctrl_bootargs(void)
 	 *bit[31:30]: lcd mode(0=normal, 1=tv; 2=tablet, 3=TBD)
 	 *bit[29:28]: lcd debug para source(0=normal, 1=dts, 2=unifykey,
 	 *                                  3=bsp for uboot)
-	 *bit[27:16]: reserved
-	 *bit[15:8]: lcd test pattern
-	 *bit[7:0]:  lcd debug print flag
+	 *bit[27:20]: reserved
+	 *bit[19:16]: lcd test pattern
+	 *bit[15:0]:  lcd debug print flag
 	 */
-	value |= (debug_ctrl.debug_print_flag & 0xff);
-	value |= (debug_ctrl.debug_test_pattern & 0xff) << 8;
+	value |= (debug_ctrl.debug_print_flag & 0xffff);
+	value |= (debug_ctrl.debug_test_pattern & 0xff) << 16;
 	value |= (debug_ctrl.debug_para_source & 0x3) << 28;
 	value |= (debug_ctrl.debug_lcd_mode & 0x3) << 30;
 	sprintf(ctrl_str, "0x%08x", value);

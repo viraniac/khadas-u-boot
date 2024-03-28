@@ -107,6 +107,8 @@ int aml_lcd_unifykey_get_size(const char *key_name, int *len)
 		return -1;
 	}
 	*len = (int)key_size;
+	if (lcd_debug_print_flag)
+		LCDUKEY("%s: %s size: 0x%x\n", __func__, key_name, *len);
 
 	return 0;
 }

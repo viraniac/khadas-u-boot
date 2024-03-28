@@ -171,19 +171,15 @@ static void lcd_tcon_data_init_set(unsigned char *data_buf)
 	init_header = (struct lcd_tcon_init_block_header_s *)data_buf;
 	core_reg_table = data_buf + LCD_TCON_DATA_BLOCK_HEADER_SIZE;
 	switch (init_header->block_ctrl) {
-	case LCD_TCON_DATA_CTRL_FLAG_DLG:
+	case LCD_TCON_DATA_CTRL_FLAG_UFR:
 		if (lcd_drv->lcd_config->lcd_timing.act_timing.h_active == init_header->h_active &&
 		    lcd_drv->lcd_config->lcd_timing.act_timing.v_active == init_header->v_active) {
 			lcd_tcon_init_data_version_update(init_header->version);
 			local_cfg->cur_core_reg_table = core_reg_table;
-
+			LCDPR("%s: dlg %dx%d init, bin_ver:%s\n",
+				__func__, init_header->h_active,
+				init_header->v_active, local_cfg->bin_ver);
 			lcd_tcon_core_reg_set(tcon_conf, mm_table, core_reg_table);
-			if (lcd_debug_print_flag) {
-				LCDPR("%s: dlg %dx%d init, bin_ver:%s\n",
-					__func__, init_header->h_active,
-					init_header->v_active,
-					local_cfg->bin_ver);
-			}
 		}
 		break;
 	default:

@@ -1258,8 +1258,7 @@ static int lcd_config_load_from_unifykey(struct lcd_config_s *pconf)
 	ret = aml_lcd_unifykey_get_size("lcd", &key_len);
 	if (ret)
 		return -1;
-	if (lcd_debug_print_flag)
-		LCDPR("%s: size: 0x%x\n", __func__, key_len);
+
 	para = (unsigned char *)malloc(sizeof(unsigned char) * key_len);
 	if (!para) {
 		LCDERR("%s: Not enough memory\n", __func__);
@@ -1635,11 +1634,11 @@ static void lcd_vmode_update(struct lcd_config_s *pconf)
 		memcpy(&pconf->lcd_timing.base_timing, ptiming,
 			sizeof(struct lcd_detail_timing_s));
 		lcd_cus_ctrl_config_update(pconf, (void *)ptiming, LCD_CUS_CTRL_SEL_TIMMING);
-		if (pconf->lcd_timing.base_timing.pixel_clk != pre_pclk)
-			pconf->lcd_timing.clk_change |= LCD_CLK_PLL_RESET;
 
 		//update base_timing to act_timing
 		lcd_enc_timing_init_config(pconf);
+		if (pconf->lcd_timing.base_timing.pixel_clk != pre_pclk)
+			pconf->lcd_timing.clk_change |= LCD_CLK_PLL_RESET;
 	}
 
 	if (!pdrv->vmode_mgr.cur_vmode_info || !pconf->std_duration) {

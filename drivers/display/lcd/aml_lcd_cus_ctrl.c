@@ -554,7 +554,8 @@ int lcd_cus_ctrl_load_from_unifykey(struct lcd_config_s *pconf, unsigned char *b
 	pconf->cus_ctrl.ctrl_cnt = ctrl_cnt;
 	pconf->cus_ctrl.timing_cnt = 0;
 	pconf->cus_ctrl.active_timing_type = LCD_CUS_CTRL_TYPE_MAX;
-	pconf->cus_ctrl.timing_switch_flag = 0;
+	pconf->cus_ctrl.timing_switch_flag = LCD_VMODE_SWITCH_NONE;
+	pconf->cus_ctrl.cur_timing_attr = NULL;
 
 	attr_conf = malloc(ctrl_cnt * sizeof(struct lcd_cus_ctrl_attr_config_s));
 	if (!attr_conf)
@@ -739,7 +740,7 @@ int lcd_cus_ctrl_config_update(struct lcd_config_s *pconf, void *param, unsigned
 	struct lcd_detail_timing_s *ptiming;
 	struct lcd_dfr_s *p_dfr;
 	char str[128];
-	int i, j, ret = -1;
+	int tmg_sel = 0, i, j, ret = -1;
 
 	if (!pconf->cus_ctrl.attr_config)
 		return -1;
@@ -750,6 +751,8 @@ int lcd_cus_ctrl_config_update(struct lcd_config_s *pconf, void *param, unsigned
 		case LCD_CUS_CTRL_TYPE_UFR:
 			if ((mask_sel & LCD_CUS_CTRL_SEL_UFR) == 0)
 				break;
+			tmg_sel = 1;
+
 			if (attr_conf->attr_flag == 0)
 				break;
 			if (!attr_conf->attr.ufr_attr || !param)
@@ -758,6 +761,9 @@ int lcd_cus_ctrl_config_update(struct lcd_config_s *pconf, void *param, unsigned
 			tmg_match = (struct lcd_detail_timing_s *)param;
 			ptiming = &attr_conf->attr.ufr_attr->timing;
 			if (tmg_match == ptiming) {
+				if (pconf->cus_ctrl.cur_timing_attr)
+					pconf->cus_ctrl.cur_timing_attr->active = 0;
+				pconf->cus_ctrl.cur_timing_attr = attr_conf;
 				pconf->cus_ctrl.active_timing_type = LCD_CUS_CTRL_TYPE_UFR;
 				pconf->cus_ctrl.timing_switch_flag = attr_conf->attr_flag;
 				attr_conf->active = 1;
@@ -774,6 +780,8 @@ int lcd_cus_ctrl_config_update(struct lcd_config_s *pconf, void *param, unsigned
 		case LCD_CUS_CTRL_TYPE_DFR:
 			if ((mask_sel & LCD_CUS_CTRL_SEL_DFR) == 0)
 				break;
+			tmg_sel = 1;
+
 			if (attr_conf->attr_flag == 0)
 				break;
 			if (!attr_conf->attr.dfr_attr || !param)
@@ -783,6 +791,9 @@ int lcd_cus_ctrl_config_update(struct lcd_config_s *pconf, void *param, unsigned
 			for (j = 0; j < p_dfr->fr_cnt; j++) {
 				ptiming = &p_dfr->fr[j].timing;
 				if (tmg_match == ptiming) {
+					if (pconf->cus_ctrl.cur_timing_attr)
+						pconf->cus_ctrl.cur_timing_attr->active = 0;
+					pconf->cus_ctrl.cur_timing_attr = attr_conf;
 					pconf->cus_ctrl.active_timing_type =
 						LCD_CUS_CTRL_TYPE_DFR;
 					pconf->cus_ctrl.timing_switch_flag =
@@ -803,6 +814,8 @@ int lcd_cus_ctrl_config_update(struct lcd_config_s *pconf, void *param, unsigned
 		case LCD_CUS_CTRL_TYPE_EXTEND_TMG:
 			if ((mask_sel & LCD_CUS_CTRL_SEL_EXTEND_TMG) == 0)
 				break;
+			tmg_sel = 1;
+
 			if (attr_conf->attr_flag == 0)
 				break;
 			if (!attr_conf->attr.extend_tmg_attr || !param)
@@ -811,6 +824,9 @@ int lcd_cus_ctrl_config_update(struct lcd_config_s *pconf, void *param, unsigned
 			for (j = 0; j < attr_conf->attr.extend_tmg_attr->group_cnt; j++) {
 				ptiming = &attr_conf->attr.extend_tmg_attr->timing[j];
 				if (tmg_match == ptiming) {
+					if (pconf->cus_ctrl.cur_timing_attr)
+						pconf->cus_ctrl.cur_timing_attr->active = 0;
+					pconf->cus_ctrl.cur_timing_attr = attr_conf;
 					pconf->cus_ctrl.active_timing_type =
 						LCD_CUS_CTRL_TYPE_EXTEND_TMG;
 					pconf->cus_ctrl.timing_switch_flag =
@@ -848,13 +864,19 @@ int lcd_cus_ctrl_config_update(struct lcd_config_s *pconf, void *param, unsigned
 		}
 	}
 
+	if (tmg_sel) { //timing_sel non active, means use default timing
+		pconf->cus_ctrl.active_timing_type = LCD_CUS_CTRL_TYPE_MAX;
+		pconf->cus_ctrl.timing_switch_flag = LCD_VMODE_SWITCH_NONE;
+		pconf->cus_ctrl.cur_timing_attr = NULL;
+	}
+
 	return ret;
 }
 
 void lcd_cus_ctrl_state_clear(struct lcd_config_s *pconf, unsigned int mask_sel)
 {
 	struct lcd_cus_ctrl_attr_config_s *attr_conf;
-	int i, tmg_clr = 0;
+	int i;
 
 	if (!pconf->cus_ctrl.attr_config)
 		return;
@@ -863,22 +885,16 @@ void lcd_cus_ctrl_state_clear(struct lcd_config_s *pconf, unsigned int mask_sel)
 		attr_conf = &pconf->cus_ctrl.attr_config[i];
 		switch (attr_conf->attr_type) {
 		case LCD_CUS_CTRL_TYPE_UFR:
-			if (mask_sel & LCD_CUS_CTRL_SEL_UFR) {
+			if (mask_sel & LCD_CUS_CTRL_SEL_UFR)
 				attr_conf->active = 0;
-				tmg_clr = 1;
-			}
 			break;
 		case LCD_CUS_CTRL_TYPE_DFR:
-			if (mask_sel & LCD_CUS_CTRL_SEL_DFR) {
+			if (mask_sel & LCD_CUS_CTRL_SEL_DFR)
 				attr_conf->active = 0;
-				tmg_clr = 1;
-			}
 			break;
 		case LCD_CUS_CTRL_TYPE_EXTEND_TMG:
-			if (mask_sel & LCD_CUS_CTRL_SEL_EXTEND_TMG) {
+			if (mask_sel & LCD_CUS_CTRL_SEL_EXTEND_TMG)
 				attr_conf->active = 0;
-				tmg_clr = 1;
-			}
 			break;
 		case LCD_CUS_CTRL_TYPE_CLK_ADV:
 			if (mask_sel & LCD_CUS_CTRL_SEL_CLK_ADV)
@@ -895,10 +911,6 @@ void lcd_cus_ctrl_state_clear(struct lcd_config_s *pconf, unsigned int mask_sel)
 		default:
 			break;
 		}
-	}
-	if (tmg_clr) {
-		pconf->cus_ctrl.active_timing_type = LCD_CUS_CTRL_TYPE_MAX;
-		pconf->cus_ctrl.timing_switch_flag = 0;
 	}
 }
 

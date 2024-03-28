@@ -461,6 +461,7 @@ struct cus_ctrl_config_s {
 	unsigned char timing_ctrl_valid;
 
 	struct lcd_cus_ctrl_attr_config_s *attr_config;
+	struct lcd_cus_ctrl_attr_config_s *cur_timing_attr;
 };
 
 #define LCD_ENABLE_RETRY_MAX    3
@@ -635,12 +636,12 @@ struct lcd_boot_ctrl_s {
  *bit[31:30]: lcd mode(0=normal, 1=tv; 2=tablet, 3=TBD)
  *bit[29:28]: lcd debug para source(0=normal, 1=dts, 2=unifykey,
  *                                  3=bsp for uboot)
- *bit[27:16]: reserved
- *bit[15:8]: lcd test pattern
- *bit[7:0]:  lcd debug print flag
+ *bit[27:20]: reserved
+ *bit[19:16]: lcd test pattern
+ *bit[15:0]:  lcd debug print flag
  */
 struct lcd_debug_ctrl_s {
-	unsigned char debug_print_flag;
+	unsigned short debug_print_flag;
 	unsigned char debug_test_pattern;
 	unsigned char debug_para_source;
 	unsigned char debug_lcd_mode;

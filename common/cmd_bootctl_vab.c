@@ -20,6 +20,7 @@
 #include <mmc.h>
 #include <amlogic/aml_mmc.h>
 #include <u-boot/sha1.h>
+#include <emmc_partitions.h>
 
 #ifdef CONFIG_BOOTLOADER_CONTROL_BLOCK
 
@@ -39,6 +40,7 @@
 #define BOOTLOADER_OFFSET		512
 #define BOOTLOADER_MAX_SIZE		(4 * 1024 * 1024)
 
+#define MERGE_STATE_FILE "/ota/state"
 
 extern int store_read_ops(
     unsigned char *partition_name,
@@ -145,6 +147,17 @@ typedef struct slot_metadata {
 	uint8_t reserved : 7;
 }slot_metadata;
 
+enum UpdateState {
+	None = 0,
+	Initiated,
+	Unverified,
+	Merging,
+	MergeNeedsReboot,
+	MergeCompleted,
+	MergeFailed,
+	Cancelled
+};
+
 /* Bootloader Control AB
  *
  * This struct can be used to manage A/B metadata. It is designed to
@@ -171,7 +184,8 @@ typedef struct bootloader_control {
 	// Per-slot information.  Up to 4 slots.
 	struct slot_metadata slot_info[4];
 	// Reserved for further use.
-	uint8_t reserved1[8];
+	uint8_t merge_flag;
+	uint8_t reserved1[7];
 	// CRC32 of all 28 bytes preceding this field (little endian
 	// format).
 	uint32_t crc32_le;
@@ -290,6 +304,7 @@ void boot_info_reset(bootloader_control* boot_ctrl)
 	boot_ctrl->version = BOOT_CTRL_VERSION;
 	boot_ctrl->nb_slot = 2;
 	boot_ctrl->roll_flag = 0;
+	boot_ctrl->merge_flag = -1;
 
 	for (slot = 0; slot < 4; ++slot) {
 		slot_metadata entry = {};
@@ -619,6 +634,60 @@ void bootloader_update_check(void)
 	}
 }
 
+static int is_f2fs_by_name(char *name)
+{
+	int ret = -1;
+#ifdef CONFIG_AML_SD_EMMC
+	struct partitions *partition = NULL;
+
+	partition = find_mmc_partition_by_name(name);
+	if (!partition)
+		return ret;
+	ret = (partition->mask_flags >> 12) & 0x1;
+#endif
+
+	return ret;
+}
+
+/**
+ *get merge status
+ */
+int check_mergestatus(const char *filename)
+{
+	if (!filename)
+		return -1;
+
+#ifdef CONFIG_AML_SD_EMMC
+	int part_no = -1;
+	char cmd[256] = {0};
+
+	part_no = get_partition_num_by_name("metadata");
+	if (part_no < 0) {
+		printf("fail find part index for metadata\n");
+		return -1;
+	}
+
+	void *loadaddr = (void *)simple_strtoul("0x1080000", NULL, 16);
+
+	sprintf(cmd, "ext4load mmc 1:0x%X 0x1080000 %s",
+			part_no,
+			filename);
+
+	if (run_command(cmd, 0)) {
+		printf("command[%s] failed\n", cmd);
+		return -1;
+	}
+
+	char *pData = (char *)loadaddr;
+
+	printf("merge_state: %d\n", pData[1]);
+
+	if (pData[1] == Initiated || pData[1] == Unverified)
+		return 1;
+#endif
+	return 0;
+}
+
 static void update_after_failed_rollback(void)
 {
 	run_command("run init_display; run storeargs; run update;", 0);
@@ -934,6 +1003,8 @@ static int do_SetUpdateTries
 	bool bootable_a, bootable_b;
 	int slot;
 	int update_flag = 0;
+	int merge_ret = -1;
+	char *rebootmode = getenv("reboot_mode");
 
 	if (has_boot_slot == 0) {
 		printf("device is not ab mode\n");
@@ -974,8 +1045,38 @@ static int do_SetUpdateTries
 		}
 	}
 
+	printf("boot_ctrl.merge_flag = %d\n", boot_ctrl.merge_flag);
+
 	if (update_flag == 1)
 		boot_info_save(&boot_ctrl, miscbuf);
+
+	if (boot_ctrl.merge_flag < 1) {
+		printf("can't get merge_flag from bootctrl\n");
+		printf("try to read it from metadata\n");
+		if (is_f2fs_by_name("metadata") == 0) {
+			printf("metadata is ext4\n");
+			merge_ret = check_mergestatus(MERGE_STATE_FILE);
+		}
+	} else if (boot_ctrl.merge_flag == Initiated ||
+		boot_ctrl.merge_flag == Unverified) {
+		printf("merge_flag is Initiated or Unverified\n");
+		merge_ret = 1;
+	}
+
+	if (rebootmode && (!strcmp(rebootmode, "fastboot")) &&
+		update_flag == 1 &&
+		merge_ret == 1) {
+		printf("reboot bootloader during merge, rollback\n");
+		if (slot == 0 && bootable_a) {
+			if (boot_ctrl.slot_info[0].successful_boot == 0)
+				boot_ctrl.slot_info[0].tries_remaining = 0;
+		} else if (slot == 1 && bootable_b) {
+			if (boot_ctrl.slot_info[1].successful_boot == 0)
+				boot_ctrl.slot_info[1].tries_remaining = 0;
+		}
+		boot_info_save(&boot_ctrl, miscbuf);
+		run_command("reboot", 0);
+	}
 
 	printf("%s boot_ctrl.roll_flag = %d\n", __func__, boot_ctrl.roll_flag);
 	if (boot_ctrl.roll_flag == 1)

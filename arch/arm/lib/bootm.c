@@ -42,6 +42,7 @@
 #ifdef CONFIG_AMLOGIC_TIME_PROFILE
 #include <initcall.h>
 #endif
+#include <malloc.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -220,6 +221,94 @@ static inline int str2long(const char *p, ulong *num)
 	*num = simple_strtoul(p, &endptr, 16);
 	return *p != '\0' && *endptr == '\0';
 }
+
+/*
+ * suffix kernel bootargs to bootargs
+ *
+ */
+static void add_kernel_bootargs(bootm_headers_t *images)
+{
+	int node, len_args_uboot, len_args_dts, len;
+	char *bootargs_dts, *bootargs_uboot;
+	char *bootargs_new;
+	char  *p, *q, *t, *z, *s;
+	static char kerenl_dts_update;
+	char buf[256];
+
+	if (kerenl_dts_update)
+		return;
+
+	kerenl_dts_update = 1;
+	node = fdt_path_offset(images->ft_addr, "/chosen");
+	if (node < 0) {
+		printf("Can't find /chosen node from DTB\n");
+		return;
+	}
+	bootargs_dts = (char *)fdt_getprop(images->ft_addr, node, "bootargs", &len);
+	if (!bootargs_dts) {
+		printf("Can't find bootargs property in chosen\n");
+		return;
+	}
+	bootargs_uboot = getenv("bootargs");
+	if (!bootargs_uboot)
+		return;
+
+	len_args_uboot = strlen(bootargs_uboot);
+	len_args_dts = strlen(bootargs_dts);
+	len = len_args_uboot + len_args_dts + 2;
+
+	bootargs_new = (char *)malloc(len);
+	if (!bootargs_new) {
+		printf("fail to malloc new bootargs memory\n");
+		return;
+	}
+
+	memcpy(bootargs_new, bootargs_uboot, len_args_uboot);
+	bootargs_new[len_args_uboot] = ' ';
+	memcpy(bootargs_new + len_args_uboot + 1, bootargs_dts, len_args_dts);
+	bootargs_new[len - 1] = '\0';
+	p = bootargs_new;
+	while ((q = strchr(p, ' '))) {
+		if (q == p) {
+			p = q + 1;
+			continue;
+		}
+		memset(buf, 0, sizeof(buf));
+		if ((q - p) > sizeof(buf)) {
+			memcpy(buf, p, sizeof(buf));
+			printf("%s is oversized\n", buf);
+			p = q + 1;
+			continue;
+		}
+		memcpy(buf, p, q - p);
+		len = strlen(buf);
+		p = q + 1;
+		z = p;
+		while (z) {
+			t = strstr(z, buf);
+			if (t) {
+				s = t;
+				if (strchr(s, ' ') && (*(t + len) == ' ')) {
+					memmove(t, t + len, z + strlen(z) - t - len + 1);
+					z = t;
+				} else {
+					if (strlen(t) == len) {
+						memmove(t, t + len, z + strlen(z) - t - len + 1);
+						break;
+					} else {
+						z = t + len;
+					}
+				}
+			} else {
+				break;
+			}
+		}
+	}
+
+	setenv("bootargs", bootargs_new);
+	free(bootargs_new);
+}
+
 /*
  * kernel 5.15 limit boot env number to 32, there are lots of unused/default
  * zero envs which may cause boot failed in kernel. So remove these envs
@@ -464,6 +553,7 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 int do_bootm_linux(int flag, int argc, char * const argv[],
 		   bootm_headers_t *images)
 {
+	add_kernel_bootargs(images);
 	fix_bootargs();
 	/* No need for those on ARM */
 	if (flag & BOOTM_STATE_OS_BD_T || flag & BOOTM_STATE_OS_CMDLINE)

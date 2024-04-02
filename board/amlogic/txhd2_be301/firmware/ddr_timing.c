@@ -274,7 +274,7 @@ ddr_set_ps0_only_t __attribute__ ((aligned(4))) __ddr_setting[] __attribute__ ((
 		.cfg_ddr_training_delay_ps.ac_trace_delay[29] = 256 + AC_OFFSET + ac_sub_off,
 		// cs
 		.cfg_ddr_training_delay_ps.ac_trace_delay[10] = 128 + AC_OFFSET + ac_sub_off,
-		.cfg_ddr_training_delay_ps.ac_trace_delay[11] = 168 + AC_OFFSET + ac_sub_off - 50,
+		.cfg_ddr_training_delay_ps.ac_trace_delay[11] = 168 + AC_OFFSET + ac_sub_off - 30,
 		.cfg_ddr_training_delay_ps.ac_trace_delay[28] = 128 + AC_OFFSET,      //ck
 		.cfg_ddr_training_delay_ps.ac_trace_delay[29] = 128 + AC_OFFSET,      //ck
 		//cke

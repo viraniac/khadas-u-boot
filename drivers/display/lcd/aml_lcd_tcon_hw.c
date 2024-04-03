@@ -910,7 +910,7 @@ static int lcd_tcon_top_set_txhd(void)
 	return 0;
 }
 
-static int lcd_tcon_top_set_tl1(struct lcd_config_s *pconf)
+int lcd_tcon_top_set_tl1(struct lcd_config_s *pconf)
 {
 	struct tcon_rmem_s *tcon_rmem = get_lcd_tcon_rmem();
 	unsigned int axi_reg[3] = {0x200c, 0x2013, 0x2014};
@@ -957,7 +957,7 @@ static int lcd_tcon_top_set_tl1(struct lcd_config_s *pconf)
 	return 0;
 }
 
-static int lcd_tcon_top_set_t5(struct lcd_config_s *pconf)
+int lcd_tcon_top_set_t5(struct lcd_config_s *pconf)
 {
 	unsigned int p2p_type;
 
@@ -1045,7 +1045,7 @@ int lcd_tcon_enable_tl1(struct lcd_config_s *pconf)
 		return -1;
 
 	/* step 1: tcon top */
-	lcd_tcon_top_set_tl1(pconf);
+	//lcd_tcon_top_set_tl1(pconf);
 
 	/* step 2: tcon_core_reg_update */
 	lcd_tcon_core_reg_pre_od(tcon_conf, mm_table);
@@ -1158,7 +1158,7 @@ int lcd_tcon_enable_t5(struct lcd_config_s *pconf)
 	lcd_vcbus_write(ENCL_VIDEO_EN, 0);
 
 	/* step 1: tcon top */
-	lcd_tcon_top_set_t5(pconf);
+	//lcd_tcon_top_set_t5(pconf);
 
 	/* step 2: tcon_core_reg_update */
 	if (mm_table->core_reg_header) {

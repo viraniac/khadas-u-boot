@@ -1426,11 +1426,13 @@ int lcd_tv_driver_init(void)
 		break;
 #ifdef CONFIG_AML_LCD_TCON
 	case LCD_MLVDS:
+		lcd_tcon_top_init(pconf);
 		lcd_mlvds_control_set(pconf);
 		lcd_pinmux_set(1);
 		lcd_mlvds_phy_set(pconf, 1);
 		break;
 	case LCD_P2P:
+		lcd_tcon_top_init(pconf);
 		lcd_pinmux_set(1);
 		lcd_p2p_phy_set(pconf, 1);
 		lcd_p2p_control_set(pconf);

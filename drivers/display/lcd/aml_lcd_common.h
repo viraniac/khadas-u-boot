@@ -130,6 +130,7 @@ extern void lcd_phy_tcon_chpi_bbc_init_tl1(struct lcd_config_s *pconf);
 /* lcd tcon */
 #ifdef CONFIG_AML_LCD_TCON
 extern void lcd_tcon_info_print(void);
+int lcd_tcon_top_init(struct lcd_config_s *pconf);
 extern int lcd_tcon_enable(struct lcd_config_s *pconf);
 extern void lcd_tcon_disable(struct lcd_config_s *pconf);
 extern int lcd_tcon_probe(char *dt_addr, struct aml_lcd_drv_s *lcd_drv, int load_id);

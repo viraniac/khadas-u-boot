@@ -315,7 +315,8 @@
 		"fi;fi; "\
 		"\0"\
 		"cmdline_keys="\
-			"setenv usid t965d4${cpu_id};"\
+			"setenv usid t968d4${cpu_id};"\
+			"setenv bootargs ${bootargs} androidboot.serialno=t968d4${cpu_id};"\
 			"run cmdline_keys_base;"\
 			"\0"\
 	"upgrade_key="\

@@ -9,6 +9,7 @@
  * Copyright (c) 2021 Rockchip, Inc.
  */
 
+#define LOG_DEBUG
 #include <common.h>
 #include <clk.h>
 #include <dm.h>
@@ -409,10 +410,12 @@ static int meson_pcie_probe(struct udevice *dev)
 	priv->dw.dev = dev;
 
 	ret = meson_pcie_parse_dt(dev);
+	debug("meson_pcie: parse_dt return value : %d\n", ret);
 	if (ret)
 		return ret;
 
 	ret = meson_pcie_init_port(dev);
+	debug("meson_pcie: init_port return value : %d\n", ret);
 	if (ret) {
 		dm_gpio_free(dev, &priv->rst_gpio);
 		return ret;

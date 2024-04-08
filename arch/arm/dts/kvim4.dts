@@ -6,6 +6,7 @@
 /dts-v1/;
 
 #include "meson-t7-txxx.dtsi"
+#include "meson-t7-pcie.dtsi"
 #include "khadas-ts050-panel.dtsi"
 
 / {

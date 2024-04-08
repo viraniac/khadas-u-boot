@@ -178,6 +178,7 @@
             "get_bootloaderversion;" \
             "setenv bootargs ${initargs} hdr_policy=${hdr_policy} hdr_priority=${hdr_priority} otg_device=${otg_device} logo=${display_layer},loaded,${fb_addr} powermode=${powermode} fb_width=${fb_width} fb_height=${fb_height} display_bpp=${display_bpp} outputmode=${outputmode} vout=${outputmode},enable panel_type=${panel_type} lcd_ctrl=${lcd_ctrl} hdmimode=${hdmimode} hdmichecksum=${hdmichecksum} dolby_vision_on=${dolby_vision_on} cvbsmode=${cvbsmode} osd_reverse=${osd_reverse} video_reverse=${video_reverse} androidboot.selinux=${EnableSelinux} androidboot.firstboot=${firstboot} jtag=${jtag}; "\
 	"setenv bootargs ${bootargs} androidboot.hardware=amlogic androidboot.bootloader=${bootloader_version} androidboot.build.expect.baseband=N/A;"\
+	"setenv bootargs ${bootargs} androidboot.bootreason=${reboot_mode};"\
             "run cmdline_keys;"\
             "\0"\
         "cec_init="\
@@ -408,7 +409,6 @@
             "else "\
                 "run init_display; "\
             "fi;fi; "\
-			"setenv initargs ${initargs} androidboot.bootreason=${reboot_mode};"\
             "\0"\
         "cmdline_keys="\
             "if keyman init 0x1234; then "\

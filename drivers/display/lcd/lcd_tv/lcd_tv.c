@@ -1686,9 +1686,16 @@ static int lcd_config_valid(char *mode)
 
 static void lcd_config_init(struct lcd_config_s *pconf)
 {
+	char *mode_str;
+
 	lcd_enc_timing_init_config(pconf);
-	lcd_output_vmode_init(pconf);
 	pconf->lcd_timing.clk_change = 0; /* clear clk_change flag */
+
+	lcd_output_vmode_init(pconf);
+	//assign default outputmode for multi timing
+	mode_str = getenv("outputmode");
+	if (mode_str)
+		lcd_config_valid(mode_str);
 }
 
 int get_lcd_tv_config(char *dt_addr, int load_id)

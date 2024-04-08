@@ -41,6 +41,8 @@ static struct aml_lcd_drv_s aml_lcd_driver;
 static struct lcd_boot_ctrl_s boot_ctrl;
 static struct lcd_debug_ctrl_s debug_ctrl;
 
+static void lcd_update_boot_ctrl_bootargs(void);
+
 static void lcd_chip_detect(void)
 {
 #if 1
@@ -348,6 +350,8 @@ static void lcd_module_enable(char *mode, unsigned int frac)
 			      boot_ctrl.init_level);
 		}
 	}
+
+	lcd_update_boot_ctrl_bootargs();
 }
 
 static void lcd_module_disable(void)
@@ -382,6 +386,8 @@ static void lcd_module_prepare(char *mode, unsigned int frac)
 
 	if ((lcd_drv->lcd_status & LCD_STATUS_ENCL_ON) == 0)
 		lcd_encl_on();
+
+	lcd_update_boot_ctrl_bootargs();
 }
 
 static void lcd_vbyone_filter_flag_print(struct lcd_config_s *pconf)
@@ -905,6 +911,12 @@ static void lcd_update_boot_ctrl_bootargs(void)
 	value |= (boot_ctrl.advanced_flag & 0xff) << 8;
 	value |= (boot_ctrl.custom_pinmux & 0x1) << 16;
 	value |= (boot_ctrl.init_level & 0x3) << 18;
+	value |= (boot_ctrl.base_frame_rate & 0xff) << 24;
+
+	if (lcd_debug_print_flag) {
+		LCDPR("%s: base_fr=%d, bootctrl val=0x%x\n",
+			__func__, pconf->lcd_timing.base_timing.frame_rate, value);
+	}
 	sprintf(ctrl_str, "0x%08x", value);
 	setenv("lcd_ctrl", ctrl_str);
 

@@ -4187,6 +4187,42 @@ int do_emmc_fb_write(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	return ret;
 }
 
+int do_emmc_key_read(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	int ret = 0;
+	void *addr = NULL;
+	u64 size;
+	u32 actual_length = 0;
+	char *endp;
+
+	if (argc != 4)
+		return CMD_RET_USAGE;
+
+	addr = (void *)ustrtoull(argv[2], &endp, 16);
+	size = ustrtoull(argv[3], &endp, 16);
+	printf("enter emmc key read !!\n");
+	printf("addr:%p   size:%llx\n", addr, size);
+	ret = mmc_key_read(addr, size, &actual_length);
+	printf("ret:%d\n", ret);
+	return ret;
+}
+
+int do_emmc_key_write(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	int ret = 0;
+	void *addr = NULL;
+	u64 size;
+	u32 actual_length = 0;
+	char *endp;
+
+	if (argc != 4)
+		return CMD_RET_USAGE;
+
+	addr = (void *)ustrtoull(argv[2], &endp, 16);
+	size = ustrtoull(argv[3], &endp, 16);
+	ret = mmc_key_write(addr, size, &actual_length);
+	return ret;
+}
 
 static cmd_tbl_t cmd_emmc[] = {
 	U_BOOT_CMD_MKENT(dtb_read,  4, 0, do_emmc_dtb_read,  "", ""),
@@ -4194,6 +4230,8 @@ static cmd_tbl_t cmd_emmc[] = {
 	U_BOOT_CMD_MKENT(erase,     3, 0, do_emmc_erase,     "", ""),
 	U_BOOT_CMD_MKENT(fastboot_read, 4, 0, do_emmc_fb_read, "", ""),
 	U_BOOT_CMD_MKENT(fastboot_write, 4, 0, do_emmc_fb_write, "", ""),
+	U_BOOT_CMD_MKENT(key_read, 4, 0, do_emmc_key_read, "", ""),
+	U_BOOT_CMD_MKENT(key_write, 4, 0, do_emmc_key_write, "", ""),
 };
 
 static int do_emmc_dtb_key(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
@@ -4218,5 +4256,8 @@ U_BOOT_CMD(
 	"emmc erase dtb\n"
 	"emmc erase key\n"
 	"emmc fastboot_read addr size\n"
-	"emmc fastboot_write addr size\n");
+	"emmc fastboot_write addr size\n"
+	"emmc key_read addr size\n"
+	"emmc key_write addr size\n"
+);
 

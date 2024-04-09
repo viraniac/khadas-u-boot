@@ -627,6 +627,7 @@ static int do_store_key_ops(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 			ErrP("bufsz (%s) > max 0x%x\n", argv[4], maxkyesz);
 			return CMD_RET_FAILURE;
 		}
+		actualdtbsz = bufsz;
 	}
 
 	ops = is_write ? "key_write" : "key_read";

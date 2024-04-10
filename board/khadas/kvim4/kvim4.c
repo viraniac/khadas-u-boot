@@ -576,3 +576,19 @@ void __attribute__((weak)) set_working_fdt_addr(ulong addr) {}
 int __attribute__((weak)) ofnode_read_u32_default(ofnode node, const char *propname, u32 def) {return 0;}
 
 void __attribute__((weak)) md5_wd (unsigned char *input, int len, unsigned char output[16],	unsigned int chunk_sz){}
+
+#ifdef CONFIG_AML_PCIE
+#include <asm/arch-t7/pci.h>
+
+void amlogic_pcie_init_reset_pin(int pcie_dev)
+{
+	mdelay(5);
+	run_command("gpio set GPIOH_3", 0); //pcie reset-gpio
+
+}
+
+void amlogic_pcie_disable(void)
+{
+	run_command("gpio clear GPIOH_3", 0); //pcie reset-gpio
+}
+#endif

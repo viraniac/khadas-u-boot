@@ -46,11 +46,14 @@ struct meson_pcie {
 	/* Must be first member of the struct */
 	struct pcie_dw dw;
 	void *meson_cfg_base;
-	struct phy phy;
+	void *phy_base;
+	void *reset_base;
 	struct clk clk_port;
 	struct clk clk_general;
 	struct clk clk_pclk;
-	struct reset_ctl_bulk rsts;
+	u32 ctrl_rst_bit;
+	u32 apb_rst_bit;
+	u32 phy_rst_bit;
 	struct gpio_desc rst_gpio;
 };
 
@@ -257,42 +260,36 @@ static void meson_set_max_rd_req_size(struct meson_pcie *priv, int size)
 	dw_pcie_dbi_write_enable(&priv->dw, false);
 }
 
+static void meson_reset_assert(struct meson_pcie *priv)
+{
+	int val = 0;
+	val = readl(priv->reset_base);
+	val &= ~((1 << priv->ctrl_rst_bit) | (1 << priv->phy_rst_bit) |
+		 (1 << priv->apb_rst_bit));
+	writel(val, priv->reset_base);
+}
+
+static void meson_reset_deassert(struct meson_pcie *priv)
+{
+	int val = 0;
+	val = readl(priv->reset_base);
+	val |= (1 << priv->ctrl_rst_bit) | (1 << priv->phy_rst_bit) |
+		(1 << priv->apb_rst_bit);
+	writel(val, priv->reset_base);
+}
+
 static int meson_pcie_init_port(struct udevice *dev)
 {
 	int ret;
 	struct meson_pcie *priv = dev_get_priv(dev);
 
-	ret = generic_phy_init(&priv->phy);
-	if (ret) {
-		dev_err(dev, "failed to init phy (ret=%d)\n", ret);
-		return ret;
-	}
+	writel(0x1c, &priv->phy_base);
 
-	ret = generic_phy_power_on(&priv->phy);
-	if (ret) {
-		dev_err(dev, "failed to power on phy (ret=%d)\n", ret);
-		goto err_exit_phy;
-	}
-
-	ret = generic_phy_reset(&priv->phy);
-	if (ret) {
-		dev_err(dev, "failed to reset phy (ret=%d)\n", ret);
-		goto err_exit_phy;
-	}
-
-	ret = reset_assert_bulk(&priv->rsts);
-	if (ret) {
-		dev_err(dev, "failed to assert resets (ret=%d)\n", ret);
-		goto err_power_off_phy;
-	}
+	meson_reset_assert(priv);
 
 	udelay(PCIE_RESET_DELAY);
 
-	ret = reset_deassert_bulk(&priv->rsts);
-	if (ret) {
-		dev_err(dev, "failed to deassert resets (ret=%d)\n", ret);
-		goto err_power_off_phy;
-	}
+	meson_reset_deassert(priv);
 
 	udelay(PCIE_RESET_DELAY);
 
@@ -323,11 +320,8 @@ static int meson_pcie_init_port(struct udevice *dev)
 
 	return 0;
 err_deassert_bulk:
-	reset_assert_bulk(&priv->rsts);
-err_power_off_phy:
-	generic_phy_power_off(&priv->phy);
-err_exit_phy:
-	generic_phy_exit(&priv->phy);
+	meson_reset_assert(priv);
+	writel(0x1d, &priv->phy_base);
 
 	return ret;
 }
@@ -356,9 +350,28 @@ static int meson_pcie_parse_dt(struct udevice *dev)
 		return ret;
 	}
 
-	ret = reset_get_bulk(dev, &priv->rsts);
+	priv->reset_base = (void *)dev_read_addr_index(dev, 4);
+	if (!priv->reset_base)
+		return -ENODEV;
+
+	ret = dev_read_u32(dev, "pcie-apb-rst-bit",
+				   &priv->apb_rst_bit);
 	if (ret) {
-		dev_err(dev, "Can't get reset: %d\n", ret);
+		dev_err(dev, "failed to request apb_rst_bit\n");
+		return ret;
+	}
+
+	ret = dev_read_u32(dev, "pcie-phy-rst-bit",
+				   &priv->phy_rst_bit);
+	if (ret) {
+		dev_err(dev, "failed to request phy_rst_bit\n");
+		return ret;
+	}
+
+	ret = dev_read_u32(dev, "pcie-ctrl-rst-bit",
+				   &priv->ctrl_rst_bit);
+	if (ret) {
+		dev_err(dev, "failed to request ctrl_rst_bit\n");
 		return ret;
 	}
 
@@ -380,9 +393,9 @@ static int meson_pcie_parse_dt(struct udevice *dev)
 		return ret;
 	}
 
-	ret = generic_phy_get_by_index(dev, 0, &priv->phy);
-	if (ret) {
-		dev_err(dev, "failed to get pcie phy (ret=%d)\n", ret);
+	priv->phy_base = (void *)dev_read_addr_index(dev, 3);
+	if (!priv->phy_base) {
+		dev_err(dev, "failed to get pcie phy_base\n");
 		return ret;
 	}
 

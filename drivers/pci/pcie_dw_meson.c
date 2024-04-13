@@ -393,6 +393,12 @@ static int meson_pcie_parse_dt(struct udevice *dev)
 		return ret;
 	}
 
+	priv->dw.cfg_base = (void *)dev_read_addr_index(dev, 2);
+	if (!priv->dw.cfg_base)
+		return -EINVAL;
+
+	dev_dbg(dev, "CFG address is 0x%p\n", priv->dw.cfg_base);
+
 	priv->phy_base = (void *)dev_read_addr_index(dev, 3);
 	if (!priv->phy_base) {
 		dev_err(dev, "failed to get pcie phy_base\n");

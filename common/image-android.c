@@ -99,6 +99,10 @@ int is_android_r_image(void *img_addr)
 {
 	/* check android version for R/S/etc */
 	p_boot_img_hdr_v3_t pHDR = (p_boot_img_hdr_v3_t)(img_addr);
+
+	if (android_image_check_header((p_boot_img_hdr_t)pHDR))
+		return 0;
+
 	return ((pHDR->header_version >= 3) ? 1 : 0);
 }
 

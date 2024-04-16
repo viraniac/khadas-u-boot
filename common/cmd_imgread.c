@@ -53,6 +53,9 @@ typedef struct __aml_enc_blk{
 #define AML_SECU_BOOT_IMG_HDR_MAGIC        "AMLSECU!"
 #define AML_SECU_BOOT_IMG_HDR_MAGIC_SIZE   (8)
 #define AML_SECU_BOOT_IMG_HDR_VESRION      (0x0905)
+#define AML_BOOT_IMAGE_MAGIC               (('@' << 0) | ('A' << 8) | ('M' << 16) | ('L' << 24))
+
+#define VENFOR_BOOT_BUFFER_ADDR (0xA000000)
 
 typedef struct {
 
@@ -91,20 +94,23 @@ COMPILE_TYPE_ASSERT(2048 >= sizeof(AmlSecureBootImgHeader), _cc);
 #ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
 static int is_andr_9_image(void* pBuffer)
 {
-    int nReturn = 0;
-    p_boot_img_hdr_t pAHdr = NULL;
+	int nReturn = 0;
+	p_boot_img_hdr_t pAHdr = NULL;
 
 	if (!pBuffer)
-        goto exit;
+		goto exit;
 
-    pAHdr = (p_boot_img_hdr_t)pBuffer;
+	pAHdr = (p_boot_img_hdr_t)pBuffer;
 
-	if (pAHdr->header_version)
-        nReturn = 1;
+	if (android_image_check_header(pAHdr))
+		goto exit;
+
+	if (pAHdr->header_version == 1 || pAHdr->header_version == 2)
+		nReturn = 1;
 
 exit:
 
-    return nReturn;
+	return nReturn;
 }
 #endif
 
@@ -121,11 +127,11 @@ uint8_t rsa_sig[256];
 } aml_boot_header_t;
 
 #ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
-static int _aml_get_secure_boot_kernel_size(const void* pLoadaddr, unsigned* pTotalEncKernelSz)
+int _aml_get_secure_boot_kernel_size(const void* pLoadaddr, unsigned* pTotalEncKernelSz)
 {
     const AmlEncryptBootImgInfo*  amlEncrypteBootimgInfo = 0;
     int rc = 0;
-    unsigned secureKernelImgSz = 2048;
+    unsigned secureKernelImgSz = 0;
     unsigned int nBlkCnt = 0;
     const t_aml_enc_blk* pBlkInf = NULL;
     unsigned char *pAndHead = (unsigned char *)pLoadaddr;
@@ -142,18 +148,20 @@ static int _aml_get_secure_boot_kernel_size(const void* pLoadaddr, unsigned* pTo
 #ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
         nCheckOffset = aml_sec_boot_check(AML_D_Q_IMG_SIG_HDR_SIZE,GXB_IMG_LOAD_ADDR,GXB_EFUSE_PATTERN_SIZE,GXB_IMG_DEC_ALL);
 #endif /*CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK*/
-		if (AML_D_Q_IMG_SIG_HDR_SIZE == (nCheckOffset & 0xFFFF) &&
-            ((nCheckOffset>>16) & 0xFFFF))
-        {
+		if (AML_D_Q_IMG_SIG_HDR_SIZE == (nCheckOffset & 0xFFFF)) {
 			if (is_andr_9_image(pAndHead))
-            {
-                *pTotalEncKernelSz = (((aml_boot_header_t *)(pAndHead+secureKernelImgSz))->img_size)+secureKernelImgSz;
-            }
-            else
-                *pTotalEncKernelSz = (((aml_boot_header_t *)pLoadaddr)->img_size);
+				secureKernelImgSz = BOOT_IMG_HDR_SIZE;
+			else if (is_android_r_image(pAndHead)
+				|| vendor_boot_image_check_header((vendor_boot_img_hdr_t *)pAndHead))
+				secureKernelImgSz = BOOT_IMG_V3_HDR_SIZE;
 
-            return 0;
-        }
+			if (((aml_boot_header_t *)(pAndHead+secureKernelImgSz))->magic == AML_BOOT_IMAGE_MAGIC) {
+				*pTotalEncKernelSz = (((aml_boot_header_t *)(pAndHead+secureKernelImgSz))->img_size)
+					+ secureKernelImgSz + sizeof(aml_boot_header_t);
+            }
+
+			return 0;
+		}
     }
 
 	if (is_andr_9_image(pAndHead))
@@ -207,6 +215,7 @@ static int do_image_read_dtb(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
     unsigned char* loadaddr = 0;
     int nReturn = __LINE__;
     uint64_t lflashReadOff = 0;
+	uint64_t lflashreadinitoff = 0;
     unsigned int nFlashLoadLen = 0;
     unsigned secureKernelImgSz = 0;
     const int preloadSz = 4096;
@@ -221,8 +230,8 @@ static int do_image_read_dtb(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
 
     hdr_addr = (boot_img_hdr_t*)loadaddr;
 
-    if (3 < argc) lflashReadOff = simple_strtoull(argv[3], NULL, 0) ;
-
+    if (3 < argc) lflashreadinitoff = simple_strtoull(argv[3], NULL, 0) ;
+	lflashReadOff = lflashreadinitoff;
     nFlashLoadLen = preloadSz;//head info is one page size == 2k
     debugP("sizeof preloadSz=%u\n", nFlashLoadLen);
     nReturn = store_read_ops((unsigned char*)partName, loadaddr, lflashReadOff, nFlashLoadLen );
@@ -246,8 +255,8 @@ static int do_image_read_dtb(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
             strcpy(partName, "vendor_boot_a");
         else if (strcmp(slot_name, "1") == 0)
             strcpy(partName, "vendor_boot_b");
-	else
-		strcpy(partName, "vendor_boot");
+        else
+            strcpy(partName, "vendor_boot");
 
         printf("partName = %s \n", partName);
 
@@ -282,15 +291,6 @@ static int do_image_read_dtb(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
         }
 
     } else {
-
-#ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
-        nReturn = _aml_get_secure_boot_kernel_size(loadaddr, &secureKernelImgSz);
-        if (nReturn) {
-            errorP("Fail in _aml_get_secure_boot_kernel_size, rc=%d\n", nReturn);
-            return __LINE__;
-        }
-#endif
-
         pageSz = hdr_addr->page_size;
         /*lflashReadOff += secureKernelImgSz ? sizeof(AmlSecureBootImgHeader) : pageSz;*/
         lflashReadOff += pageSz;
@@ -333,15 +333,35 @@ static int do_image_read_dtb(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
         dtImgAddr = (unsigned char*)loadaddr + rdOffAlign;
     }
 #endif//#ifdef CONFIG_AML_MTD
-    nReturn = store_read_ops((unsigned char*)partName, dtImgAddr, rdOffAlign, nFlashLoadLen);
+
+	loff_t wroff = rdOffAlign;
+	size_t wrsz  = nFlashLoadLen;
+	unsigned char *wraddr = dtImgAddr;
+
+#ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
+    nReturn = _aml_get_secure_boot_kernel_size(loadaddr, &secureKernelImgSz);
     if (nReturn) {
-        errorP("Fail to read 0x%xB from part[%s] at offset 0x%x\n", nFlashLoadLen, partName, (unsigned int)lflashReadOff);
+        errorP("Fail in _aml_get_secure_boot_kernel_size, rc=%d\n", nReturn);
+        return __LINE__;
+    }
+
+	if (secureKernelImgSz) {
+		debugP("secure kernel sz 0x%x\n", secureKernelImgSz);
+		wrsz  = secureKernelImgSz - preloadSz;
+		wroff = lflashreadinitoff + preloadSz;
+		wraddr = (unsigned char *)loadaddr + preloadSz;
+	}
+#endif
+
+    nReturn = store_read_ops((unsigned char*)partName, wraddr, wroff, wrsz);
+    if (nReturn) {
+        errorP("Fail to read 0x%lxB from part[%s] at offset 0x%x\n", wrsz, partName, (unsigned int)wroff);
         return __LINE__;
     }
 
 #ifdef CONFIG_AML_MTD
     if (NAND_BOOT_FLAG == device_boot_flag) {
-        flush_cache((unsigned long)dtImgAddr,(unsigned long)nFlashLoadLen);
+        flush_cache((unsigned long)wraddr,(unsigned long)wrsz);
     }
 #endif
 
@@ -353,6 +373,15 @@ static int do_image_read_dtb(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
             errorP("\n[dtb]aml log : Sig Check is %d\n",nReturn);
             return __LINE__;
         }
+#ifdef AML_D_Q_IMG_SIG_HDR_SIZE
+		ulong nCheckOffset = aml_sec_boot_check(AML_D_Q_IMG_SIG_HDR_SIZE,
+				GXB_IMG_LOAD_ADDR, GXB_EFUSE_PATTERN_SIZE, GXB_IMG_DEC_ALL);
+		if (AML_D_Q_IMG_SIG_HDR_SIZE == (nCheckOffset & 0xFFFF))
+			nCheckOffset = (nCheckOffset >> 16) & 0xFFFF;
+		else
+			nCheckOffset = 0;
+		dtImgAddr += nCheckOffset;
+#endif
 #endif /*CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK*/
         MsgP("Enc dtb sz 0x%x\n", nFlashLoadLen);
     }
@@ -451,18 +480,7 @@ static int do_image_read_kernel(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 		loadaddr = (unsigned char *)getenv_hex("loadaddr", 0);
 	}
 
-
-    ulong nCheckOffset = 0;
-#ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
-    nCheckOffset = aml_sec_boot_check(AML_D_Q_IMG_SIG_HDR_SIZE,GXB_IMG_LOAD_ADDR,GXB_EFUSE_PATTERN_SIZE,GXB_IMG_DEC_ALL);
-#endif /*CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK*/
-    if (AML_D_Q_IMG_SIG_HDR_SIZE == (nCheckOffset & 0xFFFF))
-        nCheckOffset = (nCheckOffset >> 16) & 0xFFFF;
-    else
-        nCheckOffset = 0;
-
-    debugP("nCheckOffset 0x%lx\n", nCheckOffset);
-    hdr_addr = (boot_img_hdr_t*)(loadaddr + nCheckOffset);
+    hdr_addr = (boot_img_hdr_t*)loadaddr;
 
     if (3 < argc) flashReadOff = simple_strtoull(argv[3], NULL, 0);
 
@@ -556,13 +574,19 @@ static int do_image_read_kernel(cmd_tbl_t *cmdtp, int flag, int argc, char * con
             goto load_left_r;
         }
 #endif /* CONFIG_IMAGE_FORMAT_LEGACY */
-        if (!nCheckOffset) {
-            if (IMAGE_FORMAT_ANDROID != genFmt) {
-                errorP("Fmt unsupported!genFmt 0x%x != 0x%x\n", genFmt, IMAGE_FORMAT_ANDROID);
-                return __LINE__;
-            }
-        }
 
+        if (IMAGE_FORMAT_ANDROID != genFmt) {
+           errorP("Fmt unsupported!genFmt 0x%x != 0x%x\n", genFmt, IMAGE_FORMAT_ANDROID);
+            return __LINE__;
+        }
+#ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
+        //Check if encrypted image
+		rc = _aml_get_secure_boot_kernel_size(loadaddr, &secureKernelImgSz);
+		if (rc) {
+			errorP("Fail in _aml_get_secure_boot_kernel_size, rc=%d\n", rc);
+			return __LINE__;
+		}
+#endif
         hdr_addr_v3 = (p_boot_img_hdr_v3_t)hdr_addr;
         kernel_size    = ALIGN(hdr_addr_v3->kernel_size,0x1000);
         ramdisk_size   = ALIGN(hdr_addr_v3->ramdisk_size,0x1000);
@@ -579,7 +603,12 @@ static int do_image_read_kernel(cmd_tbl_t *cmdtp, int flag, int argc, char * con
 			return __LINE__;
 		}
 
-        actualBootImgSz = kernel_size + ramdisk_size + 0x1000;
+		if (secureKernelImgSz) {
+			actualBootImgSz = secureKernelImgSz;
+			MsgP("secureKernelImgSz=0x%x\n", actualBootImgSz);
+		} else {
+			actualBootImgSz = kernel_size + ramdisk_size + 0x1000;
+		}
 
 #if defined(CONFIG_IMAGE_FORMAT_LEGACY)
 load_left_r:
@@ -717,7 +746,7 @@ load_left_r:
         int nReturn_r = __LINE__;
         uint64_t lflashReadOff_r = 0;
         unsigned int nFlashLoadLen_r = 0;
-        const int preloadSz_r = 0x1000;
+        const int preloadSz_r = 0x1000 * 2;
         unsigned char * pBuffPreload = 0;
         int rc_r = 0;
 
@@ -780,15 +809,36 @@ load_left_r:
 
         rc_r = vendor_boot_image_check_header(pVendorIMGHDR);
         if (!rc_r) {
-            unsigned long ramdisk_size_r,dtb_size_r;
-            const int pageSz_r = pVendorIMGHDR->page_size;
+#ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
+			//Check if encrypted image
+			rc_r = _aml_get_secure_boot_kernel_size(pBuffPreload, &secureKernelImgSz);
+			if (rc_r) {
+				errorP("Fail in _aml_get_secure_boot_kernel_size, rc=%d\n", rc_r);
+				free(pBuffPreload);
+				pBuffPreload = 0;
+				return __LINE__;
+			}
+#endif
+			if (secureKernelImgSz) {
+				nFlashLoadLen_r = secureKernelImgSz;
+				MsgP("secureKernelImgSz=0x%x\n", nFlashLoadLen_r);
+			} else {
+				unsigned long ramdisk_size_r,dtb_size_r;
+				const int pageSz_r = pVendorIMGHDR->page_size;
 
-            /* Android R's vendor_boot partition include ramdisk and dtb */
-            ramdisk_size_r    = ALIGN(pVendorIMGHDR->vendor_ramdisk_size, pageSz_r);
-            dtb_size_r	      = ALIGN(pVendorIMGHDR->dtb_size, pageSz_r);
-            nFlashLoadLen_r   = ramdisk_size_r + dtb_size_r + 0x1000;
-            debugP("ramdisk_size_r 0x%x, totalSz 0x%lx\n", pVendorIMGHDR->vendor_ramdisk_size, ramdisk_size_r);
-            debugP("dtb_size_r 0x%x, totalSz 0x%lx\n", pVendorIMGHDR->dtb_size, dtb_size_r);
+				/* Android R's vendor_boot partition include ramdisk and dtb */
+				ramdisk_size_r    = ALIGN(pVendorIMGHDR->vendor_ramdisk_size, pageSz_r);
+				dtb_size_r	      = ALIGN(pVendorIMGHDR->dtb_size, pageSz_r);
+				nFlashLoadLen_r   = ramdisk_size_r + dtb_size_r + 0x1000;
+				debugP("ramdisk_size_r 0x%x, totalSz 0x%lx\n", pVendorIMGHDR->vendor_ramdisk_size, ramdisk_size_r);
+				debugP("dtb_size_r 0x%x, totalSz 0x%lx\n", pVendorIMGHDR->dtb_size, dtb_size_r);
+			}
+
+#ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
+            unsigned char *pvendor_addr = (unsigned char *)VENFOR_BOOT_BUFFER_ADDR;
+#else
+            unsigned char *pvendor_addr = pBuffPreload;
+#endif
 
             if (nFlashLoadLen_r > preloadSz_r)
             {
@@ -809,7 +859,7 @@ load_left_r:
 					}
 					if (rc == 0) {
 						rc = fs_read("/recovery/vendor_boot.img",
-								(unsigned long)pBuffPreload,
+								(unsigned long)pvendor_addr,
 								lflashReadOff_r, nFlashLoadLen_r,
 								&len_read);
 						if (rc < 0 || nFlashLoadLen_r != len_read) {
@@ -823,7 +873,7 @@ load_left_r:
 				if (!cache_flag) {
 					MsgP("read from part: %s\n", partName_r);
 					rc_r = store_read_ops((unsigned char *)partName_r,
-								pBuffPreload,
+								pvendor_addr,
 								lflashReadOff_r, nFlashLoadLen_r);
 					if (rc_r) {
 						errorP("Fail read 0x%xB from part[%s] at 0x%x\n",
@@ -837,7 +887,34 @@ load_left_r:
             }
 
             debugP("totalSz=0x%x\n", nFlashLoadLen_r);
-            flush_cache((unsigned long)pBuffPreload,nFlashLoadLen_r);
+            flush_cache((unsigned long)pvendor_addr,nFlashLoadLen_r);
+
+#ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
+		if (IS_FEAT_BOOT_VERIFY()) {
+			rc_r = aml_sec_boot_check(AML_D_P_IMG_DECRYPT,
+					(unsigned long)pvendor_addr,
+					GXB_IMG_SIZE, GXB_IMG_DEC_DTB);
+
+			if (rc_r) {
+				errorP("\n[vendor_boot]aml log : Sig Check is %d\n", rc_r);
+				free(pBuffPreload);
+				pBuffPreload = 0;
+				return __LINE__;
+			}
+			MsgP("vendor_boot decrypt at 0x%p\n", pvendor_addr);
+		}
+
+		ulong nCheckOffset = 0;
+		nCheckOffset = aml_sec_boot_check(AML_D_Q_IMG_SIG_HDR_SIZE,GXB_IMG_LOAD_ADDR,GXB_EFUSE_PATTERN_SIZE,GXB_IMG_DEC_ALL);
+		if (AML_D_Q_IMG_SIG_HDR_SIZE == (nCheckOffset & 0xFFFF))
+			nCheckOffset = (nCheckOffset >> 16) & 0xFFFF;
+		else
+			nCheckOffset = 0;
+		debugP("nCheckOffset 0x%lx\n", nCheckOffset);
+
+		memmove(pBuffPreload, pvendor_addr + nCheckOffset,
+			nFlashLoadLen_r - nCheckOffset);
+#endif//#ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
 
             p_vender_boot_img = (p_vendor_boot_img_t)pBuffPreload;
         }
@@ -858,6 +935,17 @@ load_left_r:
             goto load_left;
         }
 #endif /* CONFIG_IMAGE_FORMAT_LEGACY */
+
+        ulong nCheckOffset = 0;
+#ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
+        nCheckOffset = aml_sec_boot_check(AML_D_Q_IMG_SIG_HDR_SIZE,GXB_IMG_LOAD_ADDR,GXB_EFUSE_PATTERN_SIZE,GXB_IMG_DEC_ALL);
+        if (AML_D_Q_IMG_SIG_HDR_SIZE == (nCheckOffset & 0xFFFF))
+            nCheckOffset = (nCheckOffset >> 16) & 0xFFFF;
+        else
+            nCheckOffset = 0;
+        debugP("nCheckOffset 0x%lx\n", nCheckOffset);
+#endif /*CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK*/
+
         if (!nCheckOffset)
         {
             genFmt = genimg_get_format(hdr_addr);
@@ -877,7 +965,7 @@ load_left_r:
 #endif /* CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK */
         if (secureKernelImgSz)
         {
-            actualBootImgSz = secureKernelImgSz + nCheckOffset;
+            actualBootImgSz = secureKernelImgSz;
             MsgP("secureKernelImgSz=0x%x\n", actualBootImgSz);
         }
         else

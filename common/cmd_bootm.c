@@ -137,6 +137,10 @@ static void defendkey_process(void)
 }
 #endif
 
+#ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
+int _aml_get_secure_boot_kernel_size(const void* pLoadaddr, unsigned* pTotalEncKernelSz);
+#endif
+
 int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	/* add reboot_mode in bootargs for kernel command line */
@@ -179,8 +183,7 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 	int nRet;
 	char *avb_s;
-	char argv0_new[12] = {0};
-	char *argv_new = (char*)&argv0_new;
+
 #ifdef CONFIG_NEEDS_MANUAL_RELOC
 	static int relocated = 0;
 
@@ -218,7 +221,7 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 #ifndef CONFIG_SKIP_KERNEL_DTB_VERIFY
 #ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
-	unsigned int nLoadAddr = GXB_IMG_LOAD_ADDR; //default load address
+	unsigned long nLoadAddr = GXB_IMG_LOAD_ADDR; //default load address
 
 	if (argc > 0)
 	{
@@ -232,6 +235,20 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	{
 		printf("\naml log : Sig Check %d\n",nRet);
 		return nRet;
+	}
+
+	if (IS_FEAT_BOOT_VERIFY()) {
+		unsigned int secureKernelImgSz = 0;
+		ulong nCheckOffset = 0;
+		nCheckOffset = aml_sec_boot_check(AML_D_Q_IMG_SIG_HDR_SIZE,GXB_IMG_LOAD_ADDR,GXB_EFUSE_PATTERN_SIZE,GXB_IMG_DEC_ALL);
+		if (AML_D_Q_IMG_SIG_HDR_SIZE == (nCheckOffset & 0xFFFF)) {
+			nCheckOffset = (nCheckOffset >> 16) & 0xFFFF;
+			if (nCheckOffset && !_aml_get_secure_boot_kernel_size((unsigned char*)nLoadAddr, &secureKernelImgSz)) {
+				if (secureKernelImgSz > nCheckOffset)
+					memmove((unsigned char*)nLoadAddr, (unsigned char*)nLoadAddr + nCheckOffset,
+						secureKernelImgSz - nCheckOffset);
+			}
+		}
 	}
 #endif /*CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK*/
 #endif /* ! CONFIG_SKIP_KERNEL_DTB_VERIFY */
@@ -352,26 +369,6 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 #ifdef CONFIG_AML_RSVD_ADDR
 	defendkey_process();
 #endif
-
-	if (IS_FEAT_BOOT_VERIFY())
-	{
-		/* Override load address argument to skip secure boot header (512).
-		* Only skip if secure boot so normal boot can use plain boot.img+		 */
-		ulong img_addr,nCheckOffset;
-		img_addr = genimg_get_kernel_addr(argc < 1 ? NULL : argv[0]);
-		nCheckOffset = 0;
-#ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
-		nCheckOffset = aml_sec_boot_check(AML_D_Q_IMG_SIG_HDR_SIZE,GXB_IMG_LOAD_ADDR,GXB_EFUSE_PATTERN_SIZE,GXB_IMG_DEC_ALL);
-#endif /*CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK*/
-		if (AML_D_Q_IMG_SIG_HDR_SIZE == (nCheckOffset & 0xFFFF))
-			nCheckOffset = (nCheckOffset >> 16) & 0xFFFF;
-		else
-			nCheckOffset = 0;
-		img_addr += nCheckOffset;
-		snprintf(argv0_new, sizeof(argv0_new), "%lx", img_addr);
-		argc = 1;
-		argv = (char**)&argv_new;
-	}
 
 	ee_gate_off();
 	nRet = do_bootm_states(cmdtp, flag, argc, argv, BOOTM_STATE_START |

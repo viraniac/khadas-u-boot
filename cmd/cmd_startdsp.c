@@ -234,6 +234,7 @@ int set_dsp_clk(uint32_t id, uint32_t freq_sel)
 static int do_startdsp(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	uint32_t addr;
+	uint32_t id;
 	uint32_t dspid;
 	uint32_t freq_sel;
 	uint32_t cfg0;
@@ -263,9 +264,14 @@ static int do_startdsp(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 
 #if defined(CONFIG_CLK_MESON_A1) || defined(CONFIG_CLK_MESON_C1) || \
 		defined(CONFIG_CLK_MESON_T7) || defined(CONFIG_CLK_MESON_P1)
-	power_set_dsp((dspid == 0) ? PM_DSPA : PM_DSPB, PWR_ON);
+	uint32_t PM_ID;
+
+	PM_ID = (dspid == 0) ? PM_DSPA : PM_DSPB;
+	id = PACK_SMC_SUBID_ID(HIFI_DSP_PWR_SET, PM_ID);
+	power_set_dsp(id, PWR_ON);
 #else
-	power_set_dsp(PM_DSPA, PWR_ON);
+	id = PACK_SMC_SUBID_ID(HIFI_DSP_PWR_SET, PM_DSPA);
+	power_set_dsp(id, PWR_ON);
 #endif
 	udelay(100);
 
@@ -273,8 +279,8 @@ static int do_startdsp(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]
 		return -1;
 
 	udelay(100);
-
-	init_dsp(dspid, addr, cfg0);
+	id = PACK_SMC_SUBID_ID(HIFI_DSP_BOOT, dspid);
+	init_dsp(id, addr, cfg0);
 	printf("dsp init over!\n");
 
 	return 0;

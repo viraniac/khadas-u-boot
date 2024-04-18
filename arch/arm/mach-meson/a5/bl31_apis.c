@@ -310,14 +310,14 @@ void power_set_dsp(unsigned int id, unsigned int powerflag)
 {
 	struct arm_smccc_res res;
 
-	arm_smccc_smc(DSP_SEC_POWERSET, id, powerflag, 0, 0, 0, 0, 0, &res);
+	arm_smccc_smc(HIFI_DSP, id, powerflag, 0, 0, 0, 0, 0, &res);
 }
 
 void init_dsp(unsigned int id, unsigned int addr, unsigned int cfg0)
 {
 	struct arm_smccc_res res;
 
-	arm_smccc_smc(START_HIFI4, id, addr, cfg0, 0, 0, 0, 0, &res);
+	arm_smccc_smc(HIFI_DSP, id, addr, cfg0, 0, 0, 0, 0, &res);
 }
 
 unsigned aml_reboot(uint64_t function_id, uint64_t arg0, uint64_t arg1, uint64_t arg2)

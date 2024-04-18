@@ -21,7 +21,7 @@
  * platform power init config
  */
 #define CONFIG_PLATFORM_POWER_INIT
-#define CONFIG_VCCK_INIT_VOLTAGE	1100
+#define CONFIG_VCCK_INIT_VOLTAGE	990
 #define CONFIG_VDDEE_INIT_VOLTAGE	950		// voltage for power up
 #define CONFIG_VDDEE_SLEEP_VOLTAGE	 810		// voltage for suspend
 

@@ -76,6 +76,7 @@
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \
         "firstboot=1\0"\
+	"androidboot.dtbo_idx=0\0"\
         "upgrade_step=0\0"\
         "jtag=disable\0"\
         "loadaddr=1080000\0"\

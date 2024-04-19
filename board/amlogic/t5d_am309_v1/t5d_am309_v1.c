@@ -572,8 +572,7 @@ U_BOOT_DEVICES(meson_i2cs) = {
 #if 0 /* i2c pinmux demo */
 void set_i2c_b_pinmux(void)
 {
-	/*ds =3 */
-	setbits_le32(PAD_DS_REG2B, 0xf << 8);
+	/*ds default =2 */
 	/*pull up disable*/
 	clrbits_le32(PAD_PULL_UP_EN_REG2, 0x3 << 20);
 	/*pin mux to i2cm1*/

@@ -67,9 +67,14 @@ int cmd_efuse(int argc, char * const argv[], char *buf)
 	}
 
 	if (strncmp(argv[1], "usid", 4) == 0) {
-			char usid[11] = {0};
 			char usid_read[11] = {0};
+#if defined(CONFIG_KHADAS_VIM4)
+			char usid[11] = {0};
 			int size = 10;
+#else // VIM1S usid size is 14
+			char usid[15] = {0};
+			int size = 14;
+#endif
 			uint32_t usid_offset = 18;
 
 			ret = efuse_read_usr(usid, size, (loff_t *)&usid_offset);
@@ -83,7 +88,12 @@ int cmd_efuse(int argc, char * const argv[], char *buf)
 				printf("ERROR: read %d byte(s) not %d byte(s) data\n",
 						ret, size);
 			}
+#if defined(CONFIG_KHADAS_VIM4)
 			sprintf(usid_read, "%x%x%x%x%x%x%x%x%x%x", usid[0], usid[1], usid[2], usid[3], usid[4], usid[5], usid[6], usid[7], usid[8], usid[9]);
+#else
+			sprintf(usid_read, "%x%x%x%x%x%x%x%x%x%x%x%x%x%x", usid[0], usid[1], usid[2], usid[3], usid[4], usid[5], usid[6], usid[7], usid[8], usid[9], usid[10], usid[11], usid[12], usid[13]);
+#endif
+
 			env_set("usid", usid_read);
 
 			return 0;

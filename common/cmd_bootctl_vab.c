@@ -490,7 +490,6 @@ int write_bootloader(int copy, int dstindex)
 	char str[128];
 	u64 addr;
 	u64 size = 0x2000 * 512 - 512;
-	int map = 0;
 
 	buffer = (unsigned char *)malloc(size);
 	if (!buffer) {
@@ -515,7 +514,7 @@ int write_bootloader(int copy, int dstindex)
 		goto exit;
 	}
 
-	sprintf(str, "amlmmc read bootloader 0x%llx  0x200  0x%llx", addr, size);
+	sprintf(str, "amlmmc read 1 0x%llx 0x1  0x%llx", addr, size / 512);
 	printf("command: %s\n", str);
 	ret = run_command(str, 0);
 	if (ret != 0) {
@@ -523,19 +522,58 @@ int write_bootloader(int copy, int dstindex)
 		goto exit;
 	}
 
-	if (dstindex == 0) {
-		map = AML_BL_USER;
-	} else if (dstindex == 1) {
-		map = AML_BL_BOOT0;
-	} else if (dstindex == 2) {
-		map = AML_BL_BOOT1;
-	}
-
-	if (map) {
-		ret = amlmmc_write_bootloader(1, map, size, buffer);
-		if (ret) {
-			printf("update error");
+	switch (dstindex) {
+		case 0: {
+			sprintf(str, "amlmmc switch 1 user");
+			ret = run_command(str, 0);
+			if (ret != 0) {
+				printf("amlmmc cmd %s failed\n", str);
+				goto exit;
+			}
+			sprintf(str, "amlmmc write 1 0x%llx 0x1 0x%llx", addr, size / 512);
+			printf("command: %s\n", str);
+			ret = run_command(str, 0);
+			if (ret != 0) {
+				printf("amlmmc cmd %s failed\n", str);
+				goto exit;
+			}
+			break;
+		}
+		case 1: {
+			sprintf(str, "amlmmc switch 1 boot0");
+			ret = run_command(str, 0);
+			if (ret != 0) {
+				printf("amlmmc cmd %s failed\n", str);
+				goto exit;
+			}
+			sprintf(str, "amlmmc write 1 0x%llx 0x1	0x%llx", addr, size / 512);
+			printf("command: %s\n", str);
+			ret = run_command(str, 0);
+			if (ret != 0) {
+				printf("amlmmc cmd %s failed\n", str);
+				goto exit;
+			}
+			break;
+		}
+		case 2: {
+			sprintf(str, "amlmmc switch 1 boot1");
+			ret = run_command(str, 0);
+			if (ret != 0) {
+				printf("amlmmc cmd %s failed\n", str);
+				goto exit;
+			}
+			sprintf(str, "amlmmc write 1 0x%llx 0x1	0x%llx", addr, size /  512);
+			printf("command: %s\n", str);
+			ret = run_command(str, 0);
+			if (ret != 0) {
+				printf("amlmmc cmd %s failed\n", str);
+				goto exit;
+			}
+			break;
+		}
+		default: {
 			goto exit;
+			break;
 		}
 	}
 
@@ -807,7 +845,11 @@ static int do_GetValidSlot(
 			run_command("set_active_slot b", 0);
 			setenv("default_env", "1");
 			run_command("saveenv", 0);
-			if (write_bootloader(2, 0) == 0) {
+#ifdef CONFIG_AML_GPT
+			if (write_bootloader(2, 1) == 0)  {
+#else
+			if (write_bootloader(2, 0) == 0)  {
+#endif
 				printf("rollback ok\n");
 				run_command("reset", 0);
 			} else {
@@ -843,8 +885,11 @@ static int do_GetValidSlot(
 			run_command("set_active_slot a", 0);
 			setenv("default_env", "1");
 			run_command("saveenv", 0);
-
+#ifdef CONFIG_AML_GPT
+			if (write_bootloader(2, 1) == 0)  {
+#else
 			if (write_bootloader(1, 0) == 0)  {
+#endif
 				printf("rollback ok\n");
 				run_command("reset", 0);
 			} else {
@@ -870,7 +915,11 @@ static int do_GetValidSlot(
 			run_command("set_active_slot b", 0);
 			setenv("default_env", "1");
 			run_command("saveenv", 0);
-			if (write_bootloader(2, 0) == 0) {
+#ifdef CONFIG_AML_GPT
+			if (write_bootloader(2, 1) == 0)  {
+#else
+			if (write_bootloader(2, 0) == 0)  {
+#endif
 				printf("rollback ok\n");
 				run_command("reset", 0);
 			} else {
@@ -883,7 +932,11 @@ static int do_GetValidSlot(
 			run_command("set_active_slot a", 0);
 			setenv("default_env", "1");
 			run_command("saveenv", 0);
-			if (write_bootloader(1, 0) == 0) {
+#ifdef CONFIG_AML_GPT
+			if (write_bootloader(2, 1) == 0)  {
+#else
+			if (write_bootloader(1, 0) == 0)  {
+#endif
 				printf("rollback ok\n");
 				run_command("reset", 0);
 			} else {

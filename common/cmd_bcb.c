@@ -174,14 +174,16 @@ static int do_RunBcbCommand(
 			0);
 	}
 
-    if (!memcmp(command, CMD_RUN_RECOVERY, strlen(CMD_RUN_RECOVERY))) {
-        if (run_command("run recovery_from_flash", 0) < 0) {
-            printf("run_command for cmd:run recovery_from_flash failed.\n");
-            return -1;
-        }
-        printf("run command:run recovery_from_flash successful.\n");
-        return 0;
-    }
+	setenv("recovery_mode", "false");
+	if (!memcmp(command, CMD_RUN_RECOVERY, strlen(CMD_RUN_RECOVERY))) {
+		setenv("recovery_mode", "true");
+		if (run_command("run recovery_from_flash", 0) < 0) {
+			printf("run_command for cmd:run recovery_from_flash failed.\n");
+			return -1;
+		}
+		printf("run command:run recovery_from_flash successful.\n");
+		return 0;
+	}
 
 #ifdef CONFIG_CMD_BCB
     if (!memcmp(command_mark, command, strlen(command_mark))) {

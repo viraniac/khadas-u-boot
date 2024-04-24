@@ -175,9 +175,32 @@
             "\0"\
         "storeargs="\
             "get_bootloaderversion;" \
-			"setenv bootargs ${initargs} otg_device=${otg_device} logo=${display_layer},loaded,${fb_addr} powermode=${powermode} fb_width=${fb_width} fb_height=${fb_height} display_bpp=${display_bpp} outputmode=${outputmode} vout=${outputmode},enable panel_name=${panel_name} panel_type=${panel_type} lcd_ctrl=${lcd_ctrl} lcd_debug=${lcd_debug} hdmimode=${hdmimode} cvbsmode=${cvbsmode} osd_reverse=${osd_reverse} video_reverse=${video_reverse} androidboot.selinux=${EnableSelinux} androidboot.firstboot=${firstboot} jtag=${jtag} mem_size=${mem_size} disable_ir=${disable_ir};"\
-	"setenv bootargs ${bootargs} androidboot.hardware=amlogic androidboot.bootloader=${bootloader_version} androidboot.build.expect.baseband=N/A;"\
-	"setenv bootargs ${bootargs} androidboot.memsize=${memsize};"\
+			"setenv bootargs ${initargs} "\
+			"otg_device=${otg_device} "\
+			"logo=${display_layer},loaded,${fb_addr} "\
+			"powermode=${powermode} "\
+			"fb_width=${fb_width} "\
+			"fb_height=${fb_height} "\
+			"display_bpp=${display_bpp} "\
+			"outputmode=${outputmode} "\
+			"vout=${outputmode},enable "\
+			"panel_name=${panel_name} "\
+			"panel_type=${panel_type} "\
+			"lcd_ctrl=${lcd_ctrl} "\
+			"lcd_debug=${lcd_debug} "\
+			"hdmimode=${hdmimode} "\
+			"cvbsmode=${cvbsmode} "\
+			"osd_reverse=${osd_reverse} "\
+			"video_reverse=${video_reverse} "\
+			"jtag=${jtag} mem_size=${mem_size} "\
+			"disable_ir=${disable_ir};"\
+			"setenv bootconfig "\
+			"androidboot.hardware=amlogic "\
+			"androidboot.selinux=${EnableSelinux} "\
+			"androidboot.firstboot=${firstboot} "\
+			"androidboot.bootloader=${bootloader_version} "\
+			"androidboot.memsize=${memsize} "\
+			"androidboot.build.expect.baseband=N/A;"\
             "run cmdline_keys;"\
             "\0"\
         "cec_init="\
@@ -233,9 +256,9 @@
             "else if test ${reboot_mode} = update; then "\
                     "run update;"\
             "else if test ${reboot_mode} = quiescent; then "\
-                    "setenv bootargs ${bootargs} androidboot.quiescent=1;"\
+			"setenv bootconfig ${bootconfig} androidboot.quiescent=1;"\
             "else if test ${reboot_mode} = recovery_quiescent; then "\
-                    "setenv bootargs ${bootargs} androidboot.quiescent=1;"\
+			"setenv bootconfig ${bootconfig} androidboot.quiescent=1;"\
                     "run recovery_from_flash;"\
             "else if test ${reboot_mode} = cold_boot; then "\
                 "echo cold boot: ffv_wake=${ffv_wake} powermode=${powermode} suspend=${suspend};"\
@@ -285,12 +308,12 @@
             "if test ${system_mode} = 1; then "\
                 "setenv bootargs ${bootargs} ro rootwait skip_initramfs;"\
             "else "\
-                "setenv bootargs ${bootargs} androidboot.force_normal_boot=1;"\
+			"setenv bootconfig ${bootconfig} androidboot.force_normal_boot=1;"\
             "fi;"\
             "if test ${active_slot} != normal; then "\
-                    "setenv bootargs ${bootargs} androidboot.slot_suffix=${active_slot};"\
+			"setenv bootconfig ${bootconfig} androidboot.slot_suffix=${active_slot};"\
             "fi;"\
-	    "setenv bootargs ${bootargs} androidboot.rollback=${rollback_flag};"\
+			"setenv bootconfig ${bootconfig} androidboot.rollback=${rollback_flag};"\
             "if imgread kernel ${boot_part} ${loadaddr}; then bootm ${loadaddr}; fi;"\
             "run update;"\
             "\0"\
@@ -376,10 +399,18 @@
                     "if imgread kernel ${boot_part} ${loadaddr}; then bootm ${loadaddr}; fi;"\
                 "else "\
                     "if test ${vendor_boot_mode} = true; then "\
-                        "setenv bootargs ${bootargs} ${fs_type} aml_dt=${aml_dt} recovery_part=${boot_part} recovery_offset=${recovery_offset} androidboot.slot_suffix=${active_slot};"\
+					"setenv bootargs ${bootargs} ${fs_type} aml_dt=${aml_dt} "\
+					"recovery_part=${boot_part} "\
+					"recovery_offset=${recovery_offset};"\
+					"setenv bootconfig ${bootconfig} "\
+					"androidboot.slot_suffix=${active_slot};"\
                         "if imgread kernel ${boot_part} ${loadaddr}; then bootm ${loadaddr}; fi;"\
                     "else "\
-                        "setenv bootargs ${bootargs} ${fs_type} aml_dt=${aml_dt} recovery_part=${recovery_part} recovery_offset=${recovery_offset} androidboot.slot_suffix=${active_slot};"\
+					"setenv bootargs ${bootargs} ${fs_type} aml_dt=${aml_dt} "\
+					"recovery_part=${recovery_part} "\
+					"recovery_offset=${recovery_offset};"\
+					"setenv bootconfig ${bootconfig} "\
+					"androidboot.slot_suffix=${active_slot};"\
                     "if imgread kernel ${recovery_part} ${loadaddr} ${recovery_offset}; then wipeisb; bootm ${loadaddr}; fi;"\
                     "fi;"\
                 "fi;"\
@@ -417,23 +448,29 @@
         "cmdline_keys="\
             "if keyman init 0x1234; then "\
                 "if keyman read usid ${loadaddr} str; then "\
-                    "setenv bootargs ${bootargs} androidboot.serialno=${usid};"\
+					"setenv bootconfig ${bootconfig} "\
+					"androidboot.serialno=${usid};"\
                     "setenv serial ${usid};"\
                 "else "\
-                    "setenv bootargs ${bootargs} androidboot.serialno=at301${cpu_id};"\
+					"setenv bootconfig ${bootconfig} "\
+					"androidboot.serialno=at301${cpu_id};"\
                     "setenv serial at301${cpu_id};"\
                 "fi;"\
                 "if keyman read mac ${loadaddr} str; then "\
-                    "setenv bootargs ${bootargs} mac=${mac} androidboot.mac=${mac};"\
+				"setenv bootconfig ${bootconfig} "\
+				"mac=${mac} androidboot.mac=${mac};"\
                 "fi;"\
                 "if keyman read deviceid ${loadaddr} str; then "\
-                    "setenv bootargs ${bootargs} androidboot.deviceid=${deviceid};"\
+				"setenv bootconfig ${bootconfig} "\
+				"androidboot.deviceid=${deviceid};"\
                 "fi;"\
                 "if keyman read oemkey ${loadaddr} str; then "\
-                    "setenv bootargs ${bootargs} androidboot.oem.key1=${oemkey};"\
+				"setenv bootconfig ${bootconfig} "\
+				"androidboot.oem.key1=${oemkey};"\
                 "fi;"\
             "else "\
-                "setenv bootargs ${bootargs} androidboot.serialno=at301${cpu_id};"\
+				"setenv bootconfig ${bootconfig} "\
+				"androidboot.serialno=at301${cpu_id};"\
                 "setenv serial at301${cpu_id};"\
             "fi;"\
 	    "factory_provision init;"\

@@ -110,6 +110,12 @@ static void defendkey_process(void)
 	if (!bootargs)
 		return;
 
+#ifdef CONFIG_AML_PRODUCT_MODE
+	run_command("setenv bootconfig ${bootconfig} androidboot.production_mode=1", 0);
+#else
+	run_command("setenv bootconfig ${bootconfig} androidboot.production_mode=0", 0);
+#endif//#ifdef CONFIG_AML_PRODUCT_MODE
+
 	if (!strstr(bootargs,"defendkey"))
 	{
 		char *reboot_mode_s = NULL;

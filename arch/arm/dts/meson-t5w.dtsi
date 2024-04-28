@@ -658,7 +658,7 @@
 				 "spi0_miso_h9",
 				 "spi0_clk_h11";
 			function = "spi0";
-			drive-strength-microamp = <3>;
+			drive-strength = <3>;
 		};
 	};
 
@@ -666,7 +666,7 @@
 		mux {
 			groups = "spi0_ss0_h8";
 			function = "spi0";
-			drive-strength-microamp = <3>;
+			drive-strength = <3>;
 		};
 	};
 
@@ -676,7 +676,7 @@
 				 "spi0_miso_z",
 				 "spi0_clk_z";
 			function = "spi0";
-			drive-strength-microamp = <3>;
+			drive-strength = <3>;
 		};
 	};
 
@@ -686,7 +686,7 @@
 				 "spi0_miso_m",
 				 "spi0_clk_m";
 			function = "spi0";
-			drive-strength-microamp = <3>;
+			drive-strength = <3>;
 		};
 	};
 
@@ -696,7 +696,7 @@
 				 "spi1_miso_h",
 				 "spi1_clk_h";
 			function = "spi1";
-			drive-strength-microamp = <3>;
+			drive-strength = <3>;
 		};
 	};
 
@@ -706,7 +706,7 @@
 				 "spi2_miso_c",
 				 "spi2_clk_c";
 			function = "spi2";
-			drive-strength-microamp = <3>;
+			drive-strength = <3>;
 		};
 	};
 

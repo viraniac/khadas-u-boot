@@ -941,6 +941,8 @@ int board_late_init(void)
 {
 	TE(__func__);
 
+		// Set boot source
+		board_set_boot_source();
 		//update env before anyone using it
 		run_command("get_rebootmode; echo reboot_mode=${reboot_mode}; "\
 						"if test ${reboot_mode} = factory_reset; then "\
@@ -950,7 +952,7 @@ int board_late_init(void)
 		/*add board late init function here*/
 #ifndef DTB_BIND_KERNEL
 		int ret;
-		ret = run_command("store dtb read $dtb_mem_addr", 1);
+		ret = run_command(CONFIG_DTB_LOAD, 1);
         if (ret) {
 				printf("%s(): [store dtb read $dtb_mem_addr] fail\n", __func__);
 #ifdef CONFIG_DTB_MEM_ADDR
@@ -989,9 +991,6 @@ int board_late_init(void)
 	run_command("gpio clear GPIOA_8", 0); //pcie reset-gpio
 	/* load unifykey */
 	run_command("keyunify init 0x1234", 0);
-
-	// Set boot source
-	board_set_boot_source();
 
 	// Check DDR size
 	check_ddrsize();

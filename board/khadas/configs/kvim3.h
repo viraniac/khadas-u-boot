@@ -76,6 +76,19 @@
 #define CONFIG_ADC_POWER_KEY_CHAN   2  /*channel range: 0-7*/
 #define CONFIG_ADC_POWER_KEY_VAL	0  /*sample value range: 0-1023*/
 
+#ifdef DTB_BIND_KERNEL    //load dtb from kernel, such as boot partition
+#define CONFIG_DTB_LOAD  "imgread dtb ${boot_part} ${dtb_mem_addr}"
+#else
+#define CONFIG_DTB_LOAD  "store dtb read $dtb_mem_addr || " \
+                         "if test ${boot_source} = emmc; then "\
+                             "echo Load dtb/${fdtfile} from eMMC (1:1) ...;" \
+                             "load mmc 1:1 ${dtb_mem_addr} dtb/${fdtfile};" \
+                         "else if test ${boot_source} = sd; then "\
+                             "echo Load dtb/${fdtfile} from SD (0:1) ...;" \
+                             "load mmc 0:1 ${dtb_mem_addr} dtb/${fdtfile};" \
+                         "fi;fi;"
+#endif
+
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 

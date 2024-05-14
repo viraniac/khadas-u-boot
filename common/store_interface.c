@@ -393,20 +393,20 @@ static int do_store_dtb_ops(cmd_tbl_t *cmdtp, int flag, int argc, char * const a
 		ret = run_command(_cmdbuf, 0);
 
 		unsigned long dtimgaddr = simple_strtoul(dtbloadaddr, NULL, 16);
-		//
-		//ONLY need decrypting when 'store dtb read'
-	   if (!strcmp("read", argv[2]))
-	   {
-		   flush_cache(dtimgaddr, AML_DTB_IMG_MAX_SZ);
+		if (!ret) {
+			//ONLY need decrypting when 'store dtb read'
+			if (!strcmp("read", argv[2]))
+			{
+				flush_cache(dtimgaddr, AML_DTB_IMG_MAX_SZ);
 #ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
-
-		   ret = aml_sec_boot_check(AML_D_P_IMG_DECRYPT, dtimgaddr, AML_DTB_IMG_MAX_SZ, 0);
-		   if (ret) {
-			   MsgP("decrypt dtb: Sig Check %d\n",ret);
-			   return ret;
-		   }
+				ret = aml_sec_boot_check(AML_D_P_IMG_DECRYPT, dtimgaddr, AML_DTB_IMG_MAX_SZ, 0);
+				if (ret) {
+					MsgP("decrypt dtb: Sig Check %d\n",ret);
+					return ret;
+			   }
 #endif
-	   }
+			}
+		}
 
 #ifndef CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK
 	   if (!is_write && strcmp("iread", argv[2]))

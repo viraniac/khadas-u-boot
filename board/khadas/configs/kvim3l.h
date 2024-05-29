@@ -435,7 +435,7 @@
 		BOOTENV\
 		"pxe_boot=dhcp; pxe get && pxe boot\0"\
 		"bootcmd_storeboot=run storeboot\0"\
-		"boot_targets=spi usb0 mmc0 mmc1 storeboot pxe dhcp\0"
+		"boot_targets=usb0 mmc0 mmc1 storeboot pxe dhcp\0"
 
 #define CONFIG_PREBOOT  \
 			"run upgrade_check;"\

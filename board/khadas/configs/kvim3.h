@@ -245,12 +245,14 @@
                 "ddr_size=${ddr_size} reboot_mode=${reboot_mode};"\
 			"run cmdline_keys;"\
 			"\0"\
-		"storeboot="\
-            "kbi resetflag 0;"\
+		"legacyboot="\
+			"kbi resetflag 0;"\
 			"boot_cooling;"\
-            "cfgload;" \
-            "if load mmc 0:1 1020000 s905_autoscript || load mmc 1:1 1020000 s905_autoscript || load mmc 1:5 1020000 /boot/s905_autoscript; then autoscr 1020000; fi;"\
-            "ext4load mmc 1:5 1080000 zImage;ext4load mmc 1:5 10000000 uInitrd;ext4load mmc 1:5 20000000 dtb.img;booti 1080000 10000000 20000000;"\
+			"cfgload;" \
+			"\0"\
+		"storeboot="\
+			"if load mmc 0:1 1020000 s905_autoscript || load mmc 1:1 1020000 s905_autoscript || load mmc 1:5 1020000 /boot/s905_autoscript; then autoscr 1020000; fi;"\
+			"ext4load mmc 1:5 1080000 zImage;ext4load mmc 1:5 10000000 uInitrd;ext4load mmc 1:5 20000000 dtb.img;booti 1080000 10000000 20000000;"\
 			"for p in 1 2 3 4 5 6 7 8 9 A B C D E F 10 11 12 13 14 15 16 17 18; do if fatload mmc 1:${p} ${loadaddr} aml_autoscript; then autoscr ${loadaddr}; fi; done;"\
 			"run update;"\
 			"\0"\
@@ -416,8 +418,9 @@
             "\0"\
 		BOOTENV\
 		"pxe_boot=dhcp; pxe get && pxe boot\0"\
+		"bootcmd_legacy=run legacyboot\0"\
 		"bootcmd_storeboot=run storeboot\0"\
-		"boot_targets=spi usb0 mmc0 mmc1 storeboot pxe dhcp\0"
+		"boot_targets=legacy usb0 mmc0 mmc1 storeboot pxe dhcp\0"
 
 #define CONFIG_PREBOOT  \
 			"run upgrade_check;"\

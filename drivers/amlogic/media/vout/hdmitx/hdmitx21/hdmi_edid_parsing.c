@@ -1745,10 +1745,10 @@ static bool edid_check_dsc_support(struct hdmitx_dev *hdev, struct hdmi_format_p
 static bool hdmitx21_edid_validate_mode(struct hdmitx_dev *hdev,
 				enum hdmi_vic vic)
 {
-	int i;
+	int i, j;
 	bool ret = false;
 	struct rx_cap *prxcap = &hdev->RXCap;
-	enum hdmi_vic *vesa_t = prxcap->vesa_timing[0];
+	enum hdmi_vic *vesa_t = &prxcap->vesa_timing[0];
 
 	if (vic < HDMITX_VESA_OFFSET) {
 		for (i = 0; (i < prxcap->VIC_count) && (i < VIC_MAX_NUM); i++) {

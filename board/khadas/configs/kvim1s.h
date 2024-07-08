@@ -62,6 +62,14 @@
 #define CONFIG_SUPPORT_EMMC_RPMB 1
 #define CONFIG_AML_DEV_ID 1
 
+#ifdef CONFIG_NOVERBOSE_BUILD
+#define SILENT         "silent=1\0"
+#define KERNL_LOGLEVEL "loglevel=2 "
+#else
+#define SILENT         "silent=0\0"
+#define KERNL_LOGLEVEL "loglevel=7 "
+#endif
+
 #ifdef CONFIG_DTB_LOAD
 #undef CONFIG_DTB_LOAD
 #endif
@@ -115,7 +123,7 @@
     "bootfile=\0"\
     "fdtfile=amlogic/" CONFIG_DEFAULT_DEVICE_TREE ".dtb\0" \
     CONFIG_EXTRA_ENV_SETTINGS_BASE \
-	"silent=0\0"\
+        SILENT \
         "dv_fw_addr=0xa00000\0"\
         "otg_device=1\0" \
         "panel_type=lcd_1\0" \
@@ -142,7 +150,6 @@
         "sdcburncfg=aml_sdc_burn.ini\0"\
         "EnableSelinux=enforcing\0" \
         "recovery_part=recovery\0"\
-        "loglevel=8\0" \
 	    "lock=10101000\0"\
         "cvbs_drv=0\0"\
         "osd_reverse=0\0"\
@@ -155,7 +162,7 @@
         "initargs="\
             "rootflags=data=writeback rw rootfstype=ext4" CONFIG_KNL_LOG_LEVEL "no_console_suspend fsck.repair=yes net.ifnames=0 "\
             "ramoops.pstore_en=1 ramoops.record_size=0x8000 ramoops.console_size=0x4000 loop.max_part=4 scramble_reg=0x0xfe02e030 khadas_board=VIM1S boot_source=${boot_source} "\
-			"cma_first_wm_low=on "\
+			"cma_first_wm_low=on " KERNL_LOGLEVEL \
             "\0"\
         "nfs_boot="\
             "dhcp;"\

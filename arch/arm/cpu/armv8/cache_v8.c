@@ -261,6 +261,27 @@ static void add_map(struct mm_region *map)
 	}
 }
 
+extern unsigned long __RO_END__;
+extern unsigned long __RO_START__;
+#define _text_end (unsigned long)(&__RO_END__)
+#define _text_start (unsigned long)(&__RO_START__)
+void mmu_update_text_attr(void)
+{
+#ifndef CONFIG_USEMMU_BOARDF
+	struct mm_region mem_map;
+
+	dcache_disable();
+	mem_map.virt = _text_start;
+	mem_map.phys = _text_start;
+	mem_map.size = _text_end -  _text_start;
+	mem_map.attrs = PTE_BLOCK_MEMTYPE(MT_NORMAL) |
+			 PTE_BLOCK_INNER_SHARE | PTE_BLOCK_RO;
+
+	add_map(&mem_map);
+	dcache_enable();
+#endif
+}
+
 enum pte_type {
 	PTE_INVAL,
 	PTE_BLOCK,
@@ -362,9 +383,9 @@ __weak u64 get_page_table_size(void)
 
 	/*
 	 * We may need to split page tables later on if dcache settings change,
-	 * so reserve up to 4 (random pick) page tables for that.
+	 * so reserve up to 8 (random pick) page tables for that.
 	 */
-	size += one_pt * 4;
+	size += one_pt * 8;
 
 	return size;
 }

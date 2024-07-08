@@ -22,7 +22,6 @@
 #include <linux/mtd/partitions.h>
 #include <asm/arch/bl31_apis.h>
 #include <amlogic/aml_mtd.h>
-#include <amlogic/aml_mmc.h>
 
 #ifdef CONFIG_AML_VPU
 #include <amlogic/media/vpu/vpu.h>
@@ -234,7 +233,7 @@ int board_late_init(void)
 	} else {
 		env_set("cpu_id", "1234567890");
 	}
-	emmc_quirks();
+
 	return 0;
 }
 
@@ -399,22 +398,22 @@ static const struct mtd_partition spinand_partitions[] = {
 	{
 	 .name = "misc",
 	 .offset = 0,
-	 .size = 1 * SZ_1M,
+	 .size = 2 * SZ_1M,
 	  },
 	{
 	 .name = "recovery",
 	 .offset = 0,
-	 .size = 10 * SZ_1M,
+	 .size = 16 * SZ_1M,
 	  },
 	{
 	 .name = "boot",
 	 .offset = 0,
-	 .size = 10 * SZ_1M,
+	 .size = 16 * SZ_1M,
 	  },
 	{
 	 .name = "system",
 	 .offset = 0,
-	 .size = 70 * SZ_1M,
+	 .size = 128 * SZ_1M,
 	  },
 	/* last partition get the rest capacity */
 	{

@@ -750,6 +750,38 @@ static int do_SetRollFlag
 	return 0;
 }
 
+int do_UpdateDt(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	printf("write dtb from ${boot_part}\n");
+	run_command("imgread dtb ${boot_part} ${dtb_mem_addr}", 0);
+	run_command("emmc dtb_write ${dtb_mem_addr} 0", 0);
+
+	env_set("update_dt", "0");
+#if CONFIG_IS_ENABLED(AML_UPDATE_ENV)
+	run_command("update_env_part -p update_dt;", 0);
+#else
+	run_command("saveenv", 0);
+#endif
+
+	char *part_changed = env_get("part_changed");
+
+	if (part_changed && (!strcmp(part_changed, "1"))) {
+		env_set("part_changed", "0");
+#if CONFIG_IS_ENABLED(AML_UPDATE_ENV)
+		run_command("update_env_part -p part_changed;", 0);
+#else
+		run_command("saveenv", 0);
+#endif
+
+		printf("part changes, reset\n");
+		run_command("reset", 0);
+	}
+
+	return 0;
+}
+
+#endif /* CONFIG_BOOTLOADER_CONTROL_BLOCK */
+
 static int do_GetSystemMode(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 #ifdef CONFIG_SYSTEM_AS_ROOT
@@ -772,32 +804,6 @@ static int do_GetAvbMode(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 	return 0;
 }
 
-int do_UpdateDt(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
-{
-	char *update_dt = env_get("update_dt");
-	char *part_changed = env_get("part_changed");
-
-	printf("update_dt %s, part_changed: %s\n", update_dt, part_changed);
-	if (update_dt && (!strcmp(update_dt, "1"))) {
-		printf("write dtb\n");
-		run_command("imgread dtb ${boot_part} ${dtb_mem_addr}", 0);
-		run_command("emmc dtb_write ${dtb_mem_addr} 0", 0);
-
-		env_set("update_dt", "0");
-		run_command("saveenv", 0);
-
-		if (part_changed && (!strcmp(part_changed, "1"))) {
-			env_set("part_changed", "0");
-			run_command("saveenv", 0);
-
-			run_command("reset", 0);
-		}
-	}
-	return 0;
-}
-
-#endif /* CONFIG_BOOTLOADER_CONTROL_BLOCK */
-
 #ifdef CONFIG_UNIFY_BOOTLOADER
 bootctl_func_handles *get_bootctl_cmd_func_avb(void)
 {
@@ -811,6 +817,7 @@ bootctl_func_handles *get_bootctl_cmd_func_avb(void)
 	return &avb_cmd_bootctrl_handles;
 }
 #else
+#ifdef CONFIG_BOOTLOADER_CONTROL_BLOCK
 U_BOOT_CMD(
 	get_valid_slot, 2, 0, do_GetValidSlot,
 	"get_valid_slot",
@@ -841,6 +848,14 @@ U_BOOT_CMD
 );
 
 U_BOOT_CMD
+(update_dt, 1,	0, do_UpdateDt,
+	"update_dt",
+	"\nThis command will update dt\n"
+	"So you can execute command: update_dt"
+);
+
+#endif
+U_BOOT_CMD
 (get_system_as_root_mode, 1,	0, do_GetSystemMode,
 	"get_system_as_root_mode",
 	"\nThis command will get system_as_root_mode\n"
@@ -853,14 +868,9 @@ U_BOOT_CMD(
 	"\nThis command will get avb mode\n"
 	"So you can execute command: get_avb_mode"
 );
-U_BOOT_CMD
-(update_dt, 1,	0, do_UpdateDt,
-	"update_dt",
-	"\nThis command will update dt\n"
-	"So you can execute command: update_dt"
-);
 #endif
 
+#if defined(CONFIG_MMC_MESON_GX)
 static int get_bootloader_message_block(char * miscbuf, int size, AvbABData *info) {
     const char *misc_device = "misc";
     printf("read misc for emmc device\n");
@@ -906,4 +916,5 @@ int set_successful_boot(void) {
 
     return -1;
 }
+#endif
 

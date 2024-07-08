@@ -39,25 +39,6 @@
 #include <asm/arch/stick_mem.h>
 #include <amlogic/board.h>
 
-#ifdef CONFIG_AML_VPU
-#include <amlogic/media/vpu/vpu.h>
-#endif
-#ifdef CONFIG_AML_VPP
-#include <amlogic/media/vpp/vpp.h>
-#endif
-#ifdef CONFIG_AML_VOUT
-#include <amlogic/media/vout/aml_vout.h>
-#endif
-#ifdef CONFIG_AML_HDMITX20
-#include <amlogic/media/vout/hdmitx/hdmitx_module.h>
-#endif
-#ifdef CONFIG_AML_LCD
-#include <amlogic/media/vout/lcd/lcd_vout.h>
-#endif
-#ifdef CONFIG_RX_RTERM
-#include <amlogic/aml_hdmirx.h>
-#endif
-
 DECLARE_GLOBAL_DATA_PTR;
 
 void sys_led_init(void)
@@ -78,7 +59,7 @@ int dram_init(void)
 /* secondary_boot_func
  * this function should be write with asm, here, is is only for compiling pass
  * */
-void secondary_boot_func(void)
+__weak void secondary_boot_func(void)
 {
 }
 
@@ -172,24 +153,12 @@ int board_init(void)
 int board_late_init(void)
 {
 	printf("board late init\n");
+	env_set("defenv_para", "-c -b0");
 	aml_board_late_init_front(NULL);
+	get_stick_reboot_flag_mbx();
 
-#ifdef CONFIG_AML_VPU
-	vpu_probe();
-#endif
-#ifdef CONFIG_AML_VPP
-	vpp_init();
-#endif
-#ifdef CONFIG_RX_RTERM
-	rx_set_phy_rterm();
-#endif
-	run_command("ini_model", 0);
-#ifdef CONFIG_AML_VOUT
-	vout_probe();
-#endif
-#ifdef CONFIG_AML_LCD
-	lcd_probe();
-#endif
+	aml_board_display_init(0x01);
+
 	aml_board_late_init_tail(NULL);
 	return 0;
 }
@@ -443,18 +412,9 @@ int checkhw(char * name)
 }
 #endif
 
-const char * const _env_args_reserve_[] =
-{
-	"lock",
-	"upgrade_step",
-	"bootloader_version",
+const char * const _board_env_reserv_array0[] = {
 	"model_name",
-	"hdmimode",
-	"outputmode",
-	"dts_to_gpt",
-	"fastboot_step",
-	"reboot_status",
-	"expect_index",
+	"connector_type",
 	NULL//Keep NULL be last to tell END
 };
 int __attribute__((weak)) mmc_initialize(bd_t *bis){ return 0;}

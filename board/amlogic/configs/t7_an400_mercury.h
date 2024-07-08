@@ -71,6 +71,7 @@
 	"storeargs_hdmitx="\
 		"setenv bootargs ${bootargs} powermode=${powermode} "\
 		"lcd_ctrl=${lcd_ctrl} lcd_debug=${lcd_debug} "\
+		"dptx0_ctrl=${dptx0_ctrl} dptx1_ctrl=${dptx1_ctrl} "\
 		"outputmode=${outputmode} hdmitx=${cecconfig},${colorattribute};"\
 		"\0"\
 	"init_display_hdmitx="\
@@ -86,6 +87,8 @@
 	"lcd_ctrl=0x00000000\0" \
 	"lcd1_ctrl=0x00000000\0" \
 	"lcd2_ctrl=0x00000000\0" \
+	"dptx0_ctrl=0x00000000\0" \
+	"dptx1_ctrl=0x00000000\0" \
 	"outputmode=panel\0" \
 	"outputmode2=panel1\0" \
 	"outputmode3=1080p60hz\0" \
@@ -100,6 +103,7 @@
 		"vout2=${outputmode2},enable panel1_type=${panel1_type} "\
 		"vout3=${outputmode3},enable " \
 		"lcd1_ctrl=${lcd1_ctrl} panel2_type=${panel2_type} lcd2_ctrl=${lcd2_ctrl} "\
+		"dptx0_ctrl=${dptx0_ctrl} dptx1_ctrl=${dptx1_ctrl} "\
 		"hdr_policy=${hdr_policy} hdr_priority=${hdr_priority};"\
 		"\0"\
 	"init_display_hdmitx="\
@@ -111,6 +115,7 @@
 	CONFIG_EXTRA_ENV_SETTINGS_BASE \
 		"silent=1\0"\
 		"loadaddr_kernel=0x01080000\0"\
+		"car_mem_addr=0x80001100\0" \
 		"dv_fw_addr=0xa00000\0"\
 		"otg_device=1\0" \
 		"lcd_ctrl=0x00000000\0" \
@@ -122,12 +127,12 @@
 		"display_width=1280\0" \
 		"display_height=800\0" \
 		"hdmichecksum=0x00000000\0" \
-		"dv_fw_dir=/reserved/firmware/dovi_fw.bin\0" \
 		"display_bpp=16\0" \
 		"display_color_index=16\0" \
 		"display_layer=osd0\0" \
 		"display_color_fg=0xffff\0" \
 		"display_color_bg=0\0" \
+		"set_logo_on=123\0" \
 		"dtb_mem_addr=0x01000000\0" \
 		"fb_addr=0x00300000\0" \
 		"fb_width=1280\0" \
@@ -137,7 +142,7 @@
 		"usb_burning=" CONFIG_USB_TOOL_ENTRY "\0" \
 		"fdt_high=0x20000000\0"\
 		"sdcburncfg=aml_sdc_burn.ini\0"\
-		"EnableSelinux=permissive\0" \
+		"EnableSelinux=enforcing\0" \
 		"recovery_part=recovery\0"\
 		"lock=10101000\0"\
 	"board=mercury\0"\
@@ -170,6 +175,8 @@
 		"earlycon=aml-uart,0xfe078000 ramoops.pstore_en=1 ramoops.record_size=0x8000 "\
 		"ramoops.console_size=0x4000 loop.max_part=4 scsi_mod.scan=async "\
 		"xhci_hcd.quirks=0x800000 loglevel=4 scramble_reg=0xfe02e030 "\
+		"clk_ignore_unused meson_clk.ignore_pll_init=1 "\
+		"amlogic-clk-soc-t7.ignore_pll_init=1 "\
             "\0"\
         "upgrade_check="\
 			"run upgrade_check_base;"\
@@ -360,12 +367,14 @@
 /* dual logo, normal boot */
 #define CONFIG_DUAL_LOGO \
 	/* logo3 */ \
-	"setenv outputmode3 ${hdmimode};"\
 	"setenv display_layer viu3_osd0;"\
 	"setenv fb_width 1280;setenv fb_height 800;"\
 	"vout3 prepare ${outputmode3};"\
 	"osd open;osd clear;imgread pic logo bootup_land $loadaddr;"\
 	"bmp display $bootup_land_offset;"\
+	"if test ${logo3_on} = off; then "\
+		"osd clear;"\
+	"fi;"\
 	"bmp scale;vout3 output ${outputmode3};"\
 	"setenv fbargs fb_width3=${fb_width} fb_height3=${fb_height} "\
 	"display_bpp3=${display_bpp} fb_addr3=${fb_addr} ;"\
@@ -376,6 +385,9 @@
 	"vout2 prepare ${outputmode2};osd open;osd clear;"\
 	"imgread pic logo bootup_land $loadaddr;"\
 	"bmp display $bootup_land_offset;"\
+	"if test ${logo2_on} = off; then "\
+		"osd clear;"\
+	"fi;"\
 	"vout2 output ${outputmode2};bmp scale;"\
 	"setenv fbargs ${fbargs} fb_width2=${fb_width} fb_height2=${fb_height} "\
 	"display_bpp2=${display_bpp} fb_addr2=${fb_addr} ;"\
@@ -383,6 +395,9 @@
 	"setenv display_layer osd0;"\
 	"setenv fb_width 800;setenv fb_height 1280;"\
 	"osd open;osd clear;imgread pic logo bootup $loadaddr;bmp display $bootup_offset;"\
+	"if test ${logo1_on} = off; then "\
+		"osd clear;"\
+	"fi;"\
 	"bmp scale;vout output ${outputmode};vpp hdrpkt;"\
 	"setenv fbargs ${fbargs} fb_width=${fb_width} fb_height=${fb_height} "\
 	"display_bpp=${display_bpp} fb_addr=${fb_addr} ;"\

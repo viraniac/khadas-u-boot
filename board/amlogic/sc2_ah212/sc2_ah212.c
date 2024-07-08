@@ -21,6 +21,7 @@
 #include <amlogic/aml_v2_burning.h>
 #include <linux/mtd/partitions.h>
 #include <asm/arch/bl31_apis.h>
+#include <asm/arch/stick_mem.h>
 #ifdef CONFIG_AML_VPU
 #include <amlogic/media/vpu/vpu.h>
 #endif
@@ -35,6 +36,9 @@
 #endif
 #include <amlogic/board.h>
 #include "avb2_kpub.c"
+#ifdef CONFIG_CMD_SND
+#include "amlogic/auge_sound.h"
+#endif
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -148,6 +152,13 @@ int board_init(void)
 	hdmitx_set_hdmi_5v();
 	hdmitx_init();
 #endif
+#ifdef CONFIG_CMD_SND
+	/* Bandgap for HDMITX */
+	writel(0x0b4242, ANACTRL_HDMIPHY_CTRL0);
+	/* pinmux HDMITX_HPD_IN: GPIOH_2,  */
+	update_bits(PADCTRL_PIN_MUX_REGB, 0xf << 8, 0x1 << 8);
+	earcrx_init(EARC_RX_ANA_V1);
+#endif
 
 	//wifi reset
 	run_command("gpio c GPIOX_6", 0);
@@ -162,7 +173,9 @@ int board_init(void)
 int board_late_init(void)
 {
 	printf("board late init\n");
+	env_set("defenv_para", "-c");
 	aml_board_late_init_front(NULL);
+	get_stick_reboot_flag_mbx();
 
 #ifdef CONFIG_SC2_AH212_DEBIAN
 	// Set boot source
@@ -440,18 +453,13 @@ int checkhw(char * name)
 }
 #endif
 
-const char * const _env_args_reserve_[] =
-{
-	"lock",
-	"upgrade_step",
-	"bootloader_version",
-	"dts_to_gpt",
-	"fastboot_step",
-	"reboot_status",
-	"expect_index",
-
-	NULL//Keep NULL be last to tell END
-};
+//env_set("defenv_para", "-c -b0"); in board_late_late if need
+/*
+ *const char * const _board_env_reserv_array0[] = {
+ *        "user_env1",
+ *        NULL//Keep NULL be last to tell END
+ *};
+ */
 
 int __attribute__((weak)) mmc_initialize(bd_t *bis){ return 0;}
 

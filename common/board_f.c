@@ -44,6 +44,12 @@
 #include <dm/root.h>
 #include <linux/errno.h>
 
+#ifdef CONFIG_SYS_NONCACHED_MEMORY
+#include <linux/sizes.h>
+#endif
+#ifdef CONFIG_ARMV8_MULTIENTRY
+#include <asm/arch-meson/smp.h>
+#endif
 /*
  * Pointer to initial global data area
  *
@@ -704,7 +710,9 @@ static int reserve_stacks(void)
 	/* make stack pointer 16-byte aligned */
 	gd->start_addr_sp -= 16;
 	gd->start_addr_sp &= ~0xf;
-
+#ifdef CONFIG_ARMV8_MULTIENTRY
+	gd->start_addr_sp -= ((NR_CPUS - 1) * secondary_sp_size);
+#endif
 	/*
 	 * let the architecture-specific code tailor gd->start_addr_sp and
 	 * gd->irq_sp
@@ -872,6 +880,13 @@ static int setup_reloc(void)
 #endif
 #endif
 	memcpy(gd->new_gd, (char *)gd, sizeof(gd_t));
+
+#ifdef CONFIG_SYS_NONCACHED_MEMORY
+	gd->start_addr_sp = ALIGN(gd->start_addr_sp, MMU_SECTION_SIZE);
+	gd->start_addr_sp -= MMU_SECTION_SIZE;
+	gd->start_addr_sp -= ALIGN(CONFIG_SYS_NONCACHED_MEMORY, MMU_SECTION_SIZE);
+	gd->start_addr_sp -= (SZ_2M);
+#endif
 
 	printf("Relocation Offset is: %08lx\n", gd->reloc_off);
 	printf("Relocating to %08lx, new gd at %08lx, sp at %08lx\n",

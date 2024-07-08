@@ -49,6 +49,19 @@
 #define CMD_TEST		0x6
 #define CMD_GET_STICK_REBOOT_FLAG      0x40
 #define CMD_LED_INFO            0xF7
+#define CMD_SET_BL30_PRINT      0x6A
+#define CMD_GET_BL30_VERSION	0x6B
+
+/*******************************************************************************
+ * TimerE definition
+ ******************************************************************************/
+#define TIMERE_LOW_REG SYSCTRL_TIMERE
+#define TIMERE_HIG_REG SYSCTRL_TIMERE_HI
+
+/*******************************************************************************
+ * AOCPU tick count address
+ ******************************************************************************/
+#define AOCPU_TICK_CNT_RD_ADDR  (MAILBOX_RD_MBOX04)
 
 /*******************************************************************************
  * Mssage composition

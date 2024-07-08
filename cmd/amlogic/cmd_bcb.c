@@ -49,6 +49,7 @@ struct bootloader_message {
     char reserved[192];
 };
 
+#ifdef CONFIG_CMD_BCB
 static bool env_command_check(const char *cmd)
 {
     int index = 0;
@@ -98,6 +99,7 @@ static bool env_command_check(const char *cmd)
     strcopy = NULL;
     return true;
 }
+#endif
 
 /**
  * @usage: write data to storage device for nand flash
@@ -117,13 +119,13 @@ int nand_store_write(const char *name, loff_t off, size_t size, void *buf)
 	int ret = -1;
 	u64 rc = 0;
 	unsigned char *buffer = NULL;
-
+	u64 sz = 0;
 	rc = store_logic_cap(name);
 	if (rc == 1) {
 		printf("Failed to get partition[%s] size\n", name);
 		return ret;
 	}
-
+	sz = rc;// save the size
 	buffer = (unsigned char *)malloc(rc);
 
 	if (!buffer) {
@@ -147,9 +149,9 @@ int nand_store_write(const char *name, loff_t off, size_t size, void *buf)
 		printf("Fail erase partition %s\n", name);
 		goto exit;
 	}
-
+	// here the rc is 0, should use sz instead
 	/* 4.write data back to the partitioned table */
-	if (store_write((const char *)name, 0, rc, (unsigned char *)buffer) < 0) {
+	if (store_write((const char *)name, 0, sz, (unsigned char *)buffer) < 0) {
 		printf("failed to write data to %s.\n", name);
 		goto exit;
 	} else {
@@ -388,6 +390,7 @@ static int do_RunBcbCommand(
         return 0;
     }
 
+#ifdef CONFIG_CMD_BCB
     //uboot-command only valid once, not matter success or not
     if (clear_misc_partition(clearbuf, sizeof(clearbuf)) < 0) {
 	printf("clear misc partition failed.\n");
@@ -418,6 +421,7 @@ static int do_RunBcbCommand(
         printf("command mark(%s) not match %s,don't execute.\n",
             command_mark, command);
     }
+#endif
 
     return 0;
 

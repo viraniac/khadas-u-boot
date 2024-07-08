@@ -14,7 +14,7 @@
 
 static unsigned int first_bit_set(u32 data)
 {
-	unsigned int n = 32;
+	unsigned int n = 31;
 
 	if (data != 0) {
 		for (n = 0; (data & 1) == 0; n++)

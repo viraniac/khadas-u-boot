@@ -75,12 +75,14 @@
 	"recovery_mode=false\0"\
 	"retry_recovery_times=7\0"\
 	"androidboot.dtbo_idx=0\0"\
+	"recovery_check_part=0\0"\
 	"common_dtb_load=" CONFIG_DTB_LOAD "\0"\
 	"get_os_type=if store read ${os_ident_addr} ${boot_part} 0 0x1000; then "\
 		"os_ident ${os_ident_addr}; fi\0"\
 	"fatload_dev=usb\0"\
 	"fs_type=""rootfstype=ramfs""\0"\
 	"disable_ir=0\0"\
+	"default_governor=performance\0"\
 	"upgrade_check_base="\
 		"echo recovery_status=${recovery_status};"\
 		"if itest.s \"${recovery_status}\" == \"in_progress\"; then "\
@@ -97,7 +99,7 @@
 		"hdmitx=${cecconfig},${colorattribute} hdmimode=${hdmimode} "\
 		"hdmichecksum=${hdmichecksum} dolby_vision_on=${dolby_vision_on} "\
 		"hdr_policy=${hdr_policy} hdr_priority=${hdr_priority} "\
-		"hdr_force_mode=${hdr_force_mode} "\
+		"hdr_force_mode=${hdr_force_mode} dolby_status=${dolby_status} "\
 		"frac_rate_policy=${frac_rate_policy} hdmi_read_edid=${hdmi_read_edid} "\
 		"osd_reverse=${osd_reverse} video_reverse=${video_reverse} ;"\
 		"\0"\
@@ -129,7 +131,7 @@
 			"setenv loadaddr ${loadaddr_kernel};"\
 			"if imgread kernel ${boot_part} ${loadaddr}; then bootm ${loadaddr}; fi;"\
 		"else echo wrong OS format ${os_type}; fi;fi;"\
-		"echo try upgrade as booting failure; run update;"\
+		"echo try upgrade as booting failure; check_ab; run update;"\
 		"\0" \
 	"update_base=" _AML_RUN_UPDATE_ENV \
 		"run recovery_from_flash;" \
@@ -137,12 +139,18 @@
 	"recovery_from_fat_dev_base="\
 		"setenv loadaddr ${loadaddr_kernel};"\
 		"if fatload ${fatload_dev} 0 ${loadaddr} aml_autoscript; then "\
-			"autoscr ${loadaddr}; fi;"\
+			"if avb memory recovery ${loadaddr}; then " \
+				"avb recovery 1;" \
+				"autoscr ${loadaddr}; fi;"\
+		"fi;" \
 		"if fatload ${fatload_dev} 0 ${loadaddr} recovery.img; then "\
-			"if fatload ${fatload_dev} 0 ${dtb_mem_addr} dtb.img; then "\
-				"echo ${fatload_dev} dtb.img loaded; fi;"\
-			"setenv bootargs ${bootargs} ${fs_type};"\
-		"bootm ${loadaddr};fi;"\
+			"if avb memory recovery ${loadaddr}; then " \
+				"avb recovery 1;" \
+				"if fatload ${fatload_dev} 0 ${dtb_mem_addr} dtb.img; then "\
+					"echo ${fatload_dev} dtb.img loaded; fi;"\
+				"setenv bootargs ${bootargs} ${fs_type};"\
+				"bootm ${loadaddr};fi;"\
+		"fi;" \
 		"\0"\
 	"recovery_from_udisk_base="\
 		"setenv fatload_dev usb;"\
@@ -159,6 +167,7 @@
 		"if test ${active_slot} = normal; then "\
 			"setenv bootargs ${bootargs} ${fs_type} aml_dt=${aml_dt} "\
 			"recovery_part=${recovery_part} recovery_offset=${recovery_offset};"\
+			"avb recovery 1;" \
 			"if test ${upgrade_step} = 3; then "\
 				"if ext4load mmc 1:2 ${dtb_mem_addr} /recovery/dtb.img; then "\
 					"echo cache dtb.img loaded; fi;"\

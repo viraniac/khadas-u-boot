@@ -1128,18 +1128,10 @@ static __attribute__((unused)) int _update_ptbl_mbr(struct mmc *mmc, struct _ipt
 	return ret;
 }
 
-typedef struct PartList {
-	char name[128];
-	uint64_t old_offset;
-	uint64_t old_size;
-	uint64_t new_offset;
-	uint64_t new_size;
-	struct PartList *next;
-} __packed PartList;
-
 int check_gpt_change(struct blk_desc *dev_desc, void *buf)
 {
 	int i, k;
+	int m = 0;
 	gpt_header *gpt_h;
 	gpt_entry *gpt_e;
 	u32 calc_crc32;
@@ -1148,18 +1140,28 @@ int check_gpt_change(struct blk_desc *dev_desc, void *buf)
 	int ret = 0;
 	bool alternate_flag = false;
 	int j = 0;
-	PartList *tail = NULL;
-	PartList *node = NULL;
-	PartList *list_part = NULL;
-	PartList *part_node = NULL;
-	int ishead = 0;
+	int recovery_offset_old = 0, recovery_offset_new = 0;
+	int tee_offset_old = 0, tee_offset_new = 0;
+	int oem_offset_old = 0, oem_offset_new = 0;
+	int data_offset_old = 0, data_offset_new = 0;
+	int data_size_old = 0, data_size_new = 0;
+	int cache_offset_old = 0, cache_offset_new = 0;
+	int cache_size_old = 0, cache_size_new = 0;
+	int tee_size_old = 0, tee_size_new = 0;
+	int oem_size_old = 0, oem_size_new = 0;
+	int metadata_offset_old = 0, metadata_offset_new = 0;
+	int metadata_size_old = 0, metadata_size_new = 0;
 
 	struct partitions *partitions = p_iptbl_ept->partitions;
 	int parts_num = p_iptbl_ept->count;
 	uint64_t offset;
 	uint64_t size;
+	uint32_t mask_flags;
 	char name[PARTNAME_SZ];
 	char *update_dts_gpt = NULL;
+#if (ADD_LAST_PARTITION)
+	ulong gap = GPT_GAP;
+#endif
 
 	update_dts_gpt = env_get("update_dts_gpt");
 
@@ -1200,6 +1202,12 @@ int check_gpt_change(struct blk_desc *dev_desc, void *buf)
 		}
 
 #endif
+		if (le64_to_cpu(gpt_e[i].starting_lba) > gpt_h->last_usable_lba) {
+			printf("gpt_e[%d].starting_lba: %llX > %llX, writing failed\n", i,
+			       le64_to_cpu(gpt_e[i].starting_lba),
+			       le64_to_cpu(gpt_h->last_usable_lba));
+			return 1;
+		}
 		if (le64_to_cpu(gpt_e[i].ending_lba) > gpt_h->last_usable_lba) {
 			printf("gpt_e[%d].ending_lba: %llX > %llX, reset it\n",
 			i, le64_to_cpu(gpt_e[i].ending_lba), le64_to_cpu(gpt_h->last_usable_lba));
@@ -1221,31 +1229,50 @@ int check_gpt_change(struct blk_desc *dev_desc, void *buf)
 
 	if (update_dts_gpt) {
 		printf("update_dts_gpt is %s\n", update_dts_gpt);
-		j = 1;
+		m = 1;
+		ret = 2;
 	}
 
-	node = malloc(sizeof(PartList));
+	if (parts_num != entries_num) {
+		printf("parts_num changes\n");
+		ret = 2;
+	}
 
-	for (; j < parts_num; j++) {
-		if (node && partitions[j].size != 0 &&
+	for (j = m; j < parts_num; j++) {
+		if (partitions[j].size != 0 &&
 				(strcmp(partitions[j].name, "rsv") != 0)) {
-			strcpy(node->name, partitions[j].name);
-			node->old_offset = partitions[j].offset;
-			node->old_size = partitions[j].size;
-			if (ishead == 0) {
-				list_part = node;
-				list_part->next = NULL;
-				tail = node;
-				ishead = -1;
-			} else {
-				tail->next = node;
-				tail = node;
+			if (!strcmp(partitions[j].name, "recovery")) {
+				recovery_offset_old = partitions[j].offset;
+				//printf("recovery_offset_old = %d\n", recovery_offset_old);
+			} else if (!strcmp(partitions[j].name, "cache")) {
+				cache_offset_old = partitions[j].offset;
+				cache_size_old = partitions[j].size;
+				//printf("cache_offset_old = %d\n", cache_offset_old);
+				//printf("cache_size_old = %d\n", cache_size_old);
+			} else if (!strcmp(partitions[j].name, "userdata") ||
+				!strcmp(partitions[j].name, "data")) {
+				data_offset_old = partitions[j].offset;
+				data_size_old = partitions[j].size;
+				//printf("data_offset_old = %d\n", data_offset_old);
+				//printf("data_size_old = %d\n", data_size_old);
+			} else if (!strcmp(partitions[j].name, "tee")) {
+				tee_offset_old = partitions[j].offset;
+				tee_size_old = partitions[j].size;
+				//printf("tee_offset_old = %d\n", tee_offset_old);
+				//printf("tee_size_old = %d\n", tee_size_old);
+			} else if (!strcmp(partitions[j].name, "metadata")) {
+				metadata_offset_old = partitions[j].offset;
+				metadata_size_old = partitions[j].size;
+				//printf("metadata_offset_old = %d\n", metadata_offset_old);
+				//printf("metadata_size_old = %d\n", metadata_size_old);
+			} else if (!strcmp(partitions[j].name, "oem")) {
+				oem_offset_old = partitions[j].offset;
+				oem_size_old = partitions[j].size;
+				//printf("oem_offset_old = %d\n", tee_offset_old);
+				//printf("oem_size_old = %d\n", tee_size_old);
 			}
 		}
 	}
-
-	if (tail)
-		tail->next = NULL;
 
 	for (i = 0; i < entries_num; i++) {
 		/* partition name */
@@ -1256,34 +1283,89 @@ int check_gpt_change(struct blk_desc *dev_desc, void *buf)
 		for (k = 0; k < efiname_len; k++)
 			name[k] = (char)gpt_e[i].partition_name[k];
 
-		part_node = list_part;
+		if (strcmp(name, partitions[i].name) != 0) {
+			printf("Caution! GPT name [%s] had been changed\n", name);
+			ret = 2;
+		}
 
-		while (part_node) {
-			if (strcmp(part_node->name, name) == 0) {
-				offset = le64_to_cpu(gpt_e[i].starting_lba << 9ULL);
-				size = ((le64_to_cpu(gpt_e[i].ending_lba) + 1) -
-					le64_to_cpu(gpt_e[i].starting_lba)) << 9ULL;
-				part_node->new_offset = offset;
-				part_node->new_size = size;
+		offset = le64_to_cpu(gpt_e[i].starting_lba << 9ULL);
+		size = ((le64_to_cpu(gpt_e[i].ending_lba) + 1) -
+				le64_to_cpu(gpt_e[i].starting_lba)) << 9ULL;
 
-				if (part_node->old_offset != part_node->new_offset ||
-						part_node->old_size != part_node->new_size) {
+		mask_flags =
+			(uint32_t)le64_to_cpu(gpt_e[i].attributes.fields.type_guid_specific);
+
+		if (!strcmp(name, "recovery")) {
+			recovery_offset_new = offset;
+			//printf("recovery_offset_new = %d\n", recovery_offset_new);
+		} else if (!strcmp(name, "cache")) {
+			cache_offset_new = offset;
+			cache_size_new = size;
+			///printf("cache_offset_new = %d\n", cache_offset_new);
+			//printf("cache_size_new = %d\n", cache_size_new);
+		} else if (!strcmp(name, "userdata") ||
+			!strcmp(name, "data")) {
+			data_offset_new = offset;
+			data_size_new = size;
+			//printf("data_offset_new = %d\n", data_offset_new);
+			//printf("data_size_new = %d\n", data_size_new);
+		} else if (!strcmp(name, "tee")) {
+			tee_offset_new = offset;
+			tee_size_new = size;
+			//printf("tee_offset_new = %d\n", tee_offset_new);
+			//printf("tee_size_new = %d\n", tee_size_new);
+		} else if (!strcmp(name, "metadata")) {
+			metadata_offset_new = offset;
+			metadata_size_new = size;
+			//printf("metadata_offset_new = %d\n", metadata_offset_new);
+			//printf("metadata_size_new = %d\n", metadata_size_new);
+		} else if (!strcmp(name, "oem")) {
+			oem_offset_new = offset;
+			oem_size_new = size;
+			//printf("oem_offset_new = %d\n", oem_offset_new);
+			//printf("oem_size_new = %d\n", oem_size_new);
+		}
+
+		for (j = m; j < parts_num; j++) {
+			if ((strcmp(partitions[j].name, name) == 0) &&
+					(strcmp(partitions[j].name, "rsv") != 0)) {
+				if (partitions[j].offset != offset ||
+						partitions[j].size != size) {
 					printf("%s offset/size had been changed\n",
-							part_node->name);
+							name);
 					printf("offset: %016llx --> %016llx\n",
-							part_node->old_offset,
-							part_node->new_offset);
+							partitions[j].offset,
+							offset);
 					printf("size: %016llx --> %016llx\n",
-							part_node->old_size, part_node->new_size);
+							partitions[j].size, size);
 					ret = 3;
 				}
+				if (partitions[j].mask_flags != mask_flags) {
+					printf("%s mask_flags had been changed\n",
+						name);
+					printf("%08x<->%08x\n", partitions[j].mask_flags,
+						mask_flags);
+					if (ret == 0)
+						ret = 2;
+				}
 			}
-			part_node = part_node->next;
 		}
 	}
 
-	if (node)
-		free(node);
+	if (data_offset_old != data_offset_new ||
+		data_size_old != data_size_new ||
+		cache_offset_old != cache_offset_new ||
+		cache_size_old != cache_size_new ||
+		tee_offset_old != tee_offset_new ||
+		tee_size_old != tee_size_new ||
+		metadata_offset_old != metadata_offset_new ||
+		metadata_size_old != metadata_size_new ||
+		oem_offset_old != oem_offset_new ||
+		oem_size_old != oem_size_new ||
+		recovery_offset_old != recovery_offset_new) {
+		printf("null ab critical partition change\n");
+		ret = 4;
+	}
 
 	return ret;
 }
@@ -1627,6 +1709,11 @@ int _mmc_check_gpt(struct mmc *mmc, lbaint_t *alternate)
 	struct blk_desc *dev_desc = mmc_get_blk_desc(mmc);
 	gpt_entry *gpt_pte = NULL;
 	lbaint_t alternate_lba;
+	u32 entries_num;
+	int i, k;
+	size_t efiname_len;
+	int flag = 0;
+	char name[PARTNAME_SZ];
 
 	ALLOC_CACHE_ALIGN_BUFFER_PAD(gpt_header, gpt_head, 1, dev_desc->blksz);
 
@@ -1634,6 +1721,35 @@ int _mmc_check_gpt(struct mmc *mmc, lbaint_t *alternate)
 	if (is_gpt_valid(dev_desc, GPT_PRIMARY_PARTITION_TABLE_LBA,
 			gpt_head, &gpt_pte) == 1) {
 		alternate_lba = (lbaint_t)le64_to_cpu(gpt_head->alternate_lba);
+		entries_num = le32_to_cpu(gpt_head->num_partition_entries);
+
+		for (i = 0; i < entries_num; i++) {
+			/* partition name */
+			efiname_len = sizeof(gpt_pte[i].partition_name)
+				/ sizeof(efi_char16_t);
+
+			memset(name, 0, PARTNAME_SZ);
+			for (k = 0; k < efiname_len; k++)
+				name[k] = (char)gpt_pte[i].partition_name[k];
+
+			if (alternate_lba > le64_to_cpu(gpt_pte[i].starting_lba) &&
+				alternate_lba < le64_to_cpu(gpt_pte[i].ending_lba)) {
+				printf("GPT: alternate_lba: %lX during %s, invalid\n",
+			       alternate_lba, name);
+				flag = 1;
+			}
+		}
+
+		if (flag == 1) {
+			printf("GPT: alternate_lba: %llX invalid, reset it\n",
+			       le64_to_cpu(gpt_head->alternate_lba));
+			gpt_head->alternate_lba = gpt_pte[1].starting_lba - 1;
+			alternate_lba = (lbaint_t)le64_to_cpu(gpt_head->alternate_lba);
+			*alternate = alternate_lba;
+			free(gpt_pte);
+			return 1;
+		}
+
 		*alternate = alternate_lba;
 		free(gpt_pte);
 
@@ -1675,6 +1791,8 @@ int mmc_repair_gpt(struct mmc *mmc, lbaint_t alternate)
 	ALLOC_CACHE_ALIGN_BUFFER_PAD(gpt_header, gpt_head, 1, dev_desc->blksz);
 
 	if (is_gpt_valid(dev_desc, pri_lba, gpt_head, &gpt_pte) == 1) {
+		gpt_head->alternate_lba = alternate;
+
 		ret = write_gpt_table(dev_desc, gpt_head, gpt_pte);
 		free(gpt_pte);
 		ret |= write_gpt_alternate(alternate);

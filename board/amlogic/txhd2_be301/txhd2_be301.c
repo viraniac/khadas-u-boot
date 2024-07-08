@@ -513,6 +513,7 @@ int board_late_init(void)
 #ifdef CONFIG_PXP_EMULATOR
         return 0;
 #endif
+	env_set("defenv_para", "-c -b0");
 	aml_board_late_init_front(NULL);
 
 #ifdef CONFIG_AML_VPU
@@ -566,9 +567,9 @@ phys_size_t get_effective_memsize(void)
 {
 	// >>16 -> MB, <<20 -> real size, so >>16<<20 = <<4
 #if defined(CONFIG_SYS_MEM_TOP_HIDE)
-	return (((readl(AO_SEC_GP_CFG0)) & 0xFFF80000) << 4) - CONFIG_SYS_MEM_TOP_HIDE;
+	return (((readl(AO_SEC_GP_CFG0)) & 0xFFF00000) << 4) - CONFIG_SYS_MEM_TOP_HIDE;
 #else
-	return (((readl(AO_SEC_GP_CFG0)) & 0xFFF80000) << 4);
+	return (((readl(AO_SEC_GP_CFG0)) & 0xFFF00000) << 4);
 #endif
 }
 
@@ -601,25 +602,39 @@ int checkhw(char * name)
 	unsigned long ddr_size = 0;
 	int i;
 	cpu_id_t cpu_id = get_cpu_id();
+	int sipinfo = ((((readl(AO_SEC_GP_CFG0)) & 0xFFF80000) >> 19) & 0x1);
 
 	for (i = 0; i < CONFIG_NR_DRAM_BANKS; i++)
 		ddr_size += gd->bd->bi_dram[i].size;
 #if defined(CONFIG_SYS_MEM_TOP_HIDE)
 	ddr_size += CONFIG_SYS_MEM_TOP_HIDE;
 #endif
-	printf("ddr_size is %lx\n", ddr_size);
+	printf("ddr_size is %lx, sipinfo = %d\n", ddr_size, sipinfo);
+
 	switch (ddr_size) {
 	case 0x20000000:
 		if (cpu_id.chip_rev == 0xA)
-			strcpy(loc_name, "txhd2-reva_t950s_be301-512m\0");
+			if (sipinfo == 0x0)
+				strcpy(loc_name, "txhd2-reva_t950s_be301-512m\0");
+			else
+				strcpy(loc_name, "txhd2-reva_t950s_be311-512m\0");
 		else
-			strcpy(loc_name, "txhd2_t950s_be301-512m\0");
+			if (sipinfo == 0x0)
+				strcpy(loc_name, "txhd2_t950s_be301-512m\0");
+			else
+				strcpy(loc_name, "txhd2_t950s_be311-512m\0");
 		break;
 	case 0x40000000:
 		if (cpu_id.chip_rev == 0xA)
-			strcpy(loc_name, "txhd2-reva_t950s_be301\0");
+			if (sipinfo == 0x0)
+				strcpy(loc_name, "txhd2-reva_t950s_be301\0");
+			else
+				strcpy(loc_name, "txhd2-reva_t950s_be311\0");
 		else
-			strcpy(loc_name, "txhd2_t950s_be301\0");
+			if (sipinfo == 0x0)
+				strcpy(loc_name, "txhd2_t950s_be301\0");
+			else
+				strcpy(loc_name, "txhd2_t950s_be311\0");
 		break;
 	default:
 		strcpy(loc_name, "txhd2_t950s_unsupport");
@@ -633,20 +648,9 @@ int checkhw(char * name)
 }
 #endif
 
-const char * const _env_args_reserve_[] =
-{
-		"aml_dt",
-		"firstboot",
-		"lock",
-		"upgrade_step",
-		"model_name",
-		"memsize",
-		"dts_to_gpt",
-		"fastboot_step",
-		"reboot_status",
-		"expect_index",
-
-		NULL//Keep NULL be last to tell END
+const char * const _board_env_reserv_array0[] = {
+	"model_name",
+	NULL//Keep NULL be last to tell END
 };
 
 int ft_board_setup(void *blob, bd_t *bd)

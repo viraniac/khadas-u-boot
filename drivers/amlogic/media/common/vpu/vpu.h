@@ -36,6 +36,29 @@ enum vpu_chip_e {
 	VPU_CHIP_MAX,
 };
 
+struct vpu_arb_table_s {
+	unsigned int vmod;
+	unsigned int reg;
+	//unsigned int val;
+	unsigned int bit;
+	unsigned int len;
+	unsigned int bind_port;
+	char *name;
+	unsigned int reqen_slv_reg;
+	unsigned int reqen_slv_bit;
+	unsigned int reqen_slv_len;
+};
+
+struct vpu_urgent_table_s {
+	unsigned int vmod;
+	unsigned int reg;
+	unsigned int port;
+	unsigned int val;
+	unsigned int start_bit;
+	unsigned int len;
+	char *name;
+};
+
 #define VPU_PWR_ON             1
 #define VPU_PWR_OFF            0
 #define VPU_PWR_ID_END         0xffff
@@ -70,6 +93,11 @@ enum vpu_mux_e {
 	VID2_PLL_CLK,
 	GPLL_CLK,
 	FCLK_DIV_MAX,
+};
+
+enum vpu_read_type_e {
+	READ0_2 = 0,
+	ONLY_READ0,
 };
 
 struct fclk_div_s {
@@ -108,6 +136,7 @@ struct vpu_data_s {
 	unsigned int vpu_clkb_reg;
 	unsigned int vapb_clk_reg;
 	unsigned int vid_clk_reg;
+	unsigned int vpu_read_type;
 
 	unsigned int *pwrctrl_id_table;
 
@@ -163,5 +192,6 @@ void vpu_power_off(void);
 void vpu_power_on_new(void);
 void vpu_power_off_new(void);
 void vpu_power_off_c3(void);
+int init_arb_urgent_table(void);
 
 #endif

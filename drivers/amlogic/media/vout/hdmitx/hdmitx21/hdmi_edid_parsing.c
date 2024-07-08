@@ -94,7 +94,7 @@ static int edid_check_valid(unsigned char *buf)
 	unsigned int i = 0;
 
 	/* check block 0 first 8 bytes */
-	if (buf[0] != 0 && buf[7] != 0)
+	if (buf[0] != 0 || buf[7] != 0)
 		return 0;
 	for (i = 1; i < 7; i++) {
 		if (buf[i] != 0xff)
@@ -134,29 +134,35 @@ static int _check_edid_blk_chksum(unsigned char *block)
 {
 	unsigned int chksum = 0;
 	unsigned int i = 0;
+	struct hdmitx_dev *hdev = get_hdmitx21_device();
 
-	for (chksum = 0, i = 0; i < 0x80; i++)
-		chksum += block[i];
-	if ((chksum & 0xff) != 0)
-		return 0;
-	else
-		return 1;
+	if (!(hdev->edid_check & 0x02)) {
+		for (chksum = 0, i = 0; i < 0x80; i++)
+			chksum += block[i];
+		if ((chksum & 0xff) != 0)
+			return 0;
+	}
+	return 1;
 }
 
 /* check the first edid block */
 static int _check_base_structure(unsigned char *buf)
 {
 	unsigned int i = 0;
+	struct hdmitx_dev *hdev = get_hdmitx21_device();
 
-	/* check block 0 first 8 bytes */
-	if (buf[0] != 0 && buf[7] != 0)
-		return 0;
-
-	for (i = 1; i < 7; i++) {
-		if (buf[i] != 0xff)
+	if (!(hdev->edid_check & 0x01)) {
+		/* check block 0 first 8 bytes */
+		if (buf[0] != 0 || buf[7] != 0)
 			return 0;
+
+		for (i = 1; i < 7; i++) {
+			if (buf[i] != 0xff)
+				return 0;
+		}
 	}
 
+	/* check block 0 checksum */
 	if (_check_edid_blk_chksum(buf) == 0)
 		return 0;
 
@@ -172,6 +178,7 @@ static int check_dvi_hdmi_edid_valid(unsigned char *buf)
 {
 	int i;
 	int blk_cnt = buf[0x7e] + 1;
+	struct hdmitx_dev *hdev = get_hdmitx21_device();
 
 	/* limit blk_cnt to EDID_BLK_NO  */
 	if (blk_cnt > EDID_BLK_NO)
@@ -186,8 +193,10 @@ static int check_dvi_hdmi_edid_valid(unsigned char *buf)
 
 	/* check extension block 1 and more */
 	for (i = 1; i < blk_cnt; i++) {
-		if (buf[i * 0x80] == 0)
-			return 0;
+		if (!(hdev->edid_check & 0x01)) {
+			if (buf[i * 0x80] == 0)
+				return 0;
+		}
 		if (_check_edid_blk_chksum(&buf[i * 0x80]) == 0)
 			return 0;
 	}
@@ -834,9 +843,8 @@ static int edid_y420cmdb_postprocess(struct rx_cap *prxcap)
 		p = &prxcap->y420cmdb_bitmap[i];
 		for (j = 0; j < 8; j++) {
 			valid = ((*p >> j) & 0x1);
-			vic = prxcap->VIC[i * 8 + j];
+			vic = prxcap->SVD_VIC[i * 8 + j];
 			if (valid != 0 && _is_y420_vic(vic)) {
-				store_cea_idx(prxcap, vic);
 				store_y420_idx(prxcap, vic);
 			}
 		}
@@ -927,7 +935,6 @@ static void hdmitx_parse_sink_capability(struct rx_cap *prxcap,
 	prxcap->allm = !!(blockbuf[offset + 7] & (1 << 1));
 	prxcap->fva = !!(blockbuf[offset + 7] & (1 << 2));
 	prxcap->neg_mvrr = !!(blockbuf[offset + 7] & (1 << 3));
-	prxcap->cinemavrr = !!(blockbuf[offset + 7] & (1 << 4));
 	prxcap->mdelta = !!(blockbuf[offset + 7] & (1 << 5));
 	prxcap->qms = !!(blockbuf[offset + 7] & (1 << 6));
 	prxcap->fapa_end_extended = !!(blockbuf[offset + 7] & (1 << 7));
@@ -1055,16 +1062,6 @@ static int hdmitx_edid_cta_block_parse(struct rx_cap *prxcap,
 	int i, idx;
 	unsigned char *vfpdb_offset = NULL;
 
-	/* CEA-861 implementations are required to use Tag = 0x02
-	 * for the CEA Extension Tag and Sources should ignore
-	 * Tags that are not understood. but for Samsung LA32D400E1
-	 * its extension tag is 0x0 while other bytes normal,
-	 * so continue parse as other sources do
-	 */
-	if (blockbuf[0] == 0x0)
-		printf("unknown Extension Tag detected, continue\n");
-	else if (blockbuf[0] != 0x02)
-		return -1; /* not a CEA BLOCK. */
 	end = blockbuf[2]; /* CEA description. */
 	prxcap->native_Mode = blockbuf[1] >= 2 ? blockbuf[3] : 0;
 	prxcap->number_of_dtd += blockbuf[1] >= 2 ? (blockbuf[3] & 0xf) : 0;
@@ -1074,10 +1071,17 @@ static int hdmitx_edid_cta_block_parse(struct rx_cap *prxcap,
 	 * in addition to RGB
 	 */
 	prxcap->pref_colorspace = blockbuf[3] & 0x30;
-
+	/* Initialize SVD_VIC used for SVD storage in the video data block */
+	prxcap->SVD_VIC_count = 0;
+	memset(prxcap->SVD_VIC, 0, sizeof(prxcap->SVD_VIC));
 	/* prxcap->native_VIC = 0xff; */
 	if (end > 127)
 		return 0;
+	if (blockbuf[1] <= 2) {
+		/* skip below for loop */
+		goto next;
+	}
+
 	for (offset = 4 ; offset < end ; ) {
 		tag = blockbuf[offset] >> 5;
 		count = blockbuf[offset] & 0x1f;
@@ -1102,8 +1106,12 @@ static int hdmitx_edid_cta_block_parse(struct rx_cap *prxcap,
 					VIC &= (~0x80);
 					prxcap->native_VIC = VIC;
 				}
-				prxcap->VIC[prxcap->VIC_count] = VIC;
-				prxcap->VIC_count++;
+				/* The SVD in the video data block is stored in SVD_VIC
+				 * and mapped with 420 CMDB
+				 */
+				prxcap->SVD_VIC[prxcap->SVD_VIC_count] = VIC;
+				prxcap->SVD_VIC_count++;
+				store_cea_idx(prxcap, VIC);
 			}
 			offset += count;
 			break;
@@ -1189,7 +1197,7 @@ static int hdmitx_edid_cta_block_parse(struct rx_cap *prxcap,
 			break;
 		}
 	}
-
+next:
 	edid_y420cmdb_postprocess(prxcap);
 	idx = blockbuf[3] & 0xf;
 	for (i = 0; i < idx; i++)
@@ -1224,6 +1232,17 @@ static bool is_4k60_supported(struct rx_cap *prxcap)
 			return true;
 		}
 	}
+	return false;
+}
+
+bool is_support_y422(struct rx_cap *prxcap)
+{
+	if (!prxcap)
+		return false;
+
+	if (prxcap->native_Mode & (1 << 4))
+		return true;
+
 	return false;
 }
 
@@ -1294,6 +1313,7 @@ unsigned int hdmi_edid_parsing(unsigned char *edid_buf, struct rx_cap *prxcap)
 	int idx[4];
 	struct dv_info *dv = &prxcap->dv_info;
 	unsigned char cta_block_count;
+	struct hdmitx_dev *hdev = get_hdmitx21_device();
 
 	/* Clear all parsing data */
 	memset(prxcap, 0, sizeof(struct rx_cap));
@@ -1309,13 +1329,14 @@ unsigned int hdmi_edid_parsing(unsigned char *edid_buf, struct rx_cap *prxcap)
 
 	cta_block_count = edid_buf[0x7E];
 	/* HF-EEODB */
-	if (edid_buf[128 + 4] == 0xe2 && edid_buf[128 + 5] == 0x78)
+	if (cta_block_count && edid_buf[128 + 4] == 0xe2 &&
+		edid_buf[128 + 5] == 0x78)
 		cta_block_count = edid_buf[128 + 6];
 	/* limit cta_block_count to EDID_MAX_BLOCK - 1 */
 	if (cta_block_count > EDID_MAX_BLOCK - 1)
 		cta_block_count = EDID_MAX_BLOCK - 1;
 	for (i = 1; i <= cta_block_count; i++) {
-		if (edid_buf[i * 0x80] == 0x02)
+		if (edid_buf[i * 0x80] == 0x02 || hdev->edid_check & 0x01)
 			hdmitx_edid_cta_block_parse(prxcap, &edid_buf[i * 0x80]);
 	}
 	check_dv_truly_support(prxcap, dv);
@@ -1793,6 +1814,7 @@ enum hdmi_vic hdmitx21_get_prefer_vic(struct hdmitx_dev *hdev, enum hdmi_vic vic
 			return HDMI_0_UNKNOWN;
 		}
 	}
+
 	return vic;
 }
 
@@ -1836,6 +1858,14 @@ bool hdmitx_edid_check_valid_mode(struct hdmitx_dev *hdev,
 			return 0;
 		}
 	}
+	/* add efuse ctrl */
+	if (hdev->efuse_dis_output_4k)
+		if (para->timing.v_active >= 2160)
+			return false;
+	if (hdev->efuse_dis_hdmi_4k60)
+		if (para->timing.v_active >= 2160 && para->timing.v_freq >= 50000)
+			return false;
+
 	if (!is_support_4k() && para->sname && is_4k_fmt(para->sname))
 		return false;
 	/* exclude such as: 2160p60hz YCbCr444 10bit */
@@ -1853,15 +1883,18 @@ bool hdmitx_edid_check_valid_mode(struct hdmitx_dev *hdev,
 				hdev->tx_max_frl_rate == FRL_NONE))
 				return 0;
 		break;
+	case HDMI_6_720x480i60_4x3:
 	case HDMI_7_720x480i60_16x9:
+	case HDMI_21_720x576i50_4x3:
 	case HDMI_22_720x576i50_16x9:
 		if (para->cs == HDMI_COLORSPACE_YUV422)
 			return 0;
+		break;
 	default:
 		break;
 	}
 
-	/* DVI case, only 8bit */
+	/* DVI case, only rgb,8bit */
 	if (prxcap->IEEEOUI != HDMI_IEEEOUI) {
 		if (para->cd != COLORDEPTH_24B || para->cs != HDMI_COLORSPACE_RGB)
 			return 0;
@@ -1872,7 +1905,7 @@ bool hdmitx_edid_check_valid_mode(struct hdmitx_dev *hdev,
 	 * in hdmitx_timing table, so when match name, will return
 	 * 4x3 or 64x27 mode fist. But user prefer 16x9 first, so try 16x9 first;
 	 */
-	vic = hdmitx21_get_prefer_vic(hdev, para->timing.vic);
+	vic = hdmitx21_get_prefer_vic(hdev, para->timing.vic & 0xff);
 	/* check if vic supported by RX */
 	if (hdmitx21_edid_validate_mode(hdev, vic))
 		svd_flag = 1;

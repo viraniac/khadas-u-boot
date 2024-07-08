@@ -55,12 +55,28 @@ struct hdmitx_dev {
 	enum mode_type hdmi_current_tunnel_mode;
 	/* Add dongle_mode, clock, phy may be different from mbox */
 	unsigned int dongle_mode;
+	/* edid_check = 0 is default check
+	 * Bit 0     (0x01)  don't check block header
+	 * Bit 1     (0x02)  don't check edid checksum
+	 * Bit 0+1   (0x03)  don't check both block header and checksum
+	 */
+	unsigned int edid_check;
 	unsigned char limit_res_1080p;
 	unsigned char enc_idx;
 	int dv_en;
+	int qms_en; /* qms function enable */
+	enum hdmi_vic brr_vic; /* qms BRR vic */
 	unsigned char pxp_mode; /* for running at pxp only */
 	enum amhdmitx_chip_e chip_type;
 	bool hpd_state;
+	/* efuse ctrl state
+	 * 1 disable the function
+	 * 0 dont disable the function
+	 */
+	bool efuse_dis_hdmi_4k60;	/* 4k50,60hz */
+	bool efuse_dis_output_4k;	/* all 4k resolution */
+	bool efuse_dis_hdcp_tx22;	/* hdcptx22 */
+	bool efuse_dis_hdmi_tx3d;	/* 3d */
 };
 
 struct hdmitx_dev *get_hdmitx21_device(void);
@@ -121,7 +137,7 @@ bool is_dolby_enabled(void);
 bool is_tv_support_dv(struct hdmitx_dev *hdev);
 bool is_dv_preference(struct hdmitx_dev *hdev);
 bool is_hdr_preference(struct hdmitx_dev *hdev);
-void dolbyvision_scene_process(hdmi_data_t *hdmi_data,
+int dolbyvision_scene_process(hdmi_data_t *hdmi_data,
 	scene_output_info_t *output_info);
 void sdr_scene_process(hdmi_data_t *hdmi_data,
 	scene_output_info_t *output_info);
@@ -153,6 +169,8 @@ void hdmitx_set_drm_pkt(struct master_display_info_s *data);
 void hdmitx_set_vsif_pkt(enum eotf_type type, enum mode_type tunnel_mode,
 	struct dv_vsif_para *data);
 bool is_hdmi_mode(char *mode);
+void vrr_init_qms_para(struct hdmitx_dev *hdev);
+enum hdmi_vic hdmitx_find_brr_vic(enum hdmi_vic vic);
 
 /* the hdmitx output limits to 1080p */
 bool is_hdmitx_limited_1080p(void);
@@ -163,6 +181,7 @@ bool hdmitx_edid_check_valid_mode(struct hdmitx_dev *hdev,
 void hdmitx_dsc_cvtem_pkt_send(struct dsc_pps_data_s *pps,
 	struct hdmi_timing *timing);
 void hdmitx_dsc_cvtem_pkt_disable(void);
+enum hdmi_vic hdmitx21_get_prefer_vic(struct hdmitx_dev *hdev, enum hdmi_vic vic);
 #undef printk
 #define printk printf
 #undef pr_info

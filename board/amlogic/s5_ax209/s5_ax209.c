@@ -36,6 +36,7 @@
 #include <linux/mtd/partitions.h>
 #include <asm/arch/bl31_apis.h>
 #include <amlogic/board.h>
+#include <asm/arch/stick_mem.h>
 #ifdef CONFIG_AML_VPU
 #include <amlogic/media/vpu/vpu.h>
 #endif
@@ -162,8 +163,8 @@ int board_init(void)
 #endif
 #endif
 	pinctrl_devices_active(PIN_CONTROLLER_NUM);
-	/*set vcc5V*/
-	run_command("gpio set GPIOH_1", 0);
+	/* set VCC_5V */
+	run_command("gpio input GPIOC_7", 0);
 	return 0;
 #endif
 }
@@ -171,12 +172,14 @@ int board_init(void)
 int board_late_init(void)
 {
 	printf("board late init\n");
+	env_set("defenv_para", "-c");
 	aml_board_late_init_front(NULL);
+	get_stick_reboot_flag_mbx();
 
 #ifdef CONFIG_AML_HDMITX21
 	printf("hdmitx21_init\n");
-	hdmitx21_init();
 	hdmitx21_chip_type_init(MESON_CPU_ID_S5);
+	hdmitx21_init();
 #endif
 
 #ifdef CONFIG_AML_VPU
@@ -416,18 +419,6 @@ const struct mtd_partition *get_partition_table(int *partitions)
 	return spinand_partitions;
 }
 #endif /* CONFIG_SPI_NAND */
-
-const char * const _env_args_reserve_[] = {
-	"lock",
-	"upgrade_step",
-	"bootloader_version",
-	"dts_to_gpt",
-	"fastboot_step",
-	"reboot_status",
-	"expect_index",
-
-	NULL//Keep NULL be last to tell END
-};
 
 int __attribute__((weak)) mmc_initialize(bd_t *bis){ return 0;}
 

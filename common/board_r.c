@@ -50,6 +50,9 @@
 #include <efi_loader.h>
 #include <amlogic/storage.h>
 #include <amlogic/pm.h>
+#ifdef CONFIG_ARMV8_MULTIENTRY
+#include <asm/arch-meson/smp.h>
+#endif
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -109,6 +112,12 @@ static int initr_caches(void)
 {
 	/* Enable caches */
 	enable_caches();
+	return 0;
+}
+
+static int initr_mmu_update_text_attr(void)
+{
+	mmu_update_text_attr();
 	return 0;
 }
 #endif
@@ -306,14 +315,18 @@ static int initr_dm(void)
 		return ret;
 #endif
 
+#ifdef CONFIG_ARMV8_MULTIENTRY
+	cpu_smp_init_r();
+#endif
 	return 0;
 }
 #endif
 
 static int initr_pm(void)
 {
+#ifdef CONFIG_CPU_PM
 	pm_initialize();
-
+#endif
 	return 0;
 }
 
@@ -706,6 +719,9 @@ static init_fnc_t init_sequence_r[] = {
 	 */
 #endif
 	initr_reloc_global_data,
+#ifdef CONFIG_ARM
+	initr_mmu_update_text_attr,
+#endif
 #if defined(CONFIG_SYS_INIT_RAM_LOCK) && defined(CONFIG_E500)
 	initr_unlock_ram_in_cache,
 #endif

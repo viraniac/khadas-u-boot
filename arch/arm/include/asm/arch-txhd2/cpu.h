@@ -84,4 +84,5 @@
 
 #define CONFIG_KEY_PRESERVE		1
 
+#define  CONFIG_AML_DEFENDKEY   1
 #endif /* _CPU_H */

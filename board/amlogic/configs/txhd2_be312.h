@@ -87,11 +87,19 @@
 #define CONFIG_ADC_POWER_KEY_VAL    0  /*sample value range: 0-1023*/
 
 #define CONFIG_SILENT_CONSOLE
+#ifdef CONFIG_NOVERBOSE_BUILD
+#define SILENT		"silent=1\0"
+#define KERNL_LOGLEVEL	"loglevel=2 "
+#else
+#define SILENT		"silent=0\0"
+#define KERNL_LOGLEVEL	"loglevel=7 "
+#endif
+
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	CONFIG_EXTRA_ENV_SETTINGS_BASE \
-		"silent=0\0"\
+		SILENT \
 		"systemsuspend_switch=0\0"\
 		"ddr_resume=0\0"\
 		"otg_device=1\0" \
@@ -129,8 +137,6 @@
 	"board=t950s\0"\
 		"suspend=off\0"\
 		"powermode=on\0"\
-		"ffv_wake=off\0"\
-		"ffv_freeze=off\0"\
         "edid_14_dir=/odm/etc/tvconfig/hdmi/port_14.bin\0" \
         "edid_20_dir=/odm/etc/tvconfig/hdmi/port_20.bin\0" \
         "edid_14_dir_dynamic=/odm_ext/etc/tvconfig/hdmi/port_14.bin\0" \
@@ -148,7 +154,7 @@
 		"\0"\
         "initargs="\
 			"init=/init console=ttyS0,115200 no_console_suspend "\
-			"earlycon=aml_uart,0xff803000 loglevel=7 "\
+			"earlycon=aml_uart,0xff803000 " KERNL_LOGLEVEL \
 			"printk.devkmsg=on ramoops.pstore_en=1 ramoops.record_size=0x8000 "\
 			"ramoops.console_size=0x4000 loop.max_part=4 scramble_reg=0xff6345c4 "\
             "\0"\
@@ -184,13 +190,7 @@
                 "fi;"\
             "fi;"\
             "\0"\
-	"ffv_freeze_action="\
-		"run cec_init;"\
-		"setenv ffv_freeze on;"\
-		"setenv bootargs ${bootargs} ffv_freeze=on"\
-		"\0"\
 	"cold_boot_normal_check="\
-		"setenv bootargs ${bootargs} ffv_freeze=off; "\
 		/*"run try_auto_burn;uboot wake up "*/\
 		"if test ${powermode} = on; then "\
 			/*"run try_auto_burn; "*/\
@@ -211,51 +211,27 @@
 		"fi; fi; fi; "\
 		"\0"\
 	"switch_bootmode="\
-		"setenv ffv_freeze off;"\
 		"echo reboot_mode : ${reboot_mode};"\
 		"if test ${reboot_mode} = factory_reset; then "\
-				"run recovery_from_flash;"\
+			"run recovery_from_flash;"\
 		"else if test ${reboot_mode} = update; then "\
-				"run update;"\
+			"run update;"\
 		"else if test ${reboot_mode} = quiescent; then "\
-				"setenv bootconfig ${bootconfig} androidboot.quiescent=1;"\
+			"setenv bootconfig ${bootconfig} androidboot.quiescent=1;"\
 		"else if test ${reboot_mode} = recovery_quiescent; then "\
-				"setenv bootconfig ${bootconfig} androidboot.quiescent=1;"\
-				"run recovery_from_flash;"\
+			"setenv bootconfig ${bootconfig} androidboot.quiescent=1;"\
+			"run recovery_from_flash;"\
 		"else if test ${reboot_mode} = cold_boot; then "\
-			"echo cold boot: ffv_wake=${ffv_wake} "\
 			"powermode=${powermode} suspend=${suspend};"\
-			"if test ${ffv_wake} = on; then "\
-				"if test ${powermode} = on; then "\
-					"setenv bootargs ${bootargs} ffv_freeze=off; "\
-				"else if test ${powermode} = standby; then "\
-					"run ffv_freeze_action; "\
-				"else if test ${powermode} = last; then "\
-					"if test ${suspend} = off; then "\
-						"setenv bootargs ${bootargs} ffv_freeze=off; "\
-					"else if test ${suspend} = on; then "\
-						"run ffv_freeze_action; "\
-					"else if test ${suspend} = shutdown; then "\
-						"run ffv_freeze_action; "\
-					"fi; fi; fi; "\
-				"fi; fi; fi; "\
-			"else "\
-				"run cold_boot_normal_check;"\
-			"fi; "\
-		"else if test ${reboot_mode} = ffv_reboot; then "\
-			"if test ${ffv_wake} = on; then "\
-				"run ffv_freeze_action; "\
-			"fi; "\
+			"run cold_boot_normal_check;"\
 		"else if test ${reboot_mode} = fastboot; then "\
 			"fastboot 1;"\
 		"fi;fi;fi;fi;fi;fi;fi;"\
 		"\0" \
 	"reset_suspend="\
-		"if test ${ffv_freeze} != on; then "\
-			"if test ${suspend} = on || test ${suspend} = shutdown; then "\
-				"setenv suspend off;"\
-				"saveenv;"\
-			"fi;"\
+		"if test ${suspend} = on || test ${suspend} = shutdown; then "\
+			"setenv suspend off;"\
+			"saveenv;"\
 		"fi;"\
 		"\0" \
 		"storeboot="\
@@ -304,12 +280,9 @@
 		"\0"\
 	"check_display="\
 		"echo check_display reboot_mode : ${reboot_mode} ,powermode : ${powermode};"\
+		"setenv ddr_resume 0; "\
 		"if test ${reboot_mode} = ffv_reboot; then "\
-			"if test ${ffv_wake} = on; then "\
-				"echo ffv reboot no display; "\
-			"else "\
-				"run init_display; "\
-			"fi; "\
+			"run init_display; "\
 		"else if test ${reboot_mode} = cold_boot; then "\
 			"if test ${powermode} = standby; then "\
 				"setenv ddr_resume 1;"\

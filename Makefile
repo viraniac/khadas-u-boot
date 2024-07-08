@@ -404,6 +404,12 @@ export CFLAGS_UASAN
 
 endif
 
+ifeq ("$(CONFIG_NOVERBOSE_BUILD)", "1")
+KBUILD_CFLAGS += -DCONFIG_NOVERBOSE_BUILD
+CFLAGS += -DCONFIG_NOVERBOSE_BUILD
+export CFLAGS
+endif
+
 # Don't generate position independent code
 KBUILD_CFLAGS	+= $(call cc-option,-fno-PIE)
 KBUILD_AFLAGS	+= $(call cc-option,-fno-PIE)
@@ -1649,7 +1655,8 @@ define filechk_version.h
 	echo \#define ACS_VERSION \"$(ACSRELEASE)\"; \
 	echo \#define U_BOOT_VERSION \"U-Boot \" PLAIN_VERSION; \
 	echo \#define CC_VERSION_STRING \"$$(LC_ALL=C $(CC) --version | head -n 1)\"; \
-	echo \#define LD_VERSION_STRING \"$$(LC_ALL=C $(LD) --version | head -n 1)\"; )
+	echo \#define LD_VERSION_STRING \"$$(LC_ALL=C $(LD) --version | head -n 1)\"; \
+	echo \#define COMPILE_USER \"${USER}\";)
 endef
 
 # The SOURCE_DATE_EPOCH mechanism requires a date that behaves like GNU date.

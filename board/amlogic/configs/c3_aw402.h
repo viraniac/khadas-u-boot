@@ -56,17 +56,24 @@
 //#define CONFIG_BOOTLOADER_CONTROL_BLOCK
 #endif// #ifndef CONFIG_PXP_DDR
 
+#define CONFIG_DTB_BIND_KERNEL
 #ifdef CONFIG_DTB_BIND_KERNEL	//load dtb from kernel, such as boot partition
 #define CONFIG_DTB_LOAD  "imgread dtb ${boot_part} ${dtb_mem_addr}"
 #else
 #define CONFIG_DTB_LOAD  "imgread dtb _aml_dtb ${dtb_mem_addr}"
 #endif//#ifdef CONFIG_DTB_BIND_KERNEL	//load dtb from kernel, such as boot partition
 
+#ifdef CONFIG_NOVERBOSE_BUILD
+#define SILENT		"silent=1\0"
+#else
+#define SILENT		"silent=0\0"
+#endif
+
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"firstboot=1\0"\
-	"silent=1\0"\
+	SILENT \
 	"upgrade_step=0\0"\
 	"initrd_high=0xF800000\0"\
 	"fdt_high=0xF800000\0"\
@@ -130,13 +137,13 @@
 		"\0" \
 	"storeboot="\
 		"run storage_param;"\
-		"imgread dtb _aml_dtb ${dtb_mem_addr};"\
+		"run common_dtb_load;"\
 		"imgread kernel ${boot_part} ${loadaddr_kernel};"\
 		"store read 0x01a80000 system 0 0x300000;bootm ${loadaddr_kernel};"\
 		"\0" \
 	"storeboot_ramdisk="\
 		"run storage_param;"\
-		"imgread dtb _aml_dtb ${dtb_mem_addr};"\
+		"run common_dtb_load;"\
 		"imgread kernel ${boot_part} ${loadaddr_kernel};"\
 		"store read 0x01a80000 system 0 0x300000;bootm ${loadaddr_kernel};"\
 		"\0" \
@@ -263,7 +270,22 @@
 #error CONFIG_SPI_NAND/CONFIG_MTD_SPI_NAND/CONFIG_MESON_NFC can not support at the sametime;
 #endif
 
-#define BOARD_DDRFIP_SIZE		0x1c0000
+/* mtd advance mode layout board config */
+#define BOARD_DEVFIP_SIZE	0xdf000
+#define BOARD_BL2EX_BACKUPS	4
+#define BOARD_DDRFIP_SIZE	0x1c0000
+#define BOARD_DEVFIP_BACKUPS	2
+
+#define BOARD_NAND_RSV_CONFIG
+#ifdef BOARD_NAND_RSV_CONFIG
+#define	NAND_RSV_BLOCK_NUM	24
+#define	NAND_GAP_BLOCK_NUM	4
+#define	NAND_BBT_BLOCK_NUM	4
+#define	NAND_ENV_BLOCK_NUM	4
+#define	NAND_KEY_BLOCK_NUM	4
+#define	NAND_DTB_BLOCK_NUM	4
+#define	NAND_DDR_BLOCK_NUM	4
+#endif
 
 /* #define		CONFIG_AML_SD_EMMC 1 */
 #ifdef CONFIG_AML_SD_EMMC
@@ -367,6 +389,7 @@
 #define CONFIG_SYS_MEM_TOP_HIDE		0x001000000
 
 #define CONFIG_CPU_ARMV8
+#define CONFIG_USEMMU_BOARDF
 
 /* define CONFIG_UPDATE_MMU_TABLE for need update mmu */
 #define CONFIG_UPDATE_MMU_TABLE
@@ -381,9 +404,9 @@
 //#define CONFIG_CMD_STARTDSP
 
 //use hardware sha2
-//#define CONFIG_AML_HW_SHA2
+#define CONFIG_AML_HW_SHA2
 
-//#define CONFIG_MULTI_DTB    1
+#define CONFIG_MULTI_DTB    1
 
 /* support secure boot */
 #define CONFIG_AML_SECURE_UBOOT   1
@@ -414,7 +437,8 @@
 #undef CONFIG_BOOTM_PLAN9
 #undef CONFIG_BOOTM_RTEMS
 #undef CONFIG_BOOTM_VXWORKS
-#undef CONFIG_BZIP2
+//#undef CONFIG_BZIP2
 
+#define CONFIG_REDUCE_CODE_SIZE
 #endif
 

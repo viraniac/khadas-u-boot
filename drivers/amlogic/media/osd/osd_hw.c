@@ -63,6 +63,9 @@ static void independ_path_default_regs(void);
 static void fix_vpu_clk2_default_regs(void);
 
 static int pi_enable;
+#define BLEND_DOUT_DEF_HSIZE 3840
+#define BLEND_DOUT_DEF_VSIZE 2160
+
 struct fb_layout_s fb_layout[VPU_VPP_MAX];
 
 #ifdef AML_C3_DISPLAY
@@ -1413,6 +1416,8 @@ void osd_setting_default_hwc(u32 index, struct pandata_s *disp_data)
 		      (postbld_src3_sel & 0xf) << 0 |
 		      (postbld_osd1_premult & 0x1) << 4);
 #else
+	if (is_keystone_enable_for_txhd2())
+		postbld_src3_sel = 0;
 	osd_reg_write(OSD1_BLEND_SRC_CTRL,
 		      (0 & 0xf) << 0 |
 		      (0 & 0x1) << 4 |
@@ -1529,9 +1534,16 @@ void osd_update_blend(struct pandata_s *disp_data)
 	u32 blend_width, blend_height;
 #endif
 	int vmode = -1;
+#ifdef AML_S5_DISPLAY
+	u32 blend_dout_hsize, blend_dout_vsize;
+	struct vinfo_s *vinfo = NULL;
+#endif
 
 #ifdef CONFIG_AML_VOUT
 	vmode = vout_get_current_vmode();
+#ifdef AML_S5_DISPLAY
+	vinfo = vout_get_current_vinfo();
+#endif
 #endif
 	switch (vmode) {
 	/* case VMODE_LCD: */
@@ -1565,18 +1577,41 @@ void osd_update_blend(struct pandata_s *disp_data)
 #ifdef AML_S5_DISPLAY
 	blend_width = osd_hw.free_dst_data[0].x_end - osd_hw.free_dst_data[0].x_start + 1;
 	blend_height = osd_hw.free_dst_data[0].y_end - osd_hw.free_dst_data[0].y_start + 1;
-	osd_reg_write(VIU_OSD_BLEND_DIN1_SCOPE_H, (blend_width - 1) << 16);
-	osd_reg_write(VIU_OSD_BLEND_DIN1_SCOPE_V, (blend_height - 1) << 16);
+	if (width > 3840 && height > 2160) {
+		blend_dout_hsize = BLEND_DOUT_DEF_HSIZE;
+		blend_dout_vsize = BLEND_DOUT_DEF_VSIZE;
+	} else {
+		blend_dout_hsize = ALIGN(blend_width, 4);
+		blend_dout_vsize = blend_height;
+	}
+
+	if (width > 3840 && height > 2160) {
+		osd_reg_write(VIU_OSD_BLEND_DIN1_SCOPE_H,
+			osd_hw.free_dst_data[0].x_end << 16 | osd_hw.free_dst_data[0].x_start);
+		osd_reg_write(VIU_OSD_BLEND_DIN1_SCOPE_V,
+			osd_hw.free_dst_data[0].y_end << 16 | osd_hw.free_dst_data[0].y_start);
+		osd_reg_write(VPP_OSD1_BLD_H_SCOPE, vinfo->width - 1);
+		osd_reg_write(VPP_OSD1_BLD_V_SCOPE, vinfo->height - 1);
+	} else {
+		osd_reg_write(VIU_OSD_BLEND_DIN1_SCOPE_H, (blend_width - 1) << 16);
+		osd_reg_write(VIU_OSD_BLEND_DIN1_SCOPE_V, (blend_height - 1) << 16);
+		osd_reg_write(VPP_OSD1_BLD_H_SCOPE,
+			disp_data->x_start << 16 | disp_data->x_end);
+		osd_reg_write(VPP_OSD1_BLD_V_SCOPE,
+			disp_data->y_start << 16 | disp_data->y_end);
+	}
+
 	osd_reg_write(VIU_OSD_BLEND_BLEND0_SIZE,
-			blend_height << 16 | ALIGN(blend_width, 4));
+			blend_dout_vsize << 16 | blend_dout_hsize);
 	osd_reg_write(OSD_BLEND_DOUT0_SIZE,
-			blend_height << 16 | ALIGN(blend_width, 4));
-#endif
+			blend_dout_vsize << 16 | blend_dout_hsize);
+#else
 	/* setting blend scope */
 	osd_reg_write(VPP_OSD1_BLD_H_SCOPE,
 		disp_data->x_start << 16 | disp_data->x_end);
 	osd_reg_write(VPP_OSD1_BLD_V_SCOPE,
 		disp_data->y_start << 16 | disp_data->y_end);
+#endif
 	osd_reg_write(VPP_OUT_H_V_SIZE,
 			width << 16 | height);
 
@@ -4313,8 +4348,38 @@ void vpp_post_blend_set(u32 vpp_index,
 		__func__, vpp_blend->bld_out_w | vpp_blend->bld_out_h << 16);
 }
 
+void vpp1_post_blend_set(struct vpp1_post_blend_s *vpp_blend)
+{
+	VSYNCOSD_WR_MPEG_REG(VPP1_BLEND_H_V_SIZE,
+			vpp_blend->bld_out_w | vpp_blend->bld_out_h << 16);
+	VSYNCOSD_WR_MPEG_REG(VPP1_BLEND_BLEND_DUMMY_DATA,
+			vpp_blend->bld_dummy_data);
+	VSYNCOSD_WR_MPEG_REG_BITS(VPP1_BLEND_DUMMY_ALPHA,
+				0x100 | 0x000 << 16, 0, 32);
+	VSYNCOSD_WR_MPEG_REG_BITS(VPP1_BLEND_DUMMY_ALPHA1,
+				0x000 | 0x000 << 16, 0, 32);
+	VSYNCOSD_WR_MPEG_REG(VPP1_BLD_CTRL,
+			vpp_blend->bld_out_en << 31 |
+			vpp_blend->vpp1_dpath_sel << 30 |
+			vpp_blend->vd3_dpath_sel << 29 |
+			vpp_blend->bld_din0_alpha << 20 |
+			vpp_blend->bld_din0_premult_en << 16 |
+			vpp_blend->bld_din1_premult_en << 17 |
+			vpp_blend->bld_src2_sel << 4 |
+			vpp_blend->bld_src1_sel);
+
+	osd_logd2("%s: vpp1_postblend_h_v_size=%x\n",
+		__func__, vpp_blend->bld_out_w | vpp_blend->bld_out_h << 16);
+	osd_logd2("%s: vpp1_postblend_vd1_h_start_end=%x\n",
+		__func__, vpp_blend->bld_din0_h_start << 16 |
+		vpp_blend->bld_din0_h_end);
+	osd_logd2("%s: vpp1_postblend_vd1_v_start_end=%x\n",
+		__func__, vpp_blend->bld_din0_v_start << 16 |
+		vpp_blend->bld_din0_v_end);
+}
+
 void vpp_post_slice_set(u32 vpp_index,
-	struct vpp_post_s *vpp_post)
+	struct vpp0_post_s *vpp_post)
 {
 	u32 slice_set;
 
@@ -4351,7 +4416,7 @@ void vpp_post_slice_set(u32 vpp_index,
 }
 
 void vpp_vd1_hwin_set(u32 vpp_index,
-	struct vpp_post_s *vpp_post)
+	struct vpp0_post_s *vpp_post)
 {
 	u32 vd1_win_in_hsize = 0;
 
@@ -4370,7 +4435,7 @@ void vpp_vd1_hwin_set(u32 vpp_index,
 }
 
 void vpp_post_proc_set(u32 vpp_index,
-	struct vpp_post_s *vpp_post)
+	struct vpp0_post_s *vpp_post)
 {
 	struct vpp_post_proc_s *vpp_post_proc = NULL;
 	struct vpp_post_proc_slice_s *vpp_post_proc_slice = NULL;
@@ -4407,8 +4472,32 @@ void vpp_post_proc_set(u32 vpp_index,
 	}
 }
 
+void vpp1_post_proc_set(struct vpp1_post_s *vpp_post)
+{
+	u32 vpp1_slice = 1;
+	u32 align_fifo_size[POST_SLICE_NUM] = {2048, 1536, 1024, 512};
+
+	/* slice mode */
+	VSYNCOSD_WR_MPEG_REG_BITS(VPP_OBUF_RAM_CTRL, 1, 0, 2);
+	if (!vpp_post->vpp1_bypass_slice1) {
+		/* slice1 vpp output need set */
+		VSYNCOSD_WR_MPEG_REG(VPP_SLICE1_OUT_H_V_SIZE,
+				vpp_post->vpp1_post_blend.bld_out_w << 16 |
+				vpp_post->vpp1_post_blend.bld_out_h);
+		VSYNCOSD_WR_MPEG_REG_BITS(VPP_SLICE1_OFIFO_SIZE,
+					0x800, 0, 14);
+		/* slice1 hwin disable */
+		VSYNCOSD_WR_MPEG_REG_BITS(VPP_SLICE1_SLC_DEAL_CTRL,
+					0, 3, 1);
+		VSYNCOSD_WR_MPEG_REG_BITS(VPP_SLICE1_ALIGN_FIFO_SIZE,
+					align_fifo_size[vpp1_slice],
+					0, 14);
+	}
+	vpp1_post_blend_set(&vpp_post->vpp1_post_blend);
+}
+
 void vpp_post_padding_set(u32 vpp_index,
-	struct vpp_post_s *vpp_post)
+	struct vpp0_post_s *vpp_post)
 {
 	if (vpp_post->vpp_post_pad.vpp_post_pad_en) {
 		/* reg_pad_hsize */
@@ -4726,11 +4815,6 @@ void osd_init_hw_viux(u32 index)
 			osd_reg_set_bits(VPP_OSD3_SCALE_CTRL, 0x7, 0, 3);
 		}
 
-		/* vpp1 osd order, premult, blend_en */
-		osd_reg_set_bits(VPP1_BLD_CTRL, bld_src2_sel, 4, 4);
-		osd_reg_set_bits(VPP1_BLD_CTRL, osd_premult, 17, 1);
-		osd_reg_set_bits(VPP1_BLD_CTRL, blend_en, 31, 1);
-
 #ifdef AML_T7_DISPLAY
 		/* vpp_top input mux */
 		osd_reg_set_bits(OSD_PATH_MISC_CTRL, OSD3 + VPP_OSD1,
@@ -4751,6 +4835,10 @@ void osd_init_hw_viux(u32 index)
 		/* 1:output to vpp slice1 0:output to venc1 directly */
 		osd_reg_set_bits(VPP1_BLD_CTRL, 0, 30, 1);
 #endif
+		/* vpp1 osd order, premult, blend_en */
+		osd_reg_set_bits(VPP1_BLD_CTRL, bld_src2_sel, 4, 4);
+		osd_reg_set_bits(VPP1_BLD_CTRL, osd_premult, 17, 1);
+		osd_reg_set_bits(VPP1_BLD_CTRL, blend_en, 31, 1);
 	}
 
 	if (is_vpp2(index)) {

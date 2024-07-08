@@ -97,6 +97,7 @@
 	"storeargs_hdmitx="\
 		"setenv bootargs ${bootargs} powermode=${powermode} "\
 		"lcd_ctrl=${lcd_ctrl} lcd_debug=${lcd_debug} "\
+		"dptx0_ctrl=${dptx0_ctrl} dptx1_ctrl=${dptx1_ctrl} "\
 		"outputmode=${outputmode} hdmitx=${cecconfig},${colorattribute};"\
 		"\0"\
 	"init_display_hdmitx="\
@@ -111,6 +112,8 @@
 	"panel2_type=lvds_1\0" \
 	"lcd1_ctrl=0x00000000\0" \
 	"lcd2_ctrl=0x00000000\0" \
+	"dptx0_ctrl=0x00000000\0" \
+	"dptx1_ctrl=0x00000000\0" \
 	"outputmode=panel1\0" \
 	"outputmode2=1080p60hz\0" \
 	"cvbsmode=576cvbs\0" \
@@ -120,6 +123,7 @@
 		"outputmode=${outputmode} hdmitx=${cecconfig},${colorattribute} "\
 		"vout2=${outputmode2},enable panel1_type=${panel1_type} "\
 		"lcd1_ctrl=${lcd1_ctrl} panel2_type=${panel2_type} lcd2_ctrl=${lcd2_ctrl} "\
+		"dptx0_ctrl=${dptx0_ctrl} dptx1_ctrl=${dptx1_ctrl} "\
 		"hdr_policy=${hdr_policy} hdr_priority=${hdr_priority};"\
 		"\0"\
 	"init_display_hdmitx="\
@@ -160,7 +164,6 @@
 	"display_width=1920\0" \
 	"display_height=1080\0" \
 	"hdmichecksum=0x00000000\0" \
-	"dv_fw_dir=/reserved/firmware/dovi_fw.bin\0" \
 	"display_bpp=24\0" \
 	"display_color_index=24\0" \
 	"display_layer=osd0\0" \
@@ -193,6 +196,10 @@
 	"cec_fun=0x2F\0" \
 	"logic_addr=0x0\0" \
 	"cec_ac_wakeup=1\0" \
+	"tftp_kernel_path=boot/Image \0" \
+	"tftp_dtb_path=boot/dtb/ \0" \
+	"tftp_initrd_path=boot/initrd.img \0" \
+	"nfsroot_path= \0" \
 	CONFIG_EXTRA_HDMI_ENV_SETTINGS \
 	"initargs="\
 		"init=data=writeback rw rootfstype=ext4" CONFIG_KNL_LOG_LEVEL " "\
@@ -202,6 +209,19 @@
 		"ramoops.console_size=0x4000 loop.max_part=4 scsi_mod.scan=async "\
 		"xhci_hcd.quirks=0x800000 loglevel=4 scramble_reg=0xfe02e030 "\
 		"gamma=0 "\
+		"\0"\
+	"nfs_boot="\
+		"dhcp;"\
+		"setenv nfs_para root=/dev/nfs rw "\
+			"nfsroot=${serverip}:${nfsroot_path} ip=:::::eth0:on;"\
+		"printenv nfs_para;"\
+		"setenv bootargs ${bootargs} ${nfs_para};"\
+		"tftp ${dtb_mem_addr} ${tftp_dtb_path}${fdtfile};"\
+		"tftp ${loadaddr_kernel} ${tftp_kernel_path};"\
+		"tftp ${ramdisk_addr_r} ${tftp_initrd_path};"\
+		"setenv ramdisk_size ${filesize};"\
+		"echo ramdisk_size=${ramdisk_size};"\
+		"booti ${loadaddr_kernel} ${ramdisk_addr_r}:${ramdisk_size} ${dtb_mem_addr};"\
 		"\0"\
 	"upgrade_check="\
 		"run upgrade_check_base;"\

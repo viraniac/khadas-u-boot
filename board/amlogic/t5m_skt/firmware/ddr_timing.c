@@ -63,7 +63,7 @@ ddr_set_ps0_only_t __ddr_setting[] __attribute__ ((section(".ddr_param"))) = {
 		.cfg_board_common_setting.timming_magic = 0,
 		.cfg_board_common_setting.timming_max_valid_configs = 0,
 		//sizeof(__ddr_setting) / sizeof(ddr_set_ps0_only_t),
-		.cfg_board_common_setting.timming_struct_version = 0,
+		.cfg_board_common_setting.timming_struct_version = 0x100,
 		.cfg_board_common_setting.timming_struct_org_size = sizeof(ddr_set_ps0_only_t),
 		.cfg_board_common_setting.timming_struct_real_size = 0,
 		.cfg_board_common_setting.fast_boot = { 0					       },
@@ -769,7 +769,7 @@ ddr_set_ps0_only_t __ddr_setting[] __attribute__ ((section(".ddr_param"))) = {
 		.cfg_board_common_setting.timming_magic = 0,
 		.cfg_board_common_setting.timming_max_valid_configs = 0,
 		//sizeof(__ddr_setting) / sizeof(ddr_set_ps0_only_t),
-		.cfg_board_common_setting.timming_struct_version = 0,
+		.cfg_board_common_setting.timming_struct_version = 0x100,
 		.cfg_board_common_setting.timming_struct_org_size = sizeof(ddr_set_ps0_only_t),
 		.cfg_board_common_setting.timming_struct_real_size = 0,
 		.cfg_board_common_setting.fast_boot = { 0 },
@@ -1216,6 +1216,29 @@ ddr_set_ps0_only_t __ddr_setting[] __attribute__ ((section(".ddr_param"))) = {
 		.cfg_ddr_training_delay_ps.read_dqs_delay[5] = 128,
 		.cfg_ddr_training_delay_ps.read_dqs_delay[6] = 128,
 		.cfg_ddr_training_delay_ps.read_dqs_delay[7] = 128,
+
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[0] = 0x5b,//91,0x114
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[1] = 0x40,//64,0x116
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[2] = 0x57,//87,0x118
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[3] = 0x42,//66,0x11a
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[4] = 0x50,//80,0x11c
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[5] = 0x35,//53,0x11e
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[6] = 0x45,//69,0x120
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[7] = 0x33,//51,0x122
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[8] = 0x46,//70,0x124
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[9] = 0x52,//82,0x126
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[10] = 0x3e,//62,0x128
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[11] = 0x57,//87,0x12a
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[12] = 0x3e,//62,0x12c
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[13] = 0x4b,//75,0x12e
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[14] = 0x37,//55,0x130
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[15] = 0x57,//87,0x132
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[16] = 0x46,//70,0x134
+		.cfg_ddr_training_delay_ps.read_dq_delay_t[17] = 0x39,//57,0x136
+		.cfg_ddr_training_delay_ps.read_dqs_gate_delay[0] = 0x2cf,//719,0x2f4
+		.cfg_ddr_training_delay_ps.read_dqs_gate_delay[1] = 0x2d2,//722,0x2f6
+		.cfg_ddr_training_delay_ps.read_dqs_delay[0] = 112,
+		.cfg_ddr_training_delay_ps.read_dqs_delay[1] = 112,
 
 		.cfg_ddr_training_delay_ps.soc_bit_vref0[0] = 0x000001f,
 		//0 for auto training

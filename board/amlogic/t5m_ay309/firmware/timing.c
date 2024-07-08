@@ -3,7 +3,6 @@
  * please confirm with dvfs owner.
  */
 #define CPU_CLK                                 1920
-#define DSU_CLK                                 1512
 
 /* ddr config support multiple configs for boards which use same bootloader:
  * config steps:
@@ -37,7 +36,6 @@ board_clk_set_t __board_clk_setting
 __attribute__ ((section(".clk_param"))) = {
 	/* clock settings for bl2 */
 	.cpu_clk		= CPU_CLK / 24 * 24,
-	.dsu_clk		= DSU_CLK / 24 * 24,
 #ifdef CONFIG_PXP_EMULATOR
 	.pxp			= 1,
 #else
@@ -207,6 +205,12 @@ __attribute__ ((section(".misc_param"))) = {
 	/* set GPIOE_0 GPIOE_1 mux to pwma pwmb */
 	{ PADCTRL_PIN_MUX_REGD,	   (0x1 << 0),		       (0xf << 0), 0, 0, 0 },
 	{ PADCTRL_PIN_MUX_REGD,	   (0x1 << 4),		       (0xf << 4), 0, 0, 0 },
+#ifdef CONFIG_NOVERBOSE_BUILD
+	/* use acs flag to disable uart print in each blx
+	 * reg must be UART_B_WFIFO, flags: 1 --> disable uart print, 0: enable
+	 */
+	{ UART_B_WFIFO, 0, 0xffffffff, 0, 1, 0 },
+#endif
 };
 
 #define DEV_FIP_SIZE 0x300000

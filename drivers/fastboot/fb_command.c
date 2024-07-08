@@ -460,17 +460,20 @@ static void write_dts_reserve(void)
 	}
 }
 
-static void set_fastboot_flag(void)
+static void set_fastboot_flag(int flag)
 {
 	env_set("default_env", "1");
-	env_set("fastboot_step", "1");
+	if (flag == 1)
+		env_set("fastboot_step", "1");
 #if CONFIG_IS_ENABLED(AML_UPDATE_ENV)
 	run_command("update_env_part -p default_env;", 0);
-	run_command("update_env_part -p fastboot_step;", 0);
+	if (flag == 1)
+		run_command("update_env_part -p fastboot_step;", 0);
 #else
 	run_command("defenv_reserve;", 0);
 	run_command("setenv default_env 1;", 0);
-	run_command("setenv fastboot_step 1;", 0);
+	if (flag == 1)
+		run_command("setenv fastboot_step 1;", 0);
 	run_command("saveenv;", 0);
 #endif//#if CONFIG_IS_ENABLED(AML_UPDATE_ENV)
 }
@@ -505,11 +508,23 @@ static void flash(char *cmd_parameter, char *response)
 		printf("try to read gpt data from bootloader.img\n");
 		struct blk_desc *dev_desc;
 		int erase_flag = 0;
+		char *bootloaderindex;
+		char *boardname;
+		char *slot_name = NULL;
+		char partname[32] = {0};
 
-		rc = store_part_size("bootloader_a");
+		slot_name = env_get("active_slot");
+		if (slot_name && (strcmp(slot_name, "_a") == 0))
+			strcpy((char *)partname, "bootloader_a");
+		else if (slot_name && (strcmp(slot_name, "_b") == 0))
+			strcpy((char *)partname, "bootloader_b");
+		else
+			strcpy((char *)partname, "bootloader_up");
+
+		rc = store_part_size(partname);
 		if (rc != -1) {
-			fastboot_mmc_erase("bootloader_a", response);
-			fastboot_mmc_flash_write("bootloader_a", fastboot_buf_addr, image_size,
+			fastboot_mmc_erase(partname, response);
+			fastboot_mmc_flash_write(partname, fastboot_buf_addr, image_size,
 				response);
 		}
 
@@ -537,7 +552,11 @@ static void flash(char *cmd_parameter, char *response)
 
 			if (erase_flag == 1) {
 				printf("partition changes, erase emmc\n");
-				run_command("store erase.chip 0;", 0);
+				//run_command("store erase.chip 0;", 0);
+				if (usb_burn_erase_data(0x3)) {
+					printf("partition erase failed!\n");
+					return;
+				}
 			}
 
 			if (write_mbr_and_gpt_partitions(dev_desc, fastboot_buf_addr + 0x3DFE00)) {
@@ -561,7 +580,11 @@ static void flash(char *cmd_parameter, char *response)
 
 			if (mem_addr && erase_flag == 1) {
 				printf("partition changes, erase emmc\n");
-				run_command("store erase.chip 0;", 0);
+				//run_command("store erase.chip 0;", 0);
+				if (usb_burn_erase_data(0x3)) {
+					printf("partition erase failed!\n");
+					return;
+				}
 				printf("write _aml_dtb\n");
 				addr = (void *)simple_strtoul(mem_addr, NULL, 16);
 				ret = dtb_write(addr);
@@ -589,23 +612,49 @@ static void flash(char *cmd_parameter, char *response)
 		}
 #endif//#ifdef CONFIG_EFUSE_OBJ_API
 
+		bootloaderindex = env_get("forUpgrade_bootloaderIndex");
+		boardname = env_get("board");
+
 		if (ret == 0) {
 			printf("gpt/nocs mode\n");
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
 			fastboot_mmc_flash_write("bootloader-boot1", fastboot_buf_addr, image_size,
 				 response);
-			run_command("mmc dev 1 0;", 0);
+			if (strcmp(bootloaderindex, "1") != 0 ||
+				(boardname && (strcmp(boardname, "adt4") == 0))) {
+				printf("boot from index %s, rewrite boot0\n", bootloaderindex);
+				printf("google device also write both boot0 and boot1\n");
+				fastboot_mmc_flash_write("bootloader-boot0",
+					fastboot_buf_addr, image_size, response);
+				run_command("mmc dev 1 0;", 0);
+				set_fastboot_flag(0);
+			} else {
+				printf("need to set fastboot_step\n");
+				run_command("mmc dev 1 0;", 0);
+				set_fastboot_flag(1);
+			}
 #endif
-			set_fastboot_flag();
 			return;
 		} else {
 			printf("normal mode\n");
 #if CONFIG_IS_ENABLED(FASTBOOT_FLASH_MMC)
 			fastboot_mmc_flash_write("bootloader-boot0", fastboot_buf_addr, image_size,
 				response);
-			run_command("mmc dev 1 0;", 0);
+			fastboot_mmc_flash_write("bootloader-boot1", fastboot_buf_addr, image_size,
+				 response);
+			if (strcmp(bootloaderindex, "0") != 0 ||
+				(boardname && (strcmp(boardname, "adt4") == 0))) {
+				printf("boot from index %s, rewrite bootloader\n", bootloaderindex);
+				printf("google device also write all bootloader\n");
+				fastboot_mmc_flash_write("bootloader",
+					fastboot_buf_addr, image_size, response);
+				run_command("mmc dev 1 0;", 0);
+				set_fastboot_flag(0);
+			} else {
+				run_command("mmc dev 1 0;", 0);
+				set_fastboot_flag(1);
+			}
 #endif
-			set_fastboot_flag();
 			return;
 		}
 	}
@@ -688,6 +737,12 @@ static void flash(char *cmd_parameter, char *response)
 #else
 		run_command("defenv_reserve;saveenv;", 0);
 #endif// #if CONFIG_IS_ENABLED(AML_UPDATE_ENV)
+	}
+
+	if (strcmp(name, "bootloader-boot0") == 0 ||
+		strcmp(name, "bootloader-boot1") == 0) {
+		printf("try to switch back to user\n");
+		run_command("mmc dev 1 0;", 0);
 	}
 
 #ifdef CONFIG_FASTBOOT_FLASH_MMC_DEV
@@ -773,6 +828,7 @@ static void erase(char *cmd_parameter, char *response)
 		if (fastboot_step && strcmp(fastboot_step, "0")) {
 			printf("fastboot_step: %s, run defenv_reserv\n", fastboot_step);
 			run_command("defenv_reserv; setenv upgrade_step 2; saveenv;", 0);
+			run_command("run bcb_cmd", 0);
 			fastboot_okay(NULL, response);
 			return;
 		}
@@ -1259,11 +1315,9 @@ next:
 		if (info.unlock_ability == 1) {
 			if (info.lock_state == 1) {
 				char *avb_s;
+
+				run_command("get_avb_mode;", 0);
 				avb_s = env_get("avb2");
-				if (avb_s == NULL) {
-					run_command("get_avb_mode;", 0);
-					avb_s = env_get("avb2");
-				}
 				printf("avb2: %s\n", avb_s);
 				if (strcmp(avb_s, "1") == 0) {
 					try_unlock_dev(rc);
@@ -1280,11 +1334,9 @@ next:
 	} else if (!strcmp_l1("lock", cmd)) {
 		if (info.lock_state == 0) {
 			char *avb_s;
+
+			run_command("get_avb_mode;", 0);
 			avb_s = env_get("avb2");
-			if (avb_s == NULL) {
-				run_command("get_avb_mode;", 0);
-				avb_s = env_get("avb2");
-			}
 			printf("avb2: %s\n", avb_s);
 			if (strcmp(avb_s, "1") == 0) {
 				try_lock_dev(rc);

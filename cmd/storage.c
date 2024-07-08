@@ -385,7 +385,7 @@ static int storage_get_and_parse_ssp(int *need_build) // boot_device:
 			else if (IS_FEAT_DIS_NBL2_SNOR())
 				ssp->boot_backups = 1;
 			else
-				ssp->boot_backups = 1; /* Default 2 backup, consistent with rom */
+				ssp->boot_backups = 1;
 			break;
 		case BOOT_SNAND:
 			#ifdef BOARD_BL2EX_BACKUPS

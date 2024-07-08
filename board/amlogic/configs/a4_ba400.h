@@ -150,6 +150,8 @@
 		"\0" \
 	"storeboot="\
 		"run get_os_type;"\
+		"setenv bootargs ${bootargs} panel_type=rgb_0;"\
+		"setenv outputmode panel;"\
 		"run storage_param;"\
 		"if test ${os_type} = rtos; then "\
 			"setenv loadaddr ${loadaddr_rtos};"\
@@ -200,6 +202,7 @@
 	"recovery_from_flash="\
 		"echo active_slot: ${active_slot};"\
 		"setenv loadaddr ${loadaddr_kernel};"\
+		"run storage_param;"\
 		"if test ${active_slot} = normal; then "\
 			"setenv bootargs ${bootargs} ${fs_type} aml_dt=${aml_dt} recovery_part=${recovery_part} recovery_offset=${recovery_offset};"\
 			"if test ${upgrade_step} = 3; then "\
@@ -263,7 +266,6 @@
 		"fi;fi;"\
 		"\0"\
 	"storage_param="\
-		"setenv bootargs ${bootargs} ${emmc_quirks}; "\
 		"store param;"\
 		"setenv bootargs ${bootargs} ${mtdbootparts}; "\
 		"\0"\

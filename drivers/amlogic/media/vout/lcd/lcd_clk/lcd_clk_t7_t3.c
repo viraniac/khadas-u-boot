@@ -33,7 +33,7 @@ static void lcd_pll_ss_enable(struct aml_lcd_drv_s *pdrv, int status)
 
 	offset = cconf->pll_offset;
 	pll_ctrl2 = lcd_ana_read(ANACTRL_TCON_PLL0_CNTL2 + offset);
-	pll_ctrl2 &= ~((0xf << 16) | (0xf << 28));
+	pll_ctrl2 &= ~((1 << 15) | (0xf << 16) | (0xf << 28));
 
 	if (status) {
 		if (cconf->ss_level > 0)
@@ -46,7 +46,7 @@ static void lcd_pll_ss_enable(struct aml_lcd_drv_s *pdrv, int status)
 
 	if (flag) {
 		cconf->ss_en = 1;
-		pll_ctrl2 |= ((cconf->ss_dep_sel << 28) | (cconf->ss_str_m << 16));
+		pll_ctrl2 |= ((1 << 15) | (cconf->ss_dep_sel << 28) | (cconf->ss_str_m << 16));
 		LCDPR("[%d]: pll ss enable: level: %d, %dppm\n",
 			pdrv->index, cconf->ss_level, cconf->ss_ppm);
 	} else {
@@ -68,13 +68,15 @@ static void lcd_set_pll_ss_level(struct aml_lcd_drv_s *pdrv)
 
 	offset = cconf->pll_offset;
 	pll_ctrl2 = lcd_ana_read(ANACTRL_TCON_PLL0_CNTL2 + offset);
-	pll_ctrl2 &= ~((0xf << 16) | (0xf << 28));
+	pll_ctrl2 &= ~((1 << 15) | (0xf << 16) | (0xf << 28));
 
 	if (cconf->ss_level > 0) {
 		ret = lcd_pll_ss_level_generate(cconf);
 		if (ret == 0) {
 			cconf->ss_en = 1;
-			pll_ctrl2 |= ((cconf->ss_dep_sel << 28) | (cconf->ss_str_m << 16));
+			pll_ctrl2 |= ((1 << 15) |
+				      (cconf->ss_dep_sel << 28) |
+				      (cconf->ss_str_m << 16));
 			LCDPR("[%d]: set pll spread spectrum: level: %d, %dppm\n",
 				pdrv->index, cconf->ss_level, cconf->ss_ppm);
 		}
@@ -126,6 +128,7 @@ static void lcd_pll_frac_set(struct aml_lcd_drv_s *pdrv, unsigned int frac)
 		LCDPR("[%d]: %s: reg 0x%x: 0x%08x->0x%08x\n",
 			pdrv->index, __func__, reg, val, lcd_ana_read(reg));
 	}
+	LCDPR("[%d]: %s: pll_frac=0x%x\n", pdrv->index, __func__, frac);
 }
 
 static void lcd_set_pll_t7(struct aml_lcd_drv_s *pdrv)
@@ -299,19 +302,20 @@ static void lcd_set_dsi_meas_clk(int index)
 	}
 }
 
-static void lcd_set_dsi_phy_clk(int index)
+static void lcd_set_dsi_phy_clk(struct aml_lcd_drv_s *pdrv)
 {
+	struct lcd_clk_config_s *cconf = get_lcd_clk_config(pdrv);
+	unsigned char bit_offset = pdrv->index ? 16 : 0;
+
+	if (!cconf)
+		return;
+
 	if (lcd_debug_print_flag & LCD_DBG_PR_ADV2)
-		LCDPR("[%d]: %s\n", index, __func__);
-	if (index) {
-		lcd_clk_setb(CLKCTRL_MIPIDSI_PHY_CLK_CTRL, 0, 16, 7);
-		lcd_clk_setb(CLKCTRL_MIPIDSI_PHY_CLK_CTRL, 0, 25, 3);
-		lcd_clk_setb(CLKCTRL_MIPIDSI_PHY_CLK_CTRL, 1, 24, 1);
-	} else {
-		lcd_clk_setb(CLKCTRL_MIPIDSI_PHY_CLK_CTRL, 0, 0, 7);
-		lcd_clk_setb(CLKCTRL_MIPIDSI_PHY_CLK_CTRL, 0, 12, 3);
-		lcd_clk_setb(CLKCTRL_MIPIDSI_PHY_CLK_CTRL, 1, 8, 1);
-	}
+		LCDPR("[%d]: %s\n", pdrv->index, __func__);
+
+	lcd_clk_setb(CLKCTRL_MIPIDSI_PHY_CLK_CTRL, cconf->phy_div - 1, bit_offset + 0, 7);
+	lcd_clk_setb(CLKCTRL_MIPIDSI_PHY_CLK_CTRL, 0, bit_offset + 12, 3);
+	lcd_clk_setb(CLKCTRL_MIPIDSI_PHY_CLK_CTRL, 1, bit_offset + 8, 1);
 }
 
 static void lcd_set_phy_dig_div(struct aml_lcd_drv_s *pdrv)
@@ -437,12 +441,12 @@ static void lcd_set_vid_pll_div_t7(struct aml_lcd_drv_s *pdrv)
 	lcd_combo_dphy_setb(reg_vid_pll_div, 0, 15, 1);
 
 	i = 0;
-	while (lcd_clk_div_table[i][0] != CLK_DIV_SEL_MAX) {
+	while (lcd_clk_div_table[i][0] < cconf->data->div_sel_max) {
 		if (cconf->div_sel == lcd_clk_div_table[i][0])
 			break;
 		i++;
 	}
-	if (lcd_clk_div_table[i][0] == CLK_DIV_SEL_MAX)
+	if (lcd_clk_div_table[i][0] == cconf->data->div_sel_max)
 		LCDERR("[%d]: invalid clk divider\n", pdrv->index);
 	shift_val = lcd_clk_div_table[i][1];
 	shift_sel = lcd_clk_div_table[i][2];
@@ -482,10 +486,11 @@ static void lcd_clk_set_t7(struct aml_lcd_drv_s *pdrv)
 
 	if (pdrv->config.basic.lcd_type == LCD_MIPI) {
 		lcd_set_dsi_meas_clk(pdrv->index);
-		lcd_set_dsi_phy_clk(pdrv->index);
+		lcd_set_dsi_phy_clk(pdrv);
 	}
 }
 
+#ifdef CONFIG_AML_LCD_TCON
 /* tcon run base clk, include register access */
 static void lcd_set_tcon_clk_t3(struct aml_lcd_drv_s *pdrv)
 {
@@ -507,7 +512,7 @@ static void lcd_set_tcon_clk_t3(struct aml_lcd_drv_s *pdrv)
 		lcd_ana_setb(ANACTRL_TCON_PLL0_CNTL4, ((val >> 8) & 0xf), 24, 4);
 
 		/* tcon_clk */
-		if (pconf->timing.lcd_clk >= 100000000) /* 25M */
+		if (pconf->timing.enc_clk >= 100000000) /* 25M */
 			lcd_clk_write(CLKCTRL_TCON_CLK_CNTL, (1 << 7) | (1 << 6) | (0xf << 0));
 		else /* 12.5M */
 			lcd_clk_write(CLKCTRL_TCON_CLK_CNTL, (1 << 7) | (1 << 6) | (0x1f << 0));
@@ -521,13 +526,9 @@ static void lcd_set_tcon_clk_t3(struct aml_lcd_drv_s *pdrv)
 	}
 
 	/* global reset tcon */
-	lcd_reset_setb(RESETCTRL_RESET2_MASK, 0, 5, 1);
-	lcd_reset_setb(RESETCTRL_RESET2_LEVEL, 0, 5, 1);
-	udelay(1);
-	lcd_reset_setb(RESETCTRL_RESET2_LEVEL, 1, 5, 1);
-	udelay(2);
-	LCDPR("reset tcon\n");
+	lcd_tcon_global_reset(pdrv);
 }
+#endif
 
 static void lcd_set_vid_pll_div_t3(struct aml_lcd_drv_s *pdrv)
 {
@@ -557,12 +558,12 @@ static void lcd_set_vid_pll_div_t3(struct aml_lcd_drv_s *pdrv)
 	lcd_ana_setb(ANACTRL_VID_PLL_CLK_DIV, 0, 15, 1);
 
 	i = 0;
-	while (lcd_clk_div_table[i][0] != CLK_DIV_SEL_MAX) {
+	while (lcd_clk_div_table[i][0] < cconf->data->div_sel_max) {
 		if (cconf->div_sel == lcd_clk_div_table[i][0])
 			break;
 		i++;
 	}
-	if (lcd_clk_div_table[i][0] == CLK_DIV_SEL_MAX)
+	if (lcd_clk_div_table[i][0] == cconf->data->div_sel_max)
 		LCDERR("[%d]: invalid clk divider\n", pdrv->index);
 	shift_val = lcd_clk_div_table[i][1];
 	shift_sel = lcd_clk_div_table[i][2];
@@ -669,8 +670,10 @@ static void lcd_set_vclk_crt(struct aml_lcd_drv_s *pdrv)
 //special setting by lcd interface
 static void lcd_clktree_set(struct aml_lcd_drv_s *pdrv)
 {
+#ifdef CONFIG_AML_LCD_TCON
 	if (pdrv->index == 0) /* tcon_clk invalid for lcd1 */
 		lcd_set_tcon_clk_t3(pdrv);
+#endif
 }
 
 static void lcd_clk_disable(struct aml_lcd_drv_s *pdrv)
@@ -1150,6 +1153,7 @@ static int lcd_prbs_test_t7(struct aml_lcd_drv_s *pdrv, unsigned int ms,
 	unsigned int val1, val2, timeout;
 	unsigned int cnt = 0;
 	unsigned int clk_err_cnt = 0;
+	unsigned long lcd_encl_clk_check_std, lcd_fifo_clk_check_std;
 	int i, j, ret;
 
 	cconf = get_lcd_clk_config(pdrv);
@@ -1197,11 +1201,11 @@ static int lcd_prbs_test_t7(struct aml_lcd_drv_s *pdrv, unsigned int ms,
 		lcd_prbs_mode = (1 << i);
 		LCDPR("[%d]: lcd_prbs_mode: %d\n", pdrv->index, lcd_prbs_mode);
 		if (lcd_prbs_mode == LCD_PRBS_MODE_LVDS) {
-			lcd_encl_clk_check_std = 136;
-			lcd_fifo_clk_check_std = 48;
+			lcd_encl_clk_check_std = 136000000;
+			lcd_fifo_clk_check_std = 48000000;
 		} else if (lcd_prbs_mode == LCD_PRBS_MODE_VX1) {
-			lcd_encl_clk_check_std = 594;
-			lcd_fifo_clk_check_std = 297;
+			lcd_encl_clk_check_std = 594000000;
+			lcd_fifo_clk_check_std = 297000000;
 		}
 		if (!cconf->data->prbs_clk_config) {
 			LCDERR("[%d]: %s: prbs_clk_config is null\n",
@@ -1247,8 +1251,7 @@ static int lcd_prbs_test_t7(struct aml_lcd_drv_s *pdrv, unsigned int ms,
 				goto lcd_prbs_test_t7_err;
 			}
 			if (lcd_prbs_clk_check(lcd_encl_clk_check_std, encl_msr_id,
-					       lcd_fifo_clk_check_std, fifo_msr_id,
-					       cnt))
+					       lcd_fifo_clk_check_std, fifo_msr_id, cnt))
 				clk_err_cnt++;
 			else
 				clk_err_cnt = 0;
@@ -1309,6 +1312,7 @@ static int lcd_prbs_test_t3(struct aml_lcd_drv_s *pdrv, unsigned int ms,
 	unsigned int val1, val2, timeout;
 	unsigned int cnt = 0;
 	unsigned int clk_err_cnt = 0;
+	unsigned long lcd_encl_clk_check_std, lcd_fifo_clk_check_std;
 	int i, j, ret;
 
 	cconf = get_lcd_clk_config(pdrv);
@@ -1346,11 +1350,11 @@ static int lcd_prbs_test_t3(struct aml_lcd_drv_s *pdrv, unsigned int ms,
 		lcd_prbs_mode = (1 << i);
 		LCDPR("[%d]: lcd_prbs_mode: %d\n", pdrv->index, lcd_prbs_mode);
 		if (lcd_prbs_mode == LCD_PRBS_MODE_LVDS) {
-			lcd_encl_clk_check_std = 136;
-			lcd_fifo_clk_check_std = 48;
+			lcd_encl_clk_check_std = 136000000;
+			lcd_fifo_clk_check_std = 48000000;
 		} else if (lcd_prbs_mode == LCD_PRBS_MODE_VX1) {
-			lcd_encl_clk_check_std = 594;
-			lcd_fifo_clk_check_std = 297;
+			lcd_encl_clk_check_std = 594000000;
+			lcd_fifo_clk_check_std = 297000000;
 		}
 		if (!cconf->data->prbs_clk_config) {
 			LCDERR("[%d]: %s: prbs_clk_config is null\n",
@@ -1396,8 +1400,7 @@ static int lcd_prbs_test_t3(struct aml_lcd_drv_s *pdrv, unsigned int ms,
 				goto lcd_prbs_test_t3_err;
 			}
 			if (lcd_prbs_clk_check(lcd_encl_clk_check_std, encl_msr_id,
-					       lcd_fifo_clk_check_std, fifo_msr_id,
-					       cnt))
+					       lcd_fifo_clk_check_std, fifo_msr_id, cnt))
 				clk_err_cnt++;
 			else
 				clk_err_cnt = 0;
@@ -1469,7 +1472,7 @@ static void lcd_clk_parameter_init_t7(struct aml_lcd_drv_s *pdrv)
 	}
 }
 
-static struct lcd_clk_data_s lcd_clk_data_t7 = {
+static struct lcd_clk_data_s lcd_clk_data_t7_0 = {
 	.pll_od_fb = 0,
 	.pll_m_max = 511,
 	.pll_m_min = 2,
@@ -1494,6 +1497,10 @@ static struct lcd_clk_data_s lcd_clk_data_t7 = {
 
 	.vclk_sel = 0,
 	.enc_clk_msr_id = 222,
+
+	.div_sel_max = CLK_DIV_SEL_MAX,
+	.xd_max = 256,
+	.phy_div_max = 256,
 
 	.ss_support = 1,
 	.ss_level_max = 60,
@@ -1520,7 +1527,117 @@ static struct lcd_clk_data_s lcd_clk_data_t7 = {
 	.prbs_test = lcd_prbs_test_t7,
 };
 
-static struct lcd_clk_data_s lcd_clk_data_t3 = {
+static struct lcd_clk_data_s lcd_clk_data_t7_1 = {
+	.pll_od_fb = 0,
+	.pll_m_max = 511,
+	.pll_m_min = 2,
+	.pll_n_max = 1,
+	.pll_n_min = 1,
+	.pll_frac_range = (1 << 17),
+	.pll_frac_sign_bit = 18,
+	.pll_od_sel_max = 3,
+	.pll_ref_fmax = 25000000,
+	.pll_ref_fmin = 5000000,
+	.pll_vco_fmax = 6000000000ULL,
+	.pll_vco_fmin = 3000000000ULL,
+	.pll_out_fmax = 3100000000ULL,
+	.pll_out_fmin = 187500000,
+	.div_in_fmax = 3100000000ULL,
+	.div_out_fmax = 750000000,
+	.xd_out_fmax = 750000000,
+	.od_cnt = 3,
+	.have_tcon_div = 1,
+	.have_pll_div = 1,
+	.phy_clk_location = 0,
+
+	.vclk_sel = 0,
+	.enc_clk_msr_id = 221,
+
+	.div_sel_max = CLK_DIV_SEL_MAX,
+	.xd_max = 128,
+	.phy_div_max = 128,
+
+	.ss_support = 1,
+	.ss_level_max = 60,
+	.ss_freq_max = 6,
+	.ss_mode_max = 2,
+	.ss_dep_base = 500, //ppm
+	.ss_dep_sel_max = 12,
+	.ss_str_m_max = 10,
+
+	.clk_parameter_init = lcd_clk_parameter_init_t7,
+	.clk_generate_parameter = lcd_clk_generate_dft,
+	.pll_frac_generate = lcd_pll_frac_generate_dft,
+	.set_ss_level = lcd_set_pll_ss_level,
+	.set_ss_advance = lcd_set_pll_ss_advance,
+	.clk_ss_enable = lcd_pll_ss_enable,
+	.pll_frac_set = lcd_pll_frac_set,
+	.clk_set = lcd_clk_set_t7,
+	.vclk_crt_set = lcd_set_vclk_crt,
+	.clk_disable = lcd_clk_disable,
+	.clktree_set = NULL,
+	.clk_config_init_print = lcd_clk_config_init_print_dft,
+	.clk_config_print = lcd_clk_config_print_dft,
+	.prbs_clk_config = lcd_prbs_config_clk_t7,
+	.prbs_test = lcd_prbs_test_t7,
+};
+
+static struct lcd_clk_data_s lcd_clk_data_t7_2 = {
+	.pll_od_fb = 0,
+	.pll_m_max = 511,
+	.pll_m_min = 2,
+	.pll_n_max = 1,
+	.pll_n_min = 1,
+	.pll_frac_range = (1 << 17),
+	.pll_frac_sign_bit = 18,
+	.pll_od_sel_max = 3,
+	.pll_ref_fmax = 25000000,
+	.pll_ref_fmin = 5000000,
+	.pll_vco_fmax = 6000000000ULL,
+	.pll_vco_fmin = 3000000000ULL,
+	.pll_out_fmax = 3100000000ULL,
+	.pll_out_fmin = 187500000,
+	.div_in_fmax = 3100000000ULL,
+	.div_out_fmax = 750000000,
+	.xd_out_fmax = 750000000,
+	.od_cnt = 3,
+	.have_tcon_div = 1,
+	.have_pll_div = 1,
+	.phy_clk_location = 0,
+
+	.vclk_sel = 0,
+	.enc_clk_msr_id = 220,
+
+	.div_sel_max = CLK_DIV_SEL_MAX,
+	.xd_max = 128,
+	.phy_div_max = 128,
+
+	.ss_support = 1,
+	.ss_level_max = 60,
+	.ss_freq_max = 6,
+	.ss_mode_max = 2,
+	.ss_dep_base = 500, //ppm
+	.ss_dep_sel_max = 12,
+	.ss_str_m_max = 10,
+
+	.clk_parameter_init = lcd_clk_parameter_init_t7,
+	.clk_generate_parameter = lcd_clk_generate_dft,
+	.pll_frac_generate = lcd_pll_frac_generate_dft,
+	.set_ss_level = lcd_set_pll_ss_level,
+	.set_ss_advance = lcd_set_pll_ss_advance,
+	.clk_ss_enable = lcd_pll_ss_enable,
+	.pll_frac_set = lcd_pll_frac_set,
+	.clk_set = lcd_clk_set_t7,
+	.vclk_crt_set = lcd_set_vclk_crt,
+	.clk_disable = lcd_clk_disable,
+	.clktree_set = NULL,
+	.clk_config_init_print = lcd_clk_config_init_print_dft,
+	.clk_config_print = lcd_clk_config_print_dft,
+	.prbs_clk_config = lcd_prbs_config_clk_t7,
+	.prbs_test = lcd_prbs_test_t7,
+};
+
+static struct lcd_clk_data_s lcd_clk_data_t3_0 = {
 	.pll_od_fb = 0,
 	.pll_m_max = 511,
 	.pll_m_min = 2,
@@ -1545,6 +1662,65 @@ static struct lcd_clk_data_s lcd_clk_data_t3 = {
 
 	.vclk_sel = 0,
 	.enc_clk_msr_id = 222,
+
+	.div_sel_max = CLK_DIV_SEL_MAX,
+	.xd_max = 128,
+	.phy_div_max = 128,
+
+	.ss_support = 1,
+	.ss_level_max = 60,
+	.ss_freq_max = 6,
+	.ss_mode_max = 2,
+	.ss_dep_base = 500, //ppm
+	.ss_dep_sel_max = 12,
+	.ss_str_m_max = 10,
+
+	.clk_parameter_init = NULL,
+	.clk_generate_parameter = lcd_clk_generate_dft,
+	.pll_frac_generate = lcd_pll_frac_generate_dft,
+	.set_ss_level = lcd_set_pll_ss_level,
+	.set_ss_advance = lcd_set_pll_ss_advance,
+	.clk_ss_enable = lcd_pll_ss_enable,
+	.pll_frac_set = lcd_pll_frac_set,
+	.clk_set = lcd_clk_set_t3,
+	.vclk_crt_set = lcd_set_vclk_crt,
+	.clk_disable = lcd_clk_disable,
+	.clktree_set = lcd_clktree_set,
+	.clk_config_init_print = lcd_clk_config_init_print_dft,
+	.clk_config_print = lcd_clk_config_print_dft,
+	.prbs_clk_config = lcd_prbs_config_clk_t3,
+	.prbs_test = lcd_prbs_test_t3,
+};
+
+static struct lcd_clk_data_s lcd_clk_data_t3_1 = {
+	.pll_od_fb = 0,
+	.pll_m_max = 511,
+	.pll_m_min = 2,
+	.pll_n_max = 1,
+	.pll_n_min = 1,
+	.pll_frac_range = (1 << 17),
+	.pll_frac_sign_bit = 18,
+	.pll_od_sel_max = 3,
+	.pll_ref_fmax = 25000000,
+	.pll_ref_fmin = 5000000,
+	.pll_vco_fmax = 6000000000ULL,
+	.pll_vco_fmin = 3000000000ULL,
+	.pll_out_fmax = 3100000000ULL,
+	.pll_out_fmin = 187500000,
+	.div_in_fmax = 3100000000ULL,
+	.div_out_fmax = 750000000,
+	.xd_out_fmax = 750000000,
+	.od_cnt = 3,
+	.have_tcon_div = 1,
+	.have_pll_div = 1,
+	.phy_clk_location = 0,
+
+	.vclk_sel = 0,
+	.enc_clk_msr_id = 221,
+
+	.div_sel_max = CLK_DIV_SEL_MAX,
+	.xd_max = 128,
+	.phy_div_max = 128,
 
 	.ss_support = 1,
 	.ss_level_max = 60,
@@ -1573,44 +1749,33 @@ static struct lcd_clk_data_s lcd_clk_data_t3 = {
 
 void lcd_clk_config_chip_init_t7(struct aml_lcd_drv_s *pdrv, struct lcd_clk_config_s *cconf)
 {
-	cconf->data = &lcd_clk_data_t7;
-	cconf->pll_od_fb = lcd_clk_data_t7.pll_od_fb;
-	switch (pdrv->index) {
-	case 2:
-		cconf->data->enc_clk_msr_id = 220;
-		cconf->pll_id = 2;
-		cconf->pll_offset = (0xa << 2);
-		break;
-	case 1:
-		cconf->data->enc_clk_msr_id = 221;
-		cconf->pll_id = 1;
-		cconf->pll_offset = (0x5 << 2);
-		break;
-	case 0:
-	default:
-		cconf->data->enc_clk_msr_id = 222;
+	if (pdrv->index == 0) {
+		cconf->data = &lcd_clk_data_t7_0;
+		cconf->pll_od_fb = lcd_clk_data_t7_0.pll_od_fb;
 		cconf->pll_id = 0;
 		cconf->pll_offset = 0;
-		break;
+	} else if (pdrv->index == 1) {
+		cconf->data = &lcd_clk_data_t7_1;
+		cconf->pll_od_fb = lcd_clk_data_t7_1.pll_od_fb;
+		cconf->pll_id = 1;
+		cconf->pll_offset = (0x5 << 2);
+	} else { //pdrv->index == 2
+		cconf->data = &lcd_clk_data_t7_2;
+		cconf->pll_od_fb = lcd_clk_data_t7_2.pll_od_fb;
+		cconf->pll_id = 2;
+		cconf->pll_offset = (0xa << 2);
 	}
-	cconf->data->enc_clk_msr_id = -1;
 }
 
 void lcd_clk_config_chip_init_t3(struct aml_lcd_drv_s *pdrv, struct lcd_clk_config_s *cconf)
 {
-	cconf->data = &lcd_clk_data_t3;
-	cconf->pll_od_fb = lcd_clk_data_t3.pll_od_fb;
-	switch (pdrv->index) {
-	case 1:
-		cconf->data->enc_clk_msr_id = 221;
-		cconf->pll_id = 1;
-		break;
-	case 0:
-	default:
-		cconf->data->enc_clk_msr_id = 222;
+	if (pdrv->index == 0) {
+		cconf->data = &lcd_clk_data_t3_0;
+		cconf->pll_od_fb = lcd_clk_data_t3_0.pll_od_fb;
 		cconf->pll_id = 0;
-		break;
+	} else { //pdrv->index == 1
+		cconf->data = &lcd_clk_data_t3_1;
+		cconf->pll_od_fb = lcd_clk_data_t3_1.pll_od_fb;
+		cconf->pll_id = 1;
 	}
-	cconf->data->enc_clk_msr_id = -1;
 }
-

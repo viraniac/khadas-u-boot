@@ -57,7 +57,7 @@ static bool set_hpll_hclk_v1(u32 m, u32 frac_val)
 	hd21_write_reg(ANACTRL_HDMIPLL_CTRL1, frac_val);
 	hd21_write_reg(ANACTRL_HDMIPLL_CTRL2, 0x00000000);
 
-	if (frac_val == 0x8148) {
+	if (frac_val == 0x8168) {
 		if ((hdev->para->timing.vic == HDMI_96_3840x2160p50_16x9 ||
 		     hdev->para->timing.vic == HDMI_97_3840x2160p60_16x9 ||
 		     hdev->para->timing.vic == HDMI_106_3840x2160p50_64x27 ||
@@ -173,7 +173,7 @@ static void set21_t7_hpll_clk_out(u32 frac_rate, u32 clk)
 {
 	switch (clk) {
 	case 5940000:
-		if (set_hpll_hclk_v1(0xf7, frac_rate ? 0x8148 : 0x10000))
+		if (set_hpll_hclk_v1(0xf7, frac_rate ? 0x8168 : 0x10000))
 			break;
 		if (set_hpll_hclk_v2(0x7b, 0x18000))
 			break;
@@ -263,7 +263,7 @@ static void set21_t7_hpll_clk_out(u32 frac_rate, u32 clk)
 		break;
 	case 4032000:
 		hd21_write_reg(ANACTRL_HDMIPLL_CTRL0, 0x3b0004a8);
-		hd21_write_reg(ANACTRL_HDMIPLL_CTRL1, 0x0001aa80);
+		hd21_write_reg(ANACTRL_HDMIPLL_CTRL1, 0x00000000);
 		hd21_write_reg(ANACTRL_HDMIPLL_CTRL2, 0x00000000);
 		hd21_write_reg(ANACTRL_HDMIPLL_CTRL3, 0x4a691c00);
 		hd21_write_reg(ANACTRL_HDMIPLL_CTRL4, 0x33771290);
@@ -275,7 +275,7 @@ static void set21_t7_hpll_clk_out(u32 frac_rate, u32 clk)
 		break;
 	case 4028000:
 		hd21_write_reg(ANACTRL_HDMIPLL_CTRL0, 0x3b0004a7);
-		hd21_write_reg(ANACTRL_HDMIPLL_CTRL1, 0x00000000);
+		hd21_write_reg(ANACTRL_HDMIPLL_CTRL1, 0x0001aa80);
 		hd21_write_reg(ANACTRL_HDMIPLL_CTRL2, 0x00000000);
 		hd21_write_reg(ANACTRL_HDMIPLL_CTRL3, 0x4a691c00);
 		hd21_write_reg(ANACTRL_HDMIPLL_CTRL4, 0x33771290);

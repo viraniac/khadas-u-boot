@@ -209,8 +209,8 @@ bl2_reg_t __bl2_reg[] = {
 #else
 	{ AO_PWM_PWM_B,	VDDEE_VAL_REG,	0xffffffff,	0,	BL2_INIT_STAGE_1, 0 },
 #endif
-	/*pwm needs to support full-height or full-low output*/
-	{PWMAB_MISC_REG_AB,	((1 << 0) | (1 << 15) | (1 << 28)), ((1 << 0) | (1 << 15) | (1 << 28)), 0, BL2_INIT_STAGE_1, 0},
+	{PWMAB_MISC_REG_AB,	((1 << 0) | (1 << 15)),
+						((1 << 0) | (1 << 15)), 0, BL2_INIT_STAGE_1, 0},
 #ifdef PWM_CONSTANT_OUT
 	{AO_PWM_MISC_REG_AB,	((1 << 1) | (1 << 23) | (1 << 29)), ((1 << 1) | (1 << 23) | (1 << 29))), 0, BL2_INIT_STAGE_1, 0},
 #else
@@ -232,4 +232,10 @@ bl2_reg_t __bl2_reg[] = {
 	//{PREG_PAD_GPIO2_EN_N,  (0 << 12),               (1 << 12),   0, BL2_INIT_STAGE_1, 0},
 	/* Configure the SARADC channel of the board ID */
 	{ AO_SEC_GP_CFG0,        (0 << 8),                (0xFF << 8), 0, BL2_INIT_STAGE_1, 0 },
+#ifdef CONFIG_NOVERBOSE_BUILD
+	/* use acs flag to disable uart print in each blx
+	 * reg must be UART_B_WFIFO, flags: 1 --> disable uart print, 0: enable
+	 */
+	{ UART_B_WFIFO, 0, 0xffffffff, 0, 1, 0 },
+#endif
 };

@@ -78,7 +78,7 @@ static bool set_hpll_hclk_v1(unsigned int m, unsigned int frac_val)
 	hd_write_reg(P_ANACTRL_HDMIPLL_CTRL1, frac_val);
 	hd_write_reg(P_ANACTRL_HDMIPLL_CTRL2, 0x00000000);
 
-	if (frac_val == 0x8148) {
+	if (frac_val == 0x8168) {
 		if (((hdev->para->vic == HDMI_3840x2160p50_16x9) ||
 		     (hdev->para->vic == HDMI_3840x2160p60_16x9) ||
 		     (hdev->para->vic == HDMI_3840x2160p50_64x27) ||
@@ -158,7 +158,7 @@ void set_hpll_clk_out(unsigned int clk)
 	pr_info("config HPLL = %d frac_rate = %d\n", clk, frac_rate);
 	switch (clk) {
 	case 5940000:
-		if (set_hpll_hclk_v1(0xf7, frac_rate ? 0x8148 : 0x10000))
+		if (set_hpll_hclk_v1(0xf7, frac_rate ? 0x8168 : 0x10000))
 			break;
 		if (set_hpll_hclk_v2(0x7b, 0x18000))
 			break;
@@ -417,6 +417,30 @@ void set_hpll_clk_out(unsigned int clk)
 	case 4032000:
 		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL0, 0x3b0004a8);
 		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL1, 0x00000000);
+		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL2, 0x00000000);
+		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL3, 0x4a691c00);
+		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL4, 0x33771290);
+		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL5, 0x39270008);
+		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL6, 0x50540000);
+		hd_set_reg_bits(P_ANACTRL_HDMIPLL_CTRL0, 0x0, 29, 1);
+		WAIT_FOR_PLL_LOCKED(P_ANACTRL_HDMIPLL_CTRL0);
+		pr_info("HPLL: 0x%x\n", hd_read_reg(P_ANACTRL_HDMIPLL_CTRL0));
+		break;
+	case 4115866:
+		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL0, 0x3b0004ab);
+		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL1, 0x0000fd22);
+		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL2, 0x00000000);
+		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL3, 0x4a691c00);
+		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL4, 0x33771290);
+		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL5, 0x39270008);
+		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL6, 0x50540000);
+		hd_set_reg_bits(P_ANACTRL_HDMIPLL_CTRL0, 0x0, 29, 1);
+		WAIT_FOR_PLL_LOCKED(P_ANACTRL_HDMIPLL_CTRL0);
+		pr_info("HPLL: 0x%x\n", hd_read_reg(P_ANACTRL_HDMIPLL_CTRL0));
+		break;
+	case 4028000:
+		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL0, 0x3b0004a7);
+		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL1, 0x0001aa80);
 		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL2, 0x00000000);
 		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL3, 0x4a691c00);
 		hd_write_reg(P_ANACTRL_HDMIPLL_CTRL4, 0x33771290);
@@ -688,7 +712,7 @@ static struct hw_enc_clk_val_group setting_enc_clk_val_24[] = {
 		1, VIU_ENCP, 4838400, 4, 4, 1, VID_PLL_DIV_5, 2, 1, 1, -1},
 	{{HDMIV_1024x600p60hz,
 	  GROUP_END},
-		1, VIU_ENCP, 4032000, 4, 2, 1, VID_PLL_DIV_5, 2, 1, 1, -1},
+		1, VIU_ENCP, 4115866, 4, 2, 1, VID_PLL_DIV_5, 2, 1, 1, -1},
 	{{HDMIV_1024x768p60hz,
 	  GROUP_END},
 		1, VIU_ENCP, 5200000, 4, 2, 1, VID_PLL_DIV_5, 2, 1, 1, -1},

@@ -288,11 +288,8 @@ static int lcd_extern_cmd_multi_id(struct lcd_extern_driver_s *edrv,
 	pdrv = aml_lcd_get_driver(edrv->index);
 	if (!pdrv)
 		return -1;
-	if (pdrv->config.cus_ctrl.ufr_flag == 0)
-		return -1;
 
-	frame_rate = pdrv->config.timing.sync_duration_num /
-		pdrv->config.timing.sync_duration_den;
+	frame_rate = pdrv->config.timing.act_timing.frame_rate;
 
 	temp_list = edev->multi_list_header;
 	while (temp_list) {
@@ -586,16 +583,18 @@ static int lcd_extern_power_cmd_dynamic_size(struct lcd_extern_driver_s *edrv,
 				ret = aml_lcd_i2c_write(i2c_bus,
 					 edev->config.i2c_addr,
 					 &table[i + 2], (size - 1));
+				if (ret)
+					goto power_cmd_dynamic_err;
 				if (table[i + 1 + size] > 0)
 					mdelay(table[i + 1 + size]);
 			} else if (type == LCD_EXT_CMD_TYPE_CMD2_DELAY) {
 				ret = aml_lcd_i2c_write(i2c_bus,
 					 edev->config.i2c_addr2,
 					 &table[i + 2], (size - 1));
-				if (table[i + 1 + size] > 0)
-					mdelay(table[i + 1 + size]);
 				if (ret)
 					goto power_cmd_dynamic_err;
+				if (table[i + 1 + size] > 0)
+					mdelay(table[i + 1 + size]);
 			} else if (type == LCD_EXT_CMD_TYPE_CMD3_DELAY) {
 				ret = aml_lcd_i2c_write(i2c_bus,
 					 edev->config.i2c_addr3,

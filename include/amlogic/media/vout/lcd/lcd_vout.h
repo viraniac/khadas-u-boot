@@ -10,6 +10,8 @@
 #include <linux/list.h>
 #include <dm.h>
 #include <asm/gpio.h>
+#include <amlogic/media/vout/lcd/lcd_timing.h>
+#include <amlogic/media/vout/lcd/lcd_cus_ctrl.h>
 #ifdef CONFIG_AML_LCD_TCON
 #include <amlogic/media/vout/lcd/lcd_tcon_data.h>
 #endif
@@ -19,16 +21,24 @@
  * ********************************** */
 //#define LCD_DEBUG_INFO
 extern unsigned int lcd_debug_print_flag;
-#define LCD_DBG_PR_NORMAL       BIT(0)
+//bit[15:0]
+#define LCD_DBG_PR_NORMAL       BIT(0) //basic info & flow
 #define LCD_DBG_PR_ADV          BIT(1)
-#define LCD_DBG_PR_ADV2         BIT(2) //clk calc, tcon_data
-#define LCD_DBG_PR_BL_NORMAL    BIT(4)
-#define LCD_DBG_PR_BL_ADV       BIT(5) //pwm, isr, ext, ldim
-#define LCD_DBG_PR_TEST         BIT(6)
-#define LCD_DBG_PR_REG          BIT(7)
+#define LCD_DBG_PR_ADV2         BIT(2)
+#define LCD_DBG_PR_ISR          BIT(3)
+#define LCD_DBG_PR_BL_NORMAL    BIT(4) //basic info & flow
+#define LCD_DBG_PR_BL_ADV       BIT(5) //ext, ldim
+#define LCD_DBG_PR_BL_PWM       BIT(6)
+#define LCD_DBG_PR_BL_ISR       BIT(7)
+#define LCD_DBG_PR_CLK          BIT(8)
+#define LCD_DBG_PR_TCON         BIT(9)
+#define LCD_DBG_PR_TEST         BIT(14)
+#define LCD_DBG_PR_REG          BIT(15)
 
 #define LCDPR(fmt, args...)     printf("lcd: "fmt"", ## args)
 #define LCDERR(fmt, args...)    printf("lcd: error: "fmt"", ## args)
+
+#define PR_BUF_MAX              (4 * 1024)
 
 #define LCD_MAX_DRV             3
 
@@ -109,67 +119,44 @@ struct lcd_basic_s {
 	char model_name[MOD_LEN_MAX];
 	enum lcd_type_e lcd_type;
 	unsigned char lcd_bits;
-
-	unsigned short h_active; /* Horizontal display area */
-	unsigned short v_active; /* Vertical display area */
-	unsigned short h_period; /* Horizontal total period time */
-	unsigned short v_period; /* Vertical total period time */
-	unsigned short h_period_min;
-	unsigned short h_period_max;
-	unsigned short v_period_min;
-	unsigned short v_period_max;
-	unsigned char frame_rate_min;
-	unsigned char frame_rate_max;
-	unsigned int lcd_clk_min;
-	unsigned int lcd_clk_max;
+	unsigned char config_check;
 
 	unsigned short screen_width;  /* screen physical width in "mm" unit */
 	unsigned short screen_height; /* screen physical height in "mm" unit */
 };
 
-#define LCD_CLK_FRAC_UPDATE     (1 << 0)
-#define LCD_CLK_PLL_CHANGE      (1 << 1)
+#define LCD_CLK_FRAC_UPDATE     BIT(0)
+#define LCD_CLK_PLL_CHANGE      BIT(1)
+#define LCD_CLK_PLL_RESET       BIT(2)
 struct lcd_timing_s {
-	unsigned char clk_auto; /* clk parameters auto generation */
-	unsigned char fr_adjust_type; /* 0=clock, 1=htotal, 2=vtotal */
+	struct lcd_detail_timing_s dft_timing; //panel parameter probe stage
+	struct lcd_detail_timing_s base_timing; //panel parameter init stage
+	struct lcd_detail_timing_s act_timing; //panel parameter actual stage
+
+	unsigned char pll_flag;
+	unsigned char clk_mode;
+	unsigned char ppc;
 	unsigned char clk_change; /* internal used */
-	unsigned int lcd_clk;   /* pixel clock(unit: Hz) */
-	unsigned int base_pixel_clk; /* internal used */
-	unsigned int base_h_period;  /* internal used */
-	unsigned int base_v_period;  /* internal used */
-	unsigned int base_frame_rate; /* internal used */
+	unsigned char ss_level;
+	unsigned char ss_freq;
+	unsigned char ss_mode;
+
+	unsigned int enc_clk;
+	unsigned long long bit_rate; /* Hz */
+
 	unsigned int pll_ctrl;  /* pll settings */
 	unsigned int div_ctrl;  /* divider settings */
 	unsigned int clk_ctrl;  /* clock settings */
 	unsigned int pll_ctrl2;  /* pll settings */
 	unsigned int div_ctrl2;  /* divider settings */
 	unsigned int clk_ctrl2;  /* clock settings */
-	unsigned long long bit_rate; /* Hz */
-	unsigned int enc_clk;
-	unsigned int clk_mode;  /* 0=dependence mode, 1=independence mode */
-	unsigned int ppc;
-
-	unsigned int ss_level;
-	unsigned int ss_freq;
-	unsigned int ss_mode;
-
-	unsigned int sync_duration_num;
-	unsigned short sync_duration_den;
 
 	unsigned int hstart;
 	unsigned int hend;
 	unsigned int vstart;
 	unsigned int vend;
-
-	unsigned short hsync_width;
-	unsigned short hsync_bp;
-	unsigned short hsync_pol;
-	unsigned short vsync_width;
-	unsigned short vsync_bp;
-	unsigned short vsync_pol;
-	/* unsigned int vsync_h_phase; // [31]sign, [15:0]value */
-	unsigned int h_offset;
-	unsigned int v_offset;
+	unsigned char pre_de_h;
+	unsigned char pre_de_v;
 
 	unsigned short de_hs_addr;
 	unsigned short de_he_addr;
@@ -185,6 +172,25 @@ struct lcd_timing_s {
 	unsigned short vs_he_addr;
 	unsigned short vs_vs_addr;
 	unsigned short vs_ve_addr;
+
+	unsigned short pre_h_de_start;
+	unsigned short pre_h_de_end;
+	unsigned short pre_v_de_start;
+	unsigned short pre_v_de_end;
+	unsigned short pre_hso_start;
+	unsigned short pre_hso_end;
+	unsigned short pre_vso_hstart;
+	unsigned short pre_vso_hend;
+	unsigned short pre_vso_start;
+	unsigned short pre_vso_end;
+};
+
+struct lcd_disp_tmg_req_s {
+	unsigned int alert_level;//0:disable, 1:warning, 2:fatal err
+	unsigned int hswbp_vid;
+	unsigned int hfp_vid;
+	unsigned int vswbp_vid;
+	unsigned int vfp_vid;
 };
 
 struct rgb_config_s {
@@ -261,47 +267,85 @@ struct vbyone_config_s {
 #define SYNC_EVENT               0x1
 #define BURST_MODE               0x2
 
-/* unit: Hz */
-#define MIPI_BIT_RATE_MAX        1500000000ULL
-
 /* command config */
 #define DSI_CMD_SIZE_INDEX       1  /* byte[1] */
 #define DSI_GPIO_INDEX           2  /* byte[2] */
 
-#define DSI_INIT_ON_MAX          2600
+#define DSI_INIT_ON_MAX          2800
 #define DSI_INIT_OFF_MAX         30
+struct dsi_dphy_s {
+	unsigned int lp_tesc;
+	unsigned int lp_lpx;
+	unsigned int lp_ta_sure;
+	unsigned int lp_ta_go;
+	unsigned int lp_ta_get;
+	unsigned int hs_exit;
+	unsigned int hs_trail;
+	unsigned int hs_zero;
+	unsigned int hs_prepare;
+	unsigned int clk_trail;
+	unsigned int clk_post;
+	unsigned int clk_zero;
+	unsigned int clk_prepare;
+	unsigned int clk_pre;
+	unsigned int init;
+	unsigned int wakeup;
+};
+
+struct dsi_panel_det_attr_s {
+	unsigned char *det_init_table[8];
+	unsigned char *det_match_seq[8];
+	char *det_type[8];
+	char *fallback_type;
+};
 
 struct dsi_config_s {
+	/* user config */
 	unsigned char lane_num;
 	unsigned int bit_rate_max; /* MHz */
-	unsigned int clk_factor; /* bit_rate/pclk */
-	unsigned int factor_numerator;
-	unsigned int factor_denominator; /* 100 */
 	unsigned char operation_mode_init; /* 0=video mode, 1=command mode */
 	unsigned char operation_mode_display; /* 0=video mode, 1=command mode */
 	unsigned char video_mode_type; /* 0=sync_pulse, 1=sync_event, 2=burst */
 	unsigned char clk_always_hs; /* 0=disable, 1=enable */
-	unsigned char phy_switch; /* 0=auto, 1=standard, 2=slow */
 
-	unsigned long long local_bit_rate_max; /* Hz */
-	unsigned long long local_bit_rate_min; /* Hz*/
+	unsigned int factor_numerator;
+	unsigned int factor_denominator;
 	unsigned int lane_byte_clk;
+
+	/* non_burst vid packet */
+	unsigned int vid_num_chunks;
+	unsigned int pixel_per_chunk; /* pkt_size */
+	unsigned int vid_null_size;
+	unsigned int byte_per_chunk; /* internal usage */
+	unsigned int multi_pkt_en;   /* internal usage */
+
+	/* vid timing */
+	unsigned int hline;
+	unsigned int hsa;
+	unsigned int hbp;
+
 	unsigned int venc_data_width;
 	unsigned int dpi_data_format;
-	unsigned int data_bits;
 
 	unsigned char *dsi_init_on;
 	unsigned char *dsi_init_off;
 	unsigned char extern_init;
 
+	unsigned char dsi_rd_n;
+	struct dsi_dphy_s dphy;
+
+	//dsi_panel_check.c
 	unsigned char check_en;
 	unsigned char check_reg;
 	unsigned char check_cnt;
 	unsigned char check_state;
+	//dsi_panel_detect.c
+	char matched_panel[20];
+	char dsi_detect_dtb_path[30];
+	char *dt_addr;
+	unsigned char panel_det_attr; //[0]:det_en, [1]:store2env, [2]:0=bsp/1=dts [3]:on_matched
 };
 
-#define EDP_EDID_STATE_LOAD     BIT(0)
-#define EDP_EDID_STATE_APPLY    BIT(1)
 #define EDP_EDID_RETRY_MAX      3
 struct edp_config_s {
 	unsigned char HPD_level;
@@ -310,28 +354,23 @@ struct edp_config_s {
 	/* eDP: preset in dts */
 	unsigned char max_lane_count;
 	unsigned char max_link_rate;
-	unsigned char enhanced_framing_en;
 	/* current actually use */
 	unsigned char lane_count;
 	unsigned char link_rate;
-	// unsigned int bit_rate; // kHz
 
-	unsigned char down_ss;
-
-	unsigned char dpcd_caps_en;
 	unsigned char sync_clk_mode;
-	unsigned char scramb_mode;
-	unsigned char pn_swap;
-	unsigned char link_rate_update;
 
 	/* internal used */
-	unsigned char training_settings;
-	unsigned char main_stream_enable;
-
-	unsigned char training_mode;
+	unsigned char enhanced_framing_en;
+	unsigned char train_aux_rd_interval;
+	unsigned char down_ss;
 	unsigned char TPS_support;
-	unsigned char phy_update;
+	unsigned char coding_support;
+	unsigned char DACP_support;
 
+	unsigned char link_rate_update;
+	unsigned char phy_update;
+	unsigned char training_mode;
 	/* last known-good (DP), in range: 0~3 */
 	unsigned char last_good_vswing[4];
 	unsigned char last_good_preem[4];
@@ -348,6 +387,7 @@ struct edp_config_s {
 
 	/* edid */
 	unsigned char edid_en;
+	unsigned char timing_idx;
 };
 
 struct mlvds_config_s {
@@ -484,8 +524,15 @@ struct lcd_pinmux_ctrl_s {
 };
 
 struct cus_ctrl_config_s {
-	unsigned int flag;
-	unsigned char ufr_flag;
+	unsigned int ctrl_en;
+	unsigned int ctrl_cnt;
+	unsigned int timing_cnt;
+	unsigned int active_timing_type;
+	unsigned char timing_switch_flag;
+	unsigned char timing_ctrl_valid;
+
+	struct lcd_cus_ctrl_attr_config_s *attr_config;
+	struct lcd_cus_ctrl_attr_config_s *cur_timing_attr;
 };
 
 #define LCD_ENABLE_RETRY_MAX    3
@@ -507,11 +554,35 @@ struct lcd_config_s {
 	unsigned int pinmux_clr[LCD_PINMUX_NUM][2];
 };
 
+#define LCD_DURATION_MAX    8
 struct lcd_duration_s {
 	unsigned int frame_rate;
 	unsigned int duration_num;
 	unsigned int duration_den;
 	unsigned int frac;
+};
+
+struct lcd_vmode_info_s {
+	char name[32];
+	unsigned int width;
+	unsigned int height;
+	unsigned int base_fr;
+	unsigned int duration_index;
+	unsigned int duration_cnt;
+	struct lcd_duration_s duration[LCD_DURATION_MAX];
+	struct lcd_detail_timing_s *dft_timing;
+};
+
+struct lcd_vmode_list_s {
+	struct lcd_vmode_info_s *info;
+	struct lcd_vmode_list_s *next;
+};
+
+struct lcd_vmode_mgr_s {
+	unsigned int vmode_cnt;
+	struct lcd_vmode_list_s *vmode_list_header;
+	struct lcd_vmode_info_s *cur_vmode_info;
+	struct lcd_vmode_info_s *next_vmode_info;
 };
 
 #define LCD_INIT_LEVEL_NORMAL         0
@@ -548,12 +619,12 @@ struct lcd_boot_ctrl_s {
  *bit[31:30]: lcd mode(0=normal, 1=tv; 2=tablet, 3=TBD)
  *bit[29:28]: lcd debug para source(0=normal, 1=dts, 2=unifykey,
  *                                  3=bsp for uboot)
- *bit[27:16]: reserved
- *bit[15:8]: lcd test pattern
- *bit[7:0]:  lcd debug print flag
+ *bit[27:20]: reserved
+ *bit[19:16]: lcd test pattern
+ *bit[15:0]:  lcd debug print flag
  */
 struct lcd_debug_ctrl_s {
-	unsigned char debug_print_flag;
+	unsigned short debug_print_flag;
 	unsigned char debug_test_pattern;
 	unsigned char debug_para_source;
 	unsigned char debug_lcd_mode;
@@ -614,22 +685,26 @@ struct aml_lcd_drv_s {
 	unsigned int status;
 	unsigned char mode;
 	unsigned char key_valid;
+	unsigned char probe_done;
 	unsigned char clk_path; /* 0=hpll, 1=gp0_pll */
 	char init_mode[64];
 	int init_frac;
-	unsigned int output_vmode;
 	unsigned int power_on_suspend;
 	unsigned char clk_conf_num;
+	unsigned char config_check_glb;
+	unsigned char config_check_en;
 
 	struct lcd_config_s config;
 	struct aml_lcd_data_s *data;
 	struct lcd_boot_ctrl_s boot_ctrl;
 	struct lcd_duration_s *std_duration;
+	struct lcd_vmode_mgr_s vmode_mgr;
 	void *clk_conf;
 	struct aml_lcd_cma_mem cma_pool;
+	struct lcd_disp_tmg_req_s disp_req;
 
-	int  (*outputmode_check)(struct aml_lcd_drv_s *pdrv, char *mode, unsigned int frac);
-	int  (*config_check)(struct aml_lcd_drv_s *pdrv, char *mode, unsigned int frac);
+	int  (*outputmode_check)(struct aml_lcd_drv_s *pdrv, char *mode);
+	int  (*config_valid)(struct aml_lcd_drv_s *pdrv, char *mode);
 	void (*driver_init_pre)(struct aml_lcd_drv_s *pdrv);
 	int  (*driver_init)(struct aml_lcd_drv_s *pdrv);
 	void (*driver_disable)(struct aml_lcd_drv_s *pdrv);
@@ -637,9 +712,7 @@ struct aml_lcd_drv_s {
 #ifdef CONFIG_AML_LCD_TCON
 	void (*tcon_reg_print)(void);
 	void (*tcon_table_print)(void);
-	void (*tcon_vac_print)(void);
-	void (*tcon_demura_print)(void);
-	void (*tcon_acc_print)(void);
+	void (*tcon_lut_print_tl1)(char *name);
 	void (*tcon_data_print)(unsigned char index);
 	void (*tcon_spi_print)(void);
 	int (*tcon_spi_data_load)(void);
@@ -685,9 +758,22 @@ void aml_lcd_vbyone_rst(int index);
 int aml_lcd_vbyone_cdr(int index);
 int aml_lcd_vbyone_lock(int index);
 int aml_lcd_edp_debug(int index, char *str, int num);
+
+// switch MIPI DSI mode: 0:display, 1:command
+void aml_lcd_mipi_dsi_mode(int index, unsigned char mode);
+// exec DSI command, payload:[0]:data_type, [1]:number of leftover cmd, [2+]: command
+void aml_lcd_mipi_dsi_cmd(int index, unsigned char *payload);
+// read DSI command
+// @payload format as above
+// @rd_data is space to store read back data
+// @rd_byte_len is max size of rd_data, data read over this size will not be stored
+// return actual read out size
+int aml_lcd_mipi_dsi_read(int index,
+		unsigned char *payload, unsigned char *rd_data, unsigned char rd_byte_len);
 void aml_lcd_driver_test(int index, int num);
 int aml_lcd_driver_prbs(int index, unsigned int s, unsigned int mode_flag);
 void aml_lcd_driver_unifykey_dump(int index, unsigned int flag);
+void aml_lcd_config_check(int index);
 
 void aml_lcd_driver_ext_info(int index);
 void aml_lcd_driver_ext_power_on(int index);
@@ -696,7 +782,7 @@ void aml_lcd_driver_ext_power_off(int index);
 void aml_lcd_driver_bl_on(int index);
 void aml_lcd_driver_bl_off(int index);
 void aml_lcd_driver_set_bl_level(int index, int level);
-unsigned int  aml_lcd_driver_get_bl_level(int index);
+unsigned int aml_lcd_driver_get_bl_level(int index);
 void aml_lcd_driver_bl_config_print(int index);
 
 int aml_lcd_driver_suspend(void *pm_ops);

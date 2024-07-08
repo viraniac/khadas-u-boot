@@ -34,7 +34,7 @@
 #define CONFIG_PDVFS_ENABLE
 
 /* SMP Definitions */
-#define CPU_RELEASE_ADDR		secondary_boot_func
+// #define CPU_RELEASE_ADDR		secondary_boot_func
 
 /* Bootloader Control Block function
    That is used for recovery and the bootloader to talk to each other
@@ -79,12 +79,32 @@
 #define CONFIG_DTB_LOAD  "imgread dtb _aml_dtb ${dtb_mem_addr}"
 #endif//#ifdef CONFIG_DTB_BIND_KERNEL	//load dtb from kernel, such as boot partition
 
+#ifdef CONFIG_NOVERBOSE_BUILD
+#define SILENT		"silent=1\0"
+#define KERNL_LOGLEVEL	"loglevel=2 "
+#else
+#define SILENT		"silent=0\0"
+#define KERNL_LOGLEVEL	"loglevel=7 "
+#endif
+
+#define OSD_CMD	"osd open;osd clear;run load_bmp_logo;bmp scale; "
+#ifdef CONFIG_ARMV8_MULTIENTRY
+#define ENABLE_SMP	"display_on_smp=0\0"
+#define INIT_DISPLAY	"if test ${display_on_smp} = 0; then "\
+				"run init_display;" \
+			"fi;"
+#else
+#define ENABLE_SMP	"display_on_smp=0\0"
+#define INIT_DISPLAY	"run init_display;"
+#endif
+
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \
        CONFIG_EXTRA_ENV_SETTINGS_BASE \
 		"firstboot=1\0"\
-		"silent=1\0"\
+		SILENT \
+		ENABLE_SMP \
 		"upgrade_step=0\0"\
 		"jtag=disable\0"\
 		"loadaddr=0x00020000\0"\
@@ -93,17 +113,16 @@
 		"loadaddr_kernel=0x03080000\0"\
 		"otg_device=1\0" \
 		"panel_type=lvds_1\0" \
-		"panel1_type=vbyone_1\0" \
 		"panel_name=null\0" \
 		"lcd_ctrl=0x00000000\0" \
 		"lcd_debug=0x00000000\0" \
 		"outputmode=1080p60hz\0" \
+		"bootup_display=on\0" \
 		"hdmimode=1080p60hz\0" \
 		"connector_type=LVDS-A\0" \
 		"cvbsmode=576cvbs\0" \
 		"vout_init=disable\0" \
 		"model_name=FHD2HDMI\0" \
-		"model1_name=UHD_1RG\0" \
 		"gamma=0\0" \
 		"display_width=1920\0" \
 		"display_height=1080\0" \
@@ -151,10 +170,11 @@
 	"initargs="\
 		"init=/init " CONFIG_KNL_LOG_LEVEL "console=ttyS0,115200 "\
 		"no_console_suspend earlycon=aml-uart,0xfe07a000 "\
-	    "ramoops.pstore_en=1 ramoops.record_size=0x8000 "\
+		"ramoops.pstore_en=1 ramoops.record_size=0x8000 "\
 		"ramoops.console_size=0x4000 loop.max_part=4 "\
-	    "scsi_mod.scan=async xhci_hcd.quirks=0x800000 scramble_reg=0xfe02e030 aml_isolcpus=2 "\
-	    "\0"\
+		"scsi_mod.scan=async xhci_hcd.quirks=0x800000 scramble_reg=0xfe02e030 "\
+		KERNL_LOGLEVEL "aml_isolcpus=2 isolcpus_speedup_boot=1"\
+		"\0"\
 	"upgrade_check="\
 			"run upgrade_check_base;"\
 			"\0"\
@@ -162,8 +182,8 @@
 		"get_bootloaderversion;" \
 		"run storeargs_base;"\
 		"setenv bootargs ${bootargs} powermode=${powermode} "\
-		"lcd_ctrl=${lcd_ctrl} lcd1_ctrl=${lcd1_ctrl}  lcd_debug=${lcd_debug} "\
-		"outputmode=${outputmode}; panel1_type=${panel1_type};"\
+		"lcd_ctrl=${lcd_ctrl} lcd_debug=${lcd_debug} "\
+		"panel_name=${panel_name} outputmode=${outputmode}; "\
 		"run check_connector_type; "\
 		"run cmdline_keys;"\
 		"\0"\
@@ -280,33 +300,44 @@
 			"run load_bmp_logo_base;"\
 			"\0"\
 	"init_display="\
-		"osd open;osd clear;run load_bmp_logo;bmp scale;vout output ${outputmode}"\
+		OSD_CMD \
+		"vout output ${outputmode}"\
+		"\0"\
+	"init_display_pre="\
+		OSD_CMD \
+		"vout prepare ${outputmode}"\
+		"\0"\
+	"init_display_post="\
+		"if test ${bootup_display} = on; then "\
+			"vout output ${outputmode};"\
+		"fi;"\
 		"\0"\
 	"check_display="\
 		"echo check_display reboot_mode : ${reboot_mode} ,powermode : ${powermode};"\
 		"if test ${reboot_mode} = ffv_reboot; then "\
 			"if test ${ffv_wake} = on; then "\
 				"echo ffv reboot no display; "\
+				"setenv bootup_display off; "\
 			"else "\
-				"run init_display; "\
+				"setenv bootup_display on; "\
 			"fi; "\
 		"else if test ${reboot_mode} = cold_boot; then "\
 			"if test ${powermode} = on; then "\
-				"echo powermode : ${powermode} ,need to init_display; "\
-				"run init_display; "\
+				"echo powermode : ${powermode} ,bootup_display on; "\
+				"setenv bootup_display on; "\
 			"else if test ${powermode} = last; then "\
 				"if test ${suspend} = off; then "\
-					"echo suspend : ${suspend} ,need to init_display; "\
-					"run init_display; "\
+					"echo suspend : ${suspend} ,bootup_display on; "\
+					"setenv bootup_display on; "\
 				"fi; "\
 			"fi;fi; "\
 		"else "\
 			"echo reboot_mode is normal;"\
-			"run init_display; "\
+			"setenv bootup_display on; "\
 		"fi;fi; "\
 		"\0"\
 		"cmdline_keys="\
-			"setenv usid t965d4${cpu_id};"\
+			"setenv usid t968d4${cpu_id};"\
 			"run cmdline_keys_base;"\
 			"\0"\
 	"upgrade_key="\
@@ -326,9 +357,7 @@
 #define CONFIG_PREBOOT  \
             "run bcb_cmd; "\
             "run upgrade_check;"\
-	/* "run init_display;"\ */\
-	"get_rebootmode;"\
-	"run check_display;"\
+	INIT_DISPLAY \
 	"run storeargs;"\
             "run upgrade_key;" \
             "bcb uboot-command;" \
@@ -530,6 +559,9 @@
 
 //use hardware sha2
 //#define CONFIG_AML_HW_SHA2
+
+//Replace avb2 software SHA256 to utilize armce
+#define CONFIG_AVB2_UBOOT_SHA256
 
 #define CONFIG_MULTI_DTB    1
 

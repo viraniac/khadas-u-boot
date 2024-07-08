@@ -24,6 +24,7 @@
 #include <amlogic/aml_mtd.h>
 #include <amlogic/aml_mmc.h>
 #include <amlogic/board.h>
+#include <asm/arch/stick_mem.h>
 
 #ifdef CONFIG_AML_VPU
 #include <amlogic/media/vpu/vpu.h>
@@ -142,7 +143,9 @@ int board_init(void)
 int board_late_init(void)
 {
 	printf("board late init\n");
+	env_set("defenv_para", "-c");
 	aml_board_late_init_front(NULL);
+	get_stick_reboot_flag_mbx();
 
 #ifdef CONFIG_AML_VPU
 	vpu_probe();
@@ -345,19 +348,6 @@ const struct mtd_partition *get_spinand_partition_table(int *partitions)
 	return spinand_partitions;
 }
 #endif /* CONFIG_SPI_NAND */
-
-const char * const _env_args_reserve_[] =
-{
-	"lock",
-	"upgrade_step",
-	"bootloader_version",
-	"dts_to_gpt",
-	"fastboot_step",
-	"reboot_status",
-	"expect_index",
-
-	NULL//Keep NULL be last to tell END
-};
 
 int __attribute__((weak)) mmc_initialize(bd_t *bis){ return 0;}
 

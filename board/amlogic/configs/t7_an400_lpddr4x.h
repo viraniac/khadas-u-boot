@@ -71,6 +71,7 @@
 	"storeargs_hdmitx="\
 		"setenv bootargs ${bootargs} powermode=${powermode} "\
 		"lcd_ctrl=${lcd_ctrl} lcd_debug=${lcd_debug} "\
+		"dptx0_ctrl=${dptx0_ctrl} dptx1_ctrl=${dptx1_ctrl} "\
 		"outputmode=${outputmode} hdmitx=${cecconfig},${colorattribute};"\
 		"\0"\
 	"init_display_hdmitx="\
@@ -85,15 +86,20 @@
 	"panel2_type=lvds_1\0" \
 	"lcd1_ctrl=0x00000000\0" \
 	"lcd2_ctrl=0x00000000\0" \
+	"dptx0_ctrl=0x00000000\0" \
+	"dptx1_ctrl=0x00000000\0" \
 	"outputmode=panel1\0" \
 	"outputmode2=1080p60hz\0" \
 	"cvbsmode=576cvbs\0" \
+	"dptx0_ctrl=0x00000000\0" \
+	"dptx1_ctrl=0x00000000\0" \
 	"storeargs_hdmitx="\
 		"setenv bootargs ${bootargs} powermode=${powermode} "\
 		"lcd_ctrl=${lcd_ctrl} lcd_debug=${lcd_debug} "\
 		"outputmode=${outputmode} hdmitx=${cecconfig},${colorattribute} "\
 		"vout2=${outputmode2},enable panel1_type=${panel1_type} "\
 		"lcd1_ctrl=${lcd1_ctrl} panel2_type=${panel2_type} lcd2_ctrl=${lcd2_ctrl} "\
+		"dptx0_ctrl=${dptx0_ctrl} dptx1_ctrl=${dptx1_ctrl} "\
 		"hdr_policy=${hdr_policy} hdr_priority=${hdr_priority};"\
 		"\0"\
 	"init_display_hdmitx="\
@@ -109,6 +115,8 @@
         "otg_device=1\0" \
         "lcd_ctrl=0x00000000\0" \
         "lcd_debug=0x00000000\0" \
+		"dptx0_ctrl=0x00000000\0" \
+		"dptx1_ctrl=0x00000000\0" \
 	"hdmimode=none\0" \
         "cvbsmode=dummy_l\0" \
 		"colorattribute=444,8bit\0"\
@@ -116,7 +124,6 @@
         "display_width=1920\0" \
         "display_height=1080\0" \
 		"hdmichecksum=0x00000000\0" \
-		"dv_fw_dir=/reserved/firmware/dovi_fw.bin\0" \
 		"display_bpp=16\0" \
         "display_color_index=16\0" \
         "display_layer=osd0\0" \
@@ -131,7 +138,7 @@
         "usb_burning=" CONFIG_USB_TOOL_ENTRY "\0" \
         "fdt_high=0x20000000\0"\
         "sdcburncfg=aml_sdc_burn.ini\0"\
-        "EnableSelinux=permissive\0" \
+	"EnableSelinux=enforcing\0" \
         "recovery_part=recovery\0"\
 	"lock=10101000\0"\
 	"board=t7_an400\0"\
@@ -163,7 +170,7 @@
 		"init=/init" CONFIG_KNL_LOG_LEVEL "console=ttyS0,921600 no_console_suspend "\
 		"earlycon=aml-uart,0xfe078000 ramoops.pstore_en=1 ramoops.record_size=0x8000 "\
 		"ramoops.console_size=0x4000 loop.max_part=4 scsi_mod.scan=async "\
-		"xhci_hcd.quirks=0x800000 loglevel=4 scramble_reg=0xfe02e030 "\
+		"xhci_hcd.quirks=0x800000 scramble_reg=0xfe02e030 "\
             "\0"\
         "upgrade_check="\
 			"run upgrade_check_base;"\
@@ -606,7 +613,10 @@
 
 /* unify build for generate encrypted bootloader "u-boot.bin.encrypt" */
 #define CONFIG_AML_CRYPTO_UBOOT   1
-//#define CONFIG_AML_SIGNED_UBOOT   1
+
+#ifdef CONFIG_SCS
+    #define CONFIG_AML_SIGNED_UBOOT   1
+#endif
 /* unify build for generate encrypted kernel image
    SRC : "board/amlogic/(board)/boot.img"
    DST : "fip/boot.img.encrypt" */

@@ -453,7 +453,7 @@ int mtd_store_get_offset(const char *partname, loff_t *retoff, loff_t off)
 	struct mtd_device *dev;
 	struct part_info *part;
 	char tmp_part_name[20] = {0};
-	u8 pnum;
+	u8 pnum, entry_num = -1;
 #endif
 
 	*retoff = 0;
@@ -466,14 +466,30 @@ int mtd_store_get_offset(const char *partname, loff_t *retoff, loff_t off)
 		if ((store_get_device_bootloader_mode() == DISCRETE_BOOTLOADER) ||
 		    (store_get_device_bootloader_mode() == ADVANCE_BOOTLOADER)) {
 			if (!strcmp(partname, BOOT_BL2) ||
-			    !strcmp(partname, BOOT_SPL))
-				strncpy(tmp_part_name, BOOT_LOADER, strlen(BOOT_LOADER));
+			    !strcmp(partname, BOOT_SPL) ||
+				!strcmp(partname, BOOT_LOADER)) {
+				entry_num = BOOT_AREA_BB1ST;
+			} else if (!strcmp(partname, BOOT_BL2E)) {
+				entry_num = BOOT_AREA_BL2E;
+			} else if (!strcmp(partname, BOOT_BL2X)) {
+				entry_num = BOOT_AREA_BL2X;
+			} else if (!strcmp(partname, BOOT_DDRFIP)) {
+				entry_num = BOOT_AREA_DDRFIP;
+			} else if (!strcmp(partname, BOOT_DEVFIP)) {
+				entry_num = BOOT_AREA_DEVFIP;
+			}
 		}
+
+		if (entry_num <= BOOT_AREA_DEVFIP) {
+			off += g_ssp.boot_entry[entry_num].offset;
+			strncpy(tmp_part_name, BOOT_LOADER, strlen(BOOT_LOADER));
+		}
+
 		ret = find_dev_and_part(tmp_part_name, &dev, &pnum, &part);
 		if (ret) {
 			pr_info("%s %d can not find part:%s\n",
 				__func__, __LINE__, tmp_part_name);
-			ret = -EINVAL;
+			return -EINVAL;
 		}
 		offset = part->offset + off;
 	}
@@ -484,8 +500,7 @@ int mtd_store_get_offset(const char *partname, loff_t *retoff, loff_t off)
 		offset = off;
 	}
 
-	if (!ret)
-		*retoff = offset;
+	*retoff = offset;
 
 	return ret;
 }
@@ -833,7 +848,8 @@ int is_mtd_store_boot_area(const char *part_name)
 
 	if ((store_get_device_bootloader_mode() == DISCRETE_BOOTLOADER) ||
 	    (store_get_device_bootloader_mode() == ADVANCE_BOOTLOADER)) {
-		if (!strcmp(part_name, BOOT_BL2) ||
+		if (!strcmp(part_name, BOOT_LOADER) ||
+			!strcmp(part_name, BOOT_BL2) ||
 		    !strcmp(part_name, BOOT_SPL) ||
 		    !strcmp(part_name, BOOT_TPL) ||
 		    !strcmp(part_name, BOOT_FIP) ||

@@ -804,13 +804,21 @@ static int ldim_dev_get_config_from_dts(struct ldim_dev_driver_s *dev_drv,
 			else
 				bl_pwm->pwm_freq = 60;
 			bl_pwm->pwm_duty = 50;
+			bl_pwm->pwm_phase = 0;
 		} else {
 			bl_pwm->pwm_method = be32_to_cpup((u32 *)propdata);
-			bl_pwm->pwm_freq = be32_to_cpup((((u32 *)propdata) + 1));
+			temp = be32_to_cpup((((u32 *)propdata) + 1));
+			if (bl_pwm->pwm_port == BL_PWM_VS) {
+				bl_pwm->pwm_freq = temp & 0xff;
+				bl_pwm->pwm_phase = (temp >> 8) & 0xffffff;
+			} else {
+				bl_pwm->pwm_freq = temp;
+				bl_pwm->pwm_phase = 0;
+			}
 			bl_pwm->pwm_duty = be32_to_cpup((((u32 *)propdata) + 2));
 		}
 		if (bl_pwm->pwm_port == BL_PWM_VS) {
-			if (bl_pwm->pwm_freq > 4) {
+			if (bl_pwm->pwm_freq > 8) {
 				LDIMERR("pwm_vs wrong freq %d\n", bl_pwm->pwm_freq);
 				bl_pwm->pwm_freq = BL_FREQ_VS_DEFAULT;
 			}
@@ -818,8 +826,8 @@ static int ldim_dev_get_config_from_dts(struct ldim_dev_driver_s *dev_drv,
 			if (bl_pwm->pwm_freq > XTAL_HALF_FREQ_HZ)
 				bl_pwm->pwm_freq = XTAL_HALF_FREQ_HZ;
 		}
-		LDIMPR("get ldim_pwm pol = %d, freq = %d, default duty = %d%%\n",
-		       bl_pwm->pwm_method, bl_pwm->pwm_freq, bl_pwm->pwm_duty);
+		LDIMPR("get ldim_pwm pol = %d, freq = %d, default duty = %d%%, phase=%d\n",
+		       bl_pwm->pwm_method, bl_pwm->pwm_freq, bl_pwm->pwm_duty, bl_pwm->pwm_phase);
 	}
 
 	/* analog pwm */
@@ -843,19 +851,27 @@ static int ldim_dev_get_config_from_dts(struct ldim_dev_driver_s *dev_drv,
 			bl_pwm->pwm_duty_max = 100;
 			bl_pwm->pwm_duty_min = 20;
 			bl_pwm->pwm_duty = 50;
+			bl_pwm->pwm_phase = 0;
 		} else {
 			bl_pwm->pwm_method = be32_to_cpup((u32 *)propdata);
-			bl_pwm->pwm_freq = be32_to_cpup((((u32 *)propdata) + 1));
+			temp = be32_to_cpup((((u32 *)propdata) + 1));
+			if (bl_pwm->pwm_port == BL_PWM_VS) {
+				bl_pwm->pwm_freq = temp & 0xff;
+				bl_pwm->pwm_phase = (temp >> 8) & 0xffffff;
+			} else {
+				bl_pwm->pwm_freq = temp;
+				bl_pwm->pwm_phase = 0;
+			}
 			bl_pwm->pwm_duty_max = be32_to_cpup((((u32 *)propdata) + 2));
 			bl_pwm->pwm_duty_min = be32_to_cpup((((u32 *)propdata) + 3));
 			bl_pwm->pwm_duty = be32_to_cpup((((u32 *)propdata) + 4));
 		}
 		if (bl_pwm->pwm_freq > XTAL_HALF_FREQ_HZ)
 			bl_pwm->pwm_freq = XTAL_HALF_FREQ_HZ;
-		LDIMPR("get analog_pwm pol = %d, freq = %d, duty_max = %d%%, duty_min = %d%%, default duty = %d%%\n",
-		       bl_pwm->pwm_method, bl_pwm->pwm_freq,
-		       bl_pwm->pwm_duty_max, bl_pwm->pwm_duty_min,
-		       bl_pwm->pwm_duty);
+		LDIMPR("get analog_pwm pol = %d, freq = %d, duty_max = %d%%\n",
+			bl_pwm->pwm_method, bl_pwm->pwm_freq, bl_pwm->pwm_duty_max);
+		LDIMPR("duty_min = %d%%, default duty = %d%%, phase=%d\n",
+		       bl_pwm->pwm_duty_min, bl_pwm->pwm_duty, bl_pwm->pwm_phase);
 	}
 
 	propdata = (char *)fdt_getprop(dt_addr, child_offset, "ldim_pwm_pinmux_sel", NULL);
@@ -986,43 +1002,38 @@ static int ldim_dev_get_config_from_ukey(struct ldim_dev_driver_s *dev_drv)
 	int key_len, len;
 	const char *str;
 	unsigned int temp;
-	struct lcd_unifykey_header_s ldev_header;
+	struct lcd_unifykey_header_s *ldev_header;
 	struct bl_pwm_config_s *bl_pwm;
 	int i, ret = 0;
 
 	if (lcd_debug_print_flag & LCD_DBG_PR_BL_NORMAL)
 		LDIMPR("load ldim_dev config from unifykey\n");
 
-	key_len = LCD_UKEY_LDIM_DEV_SIZE;
+	ret = lcd_unifykey_get_size("ldim_dev", &key_len);
+	if (ret)
+		return -1;
 	para = (unsigned char *)malloc(key_len * (sizeof(unsigned char)));
 	if (!para)
 		return -1;
 	memset(para, 0, key_len * (sizeof(unsigned char)));
 
-	ret = lcd_unifykey_get("ldim_dev", para, &key_len);
+	ret = lcd_unifykey_get("ldim_dev", para, key_len);
 	if (ret < 0) {
 		free(para);
 		return -1;
 	}
 
 	/* step 1: check header */
-	len = LCD_UKEY_HEAD_SIZE;
-	ret = lcd_unifykey_len_check(key_len, len);
-	if (ret < 0) {
-		LDIMERR("unifykey header length is incorrect\n");
-		free(para);
-		return -1;
-	}
-
-	lcd_unifykey_header_check(para, &ldev_header);
-	LDIMPR("unifykey version: 0x%04x\n", ldev_header.version);
+	ldev_header = (struct lcd_unifykey_header_s *)para;
+	LDIMPR("unifykey version: 0x%04x\n", ldev_header->version);
 	if (lcd_debug_print_flag & LCD_DBG_PR_BL_NORMAL) {
 		LDIMPR("unifykey header:\n");
-		LDIMPR("crc32             = 0x%08x\n", ldev_header.crc32);
-		LDIMPR("data_len          = %d\n", ldev_header.data_len);
+		LDIMPR("crc32             = 0x%08x\n", ldev_header->crc32);
+		LDIMPR("data_len          = %d\n", ldev_header->data_len);
 	}
 
 	/* step 2: check backlight parameters */
+	len = 65; //10+30+25
 	ret = lcd_unifykey_len_check(key_len, len);
 	if (ret < 0) {
 		LDIMERR("unifykey length is incorrect\n");
@@ -1081,11 +1092,23 @@ static int ldim_dev_get_config_from_ukey(struct ldim_dev_driver_s *dev_drv)
 	bl_pwm->pwm_port = *(p + LCD_UKEY_LDIM_DEV_PWM_VS_PORT);
 	if (bl_pwm->pwm_port < BL_PWM_MAX) {
 		bl_pwm->pwm_method = *(p + LCD_UKEY_LDIM_DEV_PWM_VS_POL);
-		bl_pwm->pwm_freq =
-			(*(p + LCD_UKEY_LDIM_DEV_PWM_VS_FREQ) |
-			((*(p + LCD_UKEY_LDIM_DEV_PWM_VS_FREQ + 1)) << 8) |
-			((*(p + LCD_UKEY_LDIM_DEV_PWM_VS_FREQ + 2)) << 16) |
-			((*(p + LCD_UKEY_LDIM_DEV_PWM_VS_FREQ + 3)) << 24));
+		if (bl_pwm->pwm_port == BL_PWM_VS) {
+			temp = (*(p + LCD_UKEY_LDIM_DEV_PWM_VS_FREQ) |
+				((*(p + LCD_UKEY_LDIM_DEV_PWM_VS_FREQ + 1)) << 8) |
+				((*(p + LCD_UKEY_LDIM_DEV_PWM_VS_FREQ + 2)) << 16) |
+				((*(p + LCD_UKEY_LDIM_DEV_PWM_VS_FREQ + 3)) << 24));
+
+			bl_pwm->pwm_freq = (temp & 0xff);
+			bl_pwm->pwm_phase = (temp >> 8) & 0xffffff;
+
+		} else {
+			bl_pwm->pwm_freq =
+				(*(p + LCD_UKEY_LDIM_DEV_PWM_VS_FREQ) |
+				((*(p + LCD_UKEY_LDIM_DEV_PWM_VS_FREQ + 1)) << 8) |
+				((*(p + LCD_UKEY_LDIM_DEV_PWM_VS_FREQ + 2)) << 16) |
+				((*(p + LCD_UKEY_LDIM_DEV_PWM_VS_FREQ + 3)) << 24));
+			bl_pwm->pwm_phase = 0;
+		}
 		bl_pwm->pwm_duty =
 			(*(p + LCD_UKEY_LDIM_DEV_PWM_VS_DUTY) |
 			((*(p + LCD_UKEY_LDIM_DEV_PWM_VS_DUTY + 1)) << 8));
@@ -1099,8 +1122,8 @@ static int ldim_dev_get_config_from_ukey(struct ldim_dev_driver_s *dev_drv)
 			if (bl_pwm->pwm_freq > XTAL_HALF_FREQ_HZ)
 				bl_pwm->pwm_freq = XTAL_HALF_FREQ_HZ;
 		}
-		LDIMPR("get ldim_pwm pol = %d, freq = %d, dft duty = %d%%\n",
-		       bl_pwm->pwm_method, bl_pwm->pwm_freq, bl_pwm->pwm_duty);
+		LDIMPR("get ldim_pwm pol = %d, freq = %d, dft duty = %d%%, phase=%d\n",
+		       bl_pwm->pwm_method, bl_pwm->pwm_freq, bl_pwm->pwm_duty, bl_pwm->pwm_phase);
 	}
 
 	bl_pwm = &dev_drv->analog_pwm_config;
@@ -1108,11 +1131,21 @@ static int ldim_dev_get_config_from_ukey(struct ldim_dev_driver_s *dev_drv)
 	bl_pwm->pwm_port = *(p + LCD_UKEY_LDIM_DEV_PWM_ADJ_PORT);
 	if (bl_pwm->pwm_port < BL_PWM_VS) {
 		bl_pwm->pwm_method = *(p + LCD_UKEY_LDIM_DEV_PWM_ADJ_POL);
-		bl_pwm->pwm_freq =
-			(*(p + LCD_UKEY_LDIM_DEV_PWM_ADJ_FREQ) |
-			((*(p + LCD_UKEY_LDIM_DEV_PWM_ADJ_FREQ + 1)) << 8) |
-			((*(p + LCD_UKEY_LDIM_DEV_PWM_ADJ_FREQ + 2)) << 16) |
-			((*(p + LCD_UKEY_LDIM_DEV_PWM_ADJ_FREQ + 3)) << 24));
+		if (bl_pwm->pwm_port == BL_PWM_VS) {
+			temp = (*(p + LCD_UKEY_LDIM_DEV_PWM_ADJ_FREQ) |
+				((*(p + LCD_UKEY_LDIM_DEV_PWM_ADJ_FREQ + 1)) << 8) |
+				((*(p + LCD_UKEY_LDIM_DEV_PWM_ADJ_FREQ + 2)) << 16) |
+				((*(p + LCD_UKEY_LDIM_DEV_PWM_ADJ_FREQ + 3)) << 24));
+			bl_pwm->pwm_freq = (temp & 0xff);
+			bl_pwm->pwm_phase = (temp >> 8) & 0xffffff;
+		} else {
+			bl_pwm->pwm_freq =
+				(*(p + LCD_UKEY_LDIM_DEV_PWM_ADJ_FREQ) |
+				((*(p + LCD_UKEY_LDIM_DEV_PWM_ADJ_FREQ + 1)) << 8) |
+				((*(p + LCD_UKEY_LDIM_DEV_PWM_ADJ_FREQ + 2)) << 16) |
+				((*(p + LCD_UKEY_LDIM_DEV_PWM_ADJ_FREQ + 3)) << 24));
+			bl_pwm->pwm_phase = 0;
+		}
 		bl_pwm->pwm_duty =
 			(*(p + LCD_UKEY_LDIM_DEV_PWM_ADJ_DUTY) |
 			((*(p + LCD_UKEY_LDIM_DEV_PWM_ADJ_DUTY + 1)) << 8));
@@ -1127,9 +1160,9 @@ static int ldim_dev_get_config_from_ukey(struct ldim_dev_driver_s *dev_drv)
 			bl_pwm->pwm_freq = XTAL_HALF_FREQ_HZ;
 		LDIMPR("get analog_pwm pol = %d, freq = %d\n",
 			bl_pwm->pwm_method, bl_pwm->pwm_freq);
-		LDIMPR("duty max = %d%%, min = %d%%, default = %d%%\n",
+		LDIMPR("duty max = %d%%, min = %d%%, default = %d%%,phase=%d\n",
 			bl_pwm->pwm_duty_max,
-			bl_pwm->pwm_duty_min, bl_pwm->pwm_duty);
+			bl_pwm->pwm_duty_min, bl_pwm->pwm_duty, bl_pwm->pwm_phase);
 	}
 
 	str = (const char *)(p + LCD_UKEY_LDIM_DEV_PINMUX_SEL);

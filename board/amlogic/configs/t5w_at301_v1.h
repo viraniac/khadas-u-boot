@@ -91,6 +91,12 @@
 #define AMLOGIC_USB_POWER
 
 #define CONFIG_SILENT_CONSOLE
+#ifdef CONFIG_NOVERBOSE_BUILD
+#define KERNL_LOGLEVEL	"loglevel=2 "
+#else
+#define KERNL_LOGLEVEL	"loglevel=7 "
+#endif
+
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \
@@ -152,7 +158,7 @@
         "initargs="\
 			"init=/init console=ttyS0,115200 no_console_suspend earlycon=aml-uart,0xffd23000 "\
 			"printk.devkmsg=on ramoops.pstore_en=1 ramoops.record_size=0x8000 "\
-			"ramoops.console_size=0x4000 loop.max_part=4 scramble_reg=0xff6345c4 "\
+			"ramoops.console_size=0x4000 loop.max_part=4 scramble_reg=0xff6345c4 " KERNL_LOGLEVEL \
             "\0"\
         "upgrade_check="\
 			"run upgrade_check_base;"\
@@ -305,6 +311,7 @@
 		"\0"\
 	"check_display="\
 		"echo check_display reboot_mode : ${reboot_mode} ,powermode : ${powermode};"\
+		"setenv ddr_resume 0; "\
 		"if test ${reboot_mode} = ffv_reboot; then "\
 			"if test ${ffv_wake} = on; then "\
 				"echo ffv reboot no display; "\

@@ -16,6 +16,7 @@
 #include <amlogic/aml_rollback.h>
 #include <part.h>
 #include <cli.h>
+#include <emmc_partitions.h>
 
 #if defined(CONFIG_EFUSE_OBJ_API) && defined(CONFIG_CMD_EFUSE)
 extern efuse_obj_field_t efuse_field;
@@ -33,6 +34,7 @@ typedef boot_img_hdr_t boot_img_hdr;
 
 #define BOOTLOADER_OFFSET		512
 #define BOOTLOADER_MAX_SIZE		(4 * 1024 * 1024)
+#define MIB_SIZE                (1024 * 1024)
 
 //check SWPL-31296 for details
 static int do_get_bootloader_status(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
@@ -77,6 +79,12 @@ static int do_get_bootloader_status(cmd_tbl_t *cmdtp, int flag, int argc, char *
 		case 0x3A://s4d
 			supportRobustOta = true;
 			break;
+
+		case MESON_CPU_MAJOR_ID_T5W:
+		case MESON_CPU_MAJOR_ID_TXHD2:
+			supportRobustOta = false;
+			break;
+
 		default:
 		{
 			if (familyId > 0x3A) {
@@ -123,6 +131,11 @@ static int do_get_bootloader_status(cmd_tbl_t *cmdtp, int flag, int argc, char *
 	if (printStat) run_command("printenv forUpgrade_socType forUpgrade_secureBoot "
 			" forUpgrade_robustOta forUpgrade_flashType forUpgrade_bootloaderCopies "
 			" forUpgrade_bootloaderIndex forUpgrade_1stBootIndex", 0);
+
+	//8,production mode for ver4 boot.img bootconfig
+	env_set_ulong("production_mode", CONFIG_IS_ENABLED(AML_PRODUCT_MODE));
+	if (printStat)
+		run_command("printenv production_mode", 0);
 
 	if (saveenv) {
 #if CONFIG_IS_ENABLED(AML_UPDATE_ENV)
@@ -437,11 +450,30 @@ static int update_gpt(int flag)
 	}
 	memset(buffer, 0, capacity_boot);
 
-	iRet = store_boot_read("bootloader", 0, 0, buffer);
-	if (iRet) {
-		printf("Failed to read boot0\n");
-		ret = -1;
-		goto exit;
+	if (flag == 0) {
+		iRet = store_boot_read("bootloader", 1, 0, buffer);
+		if (iRet) {
+			printf("Failed to read boot0\n");
+			ret = -1;
+			goto exit;
+		}
+	} else if (flag == 1 || flag == 2) {
+		iRet = store_boot_read("bootloader", 0, 0, buffer);
+		if (iRet) {
+			printf("Failed to read bootloader\n");
+			ret = -1;
+			goto exit;
+		}
+	} else if (flag == 3) {
+		printf("null ab mode\n");
+		iRet = store_logic_read("bootloader_up", 0,
+			BOOTLOADER_MAX_SIZE - BOOTLOADER_OFFSET, buffer);
+		if (iRet) {
+			printf("Fail to read 0x%xB from bootloader_up\n",
+				BOOTLOADER_MAX_SIZE - BOOTLOADER_OFFSET);
+			ret = -1;
+			goto exit;
+		}
 	}
 
 	if (mmc) {
@@ -462,9 +494,17 @@ static int update_gpt(int flag)
 		} else {
 			erase_flag = check_gpt_change(dev_desc, buffer + 0x3DFE00);
 
-			if (erase_flag == 3) {
+			if (erase_flag == 4 && has_boot_slot == 0) {
+				printf("null ab critical partition change, refused to upgrade\n");
+				ret = -1;
+				goto exit;
+			} else if (has_boot_slot == 1 && (erase_flag == 3 || erase_flag == 4)) {
 				printf("Important partition changes, refused to upgrade\n");
 				ret = 1;
+				goto exit;
+			} else if (erase_flag == 0) {
+				printf("partition doesn't change, needn't update\n");
+				ret = -1;
 				goto exit;
 			}
 
@@ -497,7 +537,7 @@ static int update_gpt(int flag)
 		}
 	}
 
-	if (flag == 1 || flag == 2) {
+	if (has_boot_slot == 1 && (flag == 1 || flag == 2)) {
 		printf("update from dts to gpt, backup old bootloader\n");
 		char *slot = NULL;
 
@@ -529,12 +569,10 @@ exit:
 	if (buffer)
 		free(buffer);
 
+	if (mmc)
+		run_command("mmc dev 1 0;", 0);
+
 	if (mmc && ret > 0) {
-		dev_desc = blk_get_dev("mmc", 1);
-		if (dev_desc && dev_desc->type != DEV_TYPE_UNKNOWN) {
-			printf("valid mmc device, erase gpt\n");
-			erase_gpt_part_table(dev_desc);
-		}
 		if (ret == 1 || ret == 2 || ret == 3) {
 			printf("rollback\n");
 			update_rollback();
@@ -546,6 +584,72 @@ exit:
 	}
 #endif
 	return ret;
+}
+
+int recovery_update(void)
+{
+#ifdef CONFIG_MMC_MESON_GX
+	char bufcmd[64];
+	unsigned long long size = 0;
+	char *recovery_need_update = NULL;
+	struct partitions *partition = NULL;
+	//"ANDROID!"
+	const unsigned char imghead[] = { 0x41, 0x4e, 0x44, 0x52, 0x4f, 0x49, 0x44, 0x21 };
+
+	if (store_get_type() != BOOT_EMMC)
+		return 0;
+
+	//check recoverybak partition exist
+	partition = find_mmc_partition_by_name("recoverybak");
+	if (!partition) {
+		printf("can not find recoverybak, skip\n");
+		return 0;
+	}
+
+	//check if need update recovery from recoverybak
+	recovery_need_update = env_get("recovery_need_update");
+	if (!recovery_need_update || strcmp(recovery_need_update, "1"))
+		return 0;
+
+	//read recoverybak header data for check
+	sprintf(bufcmd, "store read $loadaddr recoverybak 0 0x%x", 16);
+	run_command(bufcmd, 0);
+
+	unsigned char *loadaddr = (unsigned char *)simple_strtoul(env_get("loadaddr"), NULL, 16);
+
+	//check recoverybak head is start "ANDROID!"
+	if (memcmp((void *)imghead, loadaddr, 8)) {
+		printf("not valid recovery image, skip update recovery\n");
+		return 0;
+	}
+
+	//write recoverybak data to recovery
+	while (size < partition->size) {
+		unsigned long long write_size = 0;
+		unsigned long long left_size = partition->size - size;
+
+		if (left_size > 10 * MIB_SIZE)
+			write_size = 10 * MIB_SIZE;
+		else
+			write_size = partition->size - size;
+
+		sprintf(bufcmd, "store read $loadaddr recoverybak 0x%llx 0x%llx", size, write_size);
+		run_command(bufcmd, 0);
+		sprintf(bufcmd, "store write $loadaddr recovery 0x%llx 0x%llx", size, write_size);
+		run_command(bufcmd, 0);
+		size += write_size;
+	}
+
+	//clean recovery_need_update to 0
+	env_set("recovery_need_update", "0");
+#if CONFIG_IS_ENABLED(AML_UPDATE_ENV)
+	run_command("update_env_part -p recovery_need_update;", 0);
+#else
+	run_command("saveenv", 0);
+#endif
+
+#endif
+	return 0;
 }
 
 static int do_secureboot_check(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
@@ -567,8 +671,7 @@ static int do_secureboot_check(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 	if (store_get_type() == BOOT_EMMC)
 		mmc = find_mmc_device(1);
 #endif
-	//unsupport update dt in boothal, update dt in uboot
-	run_command("update_dt;", 0);
+	recovery_update();
 
 	bootloader_wp();
 
@@ -654,6 +757,73 @@ static int do_secureboot_check(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 		run_command("reset", 0);
 	}
 
+	char *recovery_check = env_get("recovery_check_part");
+	int update_flag = -1;
+	int rc = 0;
+
+	if (has_boot_slot == 0 && recovery_check &&
+		(!strcmp(recovery_check, "1") || !strcmp(recovery_check, "4"))) {
+		printf("non ab for kernel 5.15, check part table\n");
+		if (!strcmp(recovery_check, "1")) {
+			printf("try write boot1\n");
+			rc = write_bootloader(1);
+			if (rc) {
+				printf("write boot1 fail, OTA error\n");
+				env_set("recovery_check_part", "3");
+			} else {
+				printf("check & update part\n");
+				update_flag = update_gpt(3);
+			}
+		} else if (!strcmp(recovery_check, "4")) {
+			printf("check & update part\n");
+			update_flag = update_gpt(1);
+		}
+
+		run_command("defenv_reserv; saveenv;", 0);
+		run_command("run bcb_cmd", 0);
+
+		if (update_flag == 0) {
+			printf("check & update part ok......\n");
+			env_set("recovery_check_part", "2");
+			printf("boot from boot0\n");
+			env_set("reboot_status", "reboot_next");
+			env_set("expect_index", "1");
+#if CONFIG_IS_ENABLED(AML_UPDATE_ENV)
+			run_command("update_env_part -p reboot_status;", 0);
+			run_command("update_env_part -p expect_index;", 0);
+#endif
+		} else {
+			printf("check & update part error\n");
+			if (!strcmp(recovery_check, "1")) {
+				printf("write boot0 back\n");
+				write_bootloader_back("2", 1);
+			} else if (!strcmp(recovery_check, "4")) {
+				printf("write bootloader back\n");
+				write_bootloader_back("2", 1);
+				write_bootloader_back("2", 0);
+			}
+			env_set("recovery_check_part", "3");
+			env_set("upgrade_step", "4");
+#if CONFIG_IS_ENABLED(AML_UPDATE_ENV)
+			run_command("update_env_part -p upgrade_step;", 0);
+#endif
+		}
+#if CONFIG_IS_ENABLED(AML_UPDATE_ENV)
+		run_command("update_env_part -p recovery_check_part;", 0);
+#else
+		run_command("saveenv", 0);
+#endif
+
+		run_command("reset", 0);
+	}
+
+	if (has_boot_slot == 0 && recovery_check &&
+		(!strcmp(recovery_check, "3"))) {
+		printf("check part error, run_recovery_from_flash\n");
+		run_recovery_from_flash();
+		return 0;
+	}
+
 	char *write_boot = env_get("write_boot");
 
 	if (has_boot_slot == 0 && write_boot && (!strcmp(write_boot, "1"))) {
@@ -693,10 +863,11 @@ static int do_secureboot_check(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 	//get boot status
 	run_command("amlbootsta -p -s", 0);
 
-	//get forUpgrade_robustOta and check if support robustota
-	robustota = env_get("forUpgrade_robustOta");
-	if ((robustota == NULL) || !strcmp(robustota, "false")) {
-		return -1;
+	if (has_boot_slot == 0) {
+		//get forUpgrade_robustOta and check if support robustota
+		robustota = env_get("forUpgrade_robustOta");
+		if (!robustota || !strcmp(robustota, "false"))
+			return -1;
 	}
 
 	//get bootloader index
@@ -706,8 +877,12 @@ static int do_secureboot_check(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 		return -1;
 	}
 
-	int rc = 0;
-	int update_flag = -1;
+	//unsupport update dt in boothal, update dt in uboot
+	if (gpt_flag != 0 && !strcmp(rebootstatus, "reboot_next")) {
+		printf("dts partition table mode, check partition changes\n");
+		run_command("update_dt;", 0);
+	}
+
 	char *update_dts_gpt = NULL;
 
 	if (write_boot && !strcmp(write_boot, "1")) {
@@ -724,15 +899,35 @@ static int do_secureboot_check(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 
 	update_dts_gpt = env_get("update_dts_gpt");
 
-	if (rc == 0 && update_dts_gpt && !strcmp(update_dts_gpt, "1")) {
-		printf("update from dts to gpt\n");
-		update_flag = update_gpt(1);
-		env_set("update_dts_gpt", "0");
-		env_set("dts_to_gpt", "1");
-		run_command("saveenv", 0);
+	if (has_boot_slot == 1) {
+		if (rc == 0 && update_dts_gpt && !strcmp(update_dts_gpt, "1")) {
+			printf("update from dts to gpt\n");
+			update_flag = update_gpt(1);
+			env_set("update_dts_gpt", "0");
+			env_set("dts_to_gpt", "1");
+			run_command("saveenv", 0);
+		} else {
+			printf("rebootstatus is %s\n", rebootstatus);
+			if (rc == 0 && !strcmp(rebootstatus, "reboot_next")) {
+				printf("update gpt\n");
+				update_flag = update_gpt(0);
+				env_set("update_gpt", "0");
+				strcpy(write_boot, "0");
+				env_set("write_boot", "0");
+#if CONFIG_IS_ENABLED(AML_UPDATE_ENV)
+				run_command("update_env_part -p update_gpt;", 0);
+				run_command("update_env_part -p write_boot;", 0);
+#else
+				run_command("saveenv", 0);
+#endif
+
+				if (update_flag != -1)
+					run_command("reset", 0);
+			}
+		}
 	}
 
-	if ((write_boot && !strcmp(write_boot, "1")) || (update_flag != -1)) {
+	if ((write_boot && !strcmp(write_boot, "1")) || update_flag > 0) {
 		printf("reset......\n");
 		env_set("write_boot", "0");
 		env_set("reboot_status", "reboot_next");
@@ -780,21 +975,21 @@ static int do_secureboot_check(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 		else
 			run_command("reboot next", 0);
 	}
-	if (mmc && fastboot_step && (strcmp(fastboot_step, "2") == 0)) {
+	if (mmc && fastboot_step &&
+		(strcmp(fastboot_step, "2") == 0 ||
+		strcmp(fastboot_step, "3") == 0)) {
 		struct blk_desc *dev_desc = mmc_get_blk_desc(mmc);
 
 		if (dev_desc && ((ret == 0 && !strcmp(bootloaderindex, "1")) ||
 			(ret != 0 && !strcmp(bootloaderindex, "0")))) {
 			printf("new bootloader error, please fastboot to another one\n");
-			env_set("fastboot_step", "0");
+			env_set("fastboot_step", "3");
 #if CONFIG_IS_ENABLED(AML_UPDATE_ENV)
 			run_command("update_env_part -p fastboot_step;", 0);
 #else
 			run_command("defenv_reserve;setenv fastboot_step 0;saveenv;", 0);
 #endif
-
-			cli_init();
-			cli_loop();
+			run_command("run enter_fastboot", 0);
 		}
 	}
 #endif
@@ -816,12 +1011,25 @@ static int do_secureboot_check(cmd_tbl_t *cmdtp, int flag, int argc, char * cons
 
 	match_flag = strcmp(bootloaderindex, expect_index);
 
+	//ignore reboot next check if power off during reboot next to finish
+	if (rebootmode && (strcmp(rebootmode, "cold_boot") == 0)) {
+		if (!strcmp(rebootstatus, "reboot_finish")) {
+			match_flag = 0;
+		}
+	}
+
 	//first reboot, command from recovery, need reboot next
 	if (!strcmp(rebootstatus,"reboot_next")) {
 		wrnP("--secure check reboot_next---\n");
 		//bootloader index, expect == current, no need reboot next
 		if (match_flag == 0) {
 			wrnP("current index is expect, no need reboot next, run cache recovery\n");
+			env_set("reboot_status", "reboot_init");
+#if CONFIG_IS_ENABLED(AML_UPDATE_ENV)
+			run_command("update_env_part -p reboot_status;", 0);
+#else
+			run_command("saveenv", 0);
+#endif
 			if (has_boot_slot == 1) {
 				wrnP("ab mode\n");
 			} else {

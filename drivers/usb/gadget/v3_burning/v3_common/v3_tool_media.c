@@ -337,12 +337,14 @@ static int _bootloader_read(u8* pBuf, unsigned off, unsigned binSz, const char* 
 	int ret = 0;
 
 #if CONFIG_NAND_BL2_VALID_NUM
-	if (!strcmp("bl2", bootName))
-		validCpyNum = CONFIG_NAND_BL2_VALID_NUM;
+	if (strcmp("tpl", bootName) && strcmp("devfip", bootName))
+		if (CONFIG_NAND_BL2_VALID_NUM != -1)
+			validCpyNum = CONFIG_NAND_BL2_VALID_NUM;
 #endif // #if CONFIG_NAND_BL2_VALID_NUM
 #if CONFIG_NAND_TPL_VALID_NUM
-	if (!strcmp("tpl", bootName))
-		validCpyNum = CONFIG_NAND_TPL_VALID_NUM;
+	if (!strcmp("tpl", bootName) || !strcmp("devfip", bootName))
+		if (CONFIG_NAND_TPL_VALID_NUM != -1)
+			validCpyNum = CONFIG_NAND_TPL_VALID_NUM;
 #endif// #if CONFIG_NAND_TPL_VALID_NUM
 
 	if (binSz + off > bootCpySz) {
@@ -707,6 +709,12 @@ int v3tool_storage_init(const int eraseFlash, unsigned int dtbImgSz, unsigned in
 				FB_MSG("remain bootloader as not usb boot\n");
 				ret = usb_burn_erase_data(1);
 			}
+		}
+		if (eraseFlash == 3) {
+			FB_MSG("Erase unifykey\n");
+			ret = store_rsv_erase("key");
+			if (ret)
+				FBS_EXIT(_ACK, "disk_initial 3, Fail in erase key\n");
 		}
 		if (ret)
 			FBS_EXIT(_ACK, "Fail in erase flash, ret[%d]\n", ret);

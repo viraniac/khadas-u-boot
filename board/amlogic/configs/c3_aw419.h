@@ -62,11 +62,17 @@
 #define CONFIG_DTB_LOAD  "imgread dtb _aml_dtb ${dtb_mem_addr}"
 #endif//#ifdef CONFIG_DTB_BIND_KERNEL	//load dtb from kernel, such as boot partition
 
+#ifdef CONFIG_NOVERBOSE_BUILD
+#define SILENT		"silent=1\0"
+#else
+#define SILENT		"silent=0\0"
+#endif
+
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"firstboot=1\0"\
-	"silent=0\0"\
+	SILENT \
 	"upgrade_step=0\0"\
 	"jtag=disable\0"\
 	"loadaddr=0x00020000\0"\
@@ -284,7 +290,6 @@
 		"fi;fi;"\
 		"\0"\
 	"storage_param="\
-		"setenv bootargs ${bootargs} ${emmc_quirks}; "\
 		"store param;"\
 		"setenv bootargs ${bootargs} ${mtdbootparts}; "\
 		"\0"\

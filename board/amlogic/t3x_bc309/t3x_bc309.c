@@ -180,7 +180,9 @@ int board_init(void)
 int board_late_init(void)
 {
 	printf("board late init\n");
+	env_set("defenv_para", "-c -b0");
 	aml_board_late_init_front(NULL);
+	get_stick_reboot_flag_mbx();
 
 #ifndef CONFIG_PXP_EMULATOR
 #ifdef CONFIG_AML_VPU
@@ -263,10 +265,11 @@ struct mm_region *mem_map = bd_mem_map;
 int mach_cpu_init(void)
 {
 	//printf("\nmach_cpu_init\n");
-	unsigned long nddrSize = (readl(SYSCTRL_SEC_STATUS_REG4) & ~0xfffffUL) << 4;
 
-	if (nddrSize <= 0xe0000000)
-		bd_mem_map[0].size = nddrSize;
+	ulong nddrSize = ((readl(SYSCTRL_SEC_STATUS_REG4) & ~0xfffffUL) << 4) >= 0xe0000000 ?
+		0xe0000000 : (readl(SYSCTRL_SEC_STATUS_REG4) & ~0xfffffUL) << 4;
+
+	bd_mem_map[0].size = nddrSize;
 
 	return 0;
 }
@@ -416,16 +419,9 @@ int checkhw(char *name)
 {
 	char loc_name[64] = {0};
 	unsigned long ddr_size = 0;
-	int i;
 	cpu_id_t cpu_id = get_cpu_id();
 
-	for (i = 0; i < CONFIG_NR_DRAM_BANKS; i++) {
-		ddr_size += gd->bd->bi_dram[i].size;
-		//
-	}
-#if defined(CONFIG_SYS_MEM_TOP_HIDE)
-	ddr_size += CONFIG_SYS_MEM_TOP_HIDE;
-#endif
+	ddr_size = (readl(SYSCTRL_SEC_STATUS_REG4) & ~0xfffffUL) << 4;
 
 	int sipinfo = ((((readl(SYSCTRL_SEC_STATUS_REG4)) & 0xFFFF0000) >> 19) & 0x1);
 	if ((sipinfo == 1) && (ddr_size == 0x80000000)) // sip package
@@ -445,7 +441,7 @@ int checkhw(char *name)
 			else if (cpu_id.chip_rev == 0xB)
 				strcpy(loc_name, "t3x_t968d4_bc309-3g\0");
 			break;
-		case 0xe0000000:
+		case 0x100000000:
 			if (cpu_id.chip_rev == 0xA)
 				strcpy(loc_name, "t3x-reva_t968d4_bc309\0");
 			else if (cpu_id.chip_rev == 0xB)
@@ -470,18 +466,9 @@ int checkhw(char *name)
 }
 #endif
 
-const char * const _env_args_reserve_[] =
-{
-	"lock",
-	"upgrade_step",
-	"bootloader_version",
+const char * const _board_env_reserv_array0[] = {
 	"model_name",
-	"hdmimode",
-	"outputmode",
-	"dts_to_gpt",
-	"fastboot_step",
-	"reboot_status",
-	"expect_index",
+	"connector_type",
 	NULL//Keep NULL be last to tell END
 };
 

@@ -515,7 +515,12 @@ __attribute__ ((section(".misc_param"))) = {
 	{ PADCTRL_PIN_MUX_REGB,	   (0 << 12),	  (0xf << 12), 0, 0, 0 },
 	{ PADCTRL_GPIOA_O,	       (0 << 3),	  (0x1 << 3), 0, 0, 0 },
 	{ PADCTRL_GPIOA_OEN,	   (0 << 3),	  (0x1 << 3), 0, 0, 0 },
-
+#ifdef CONFIG_NOVERBOSE_BUILD
+	/* use acs flag to disable uart print in each blx
+	 * reg must be UART_B_WFIFO, flags: 1 --> disable uart print, 0: enable
+	 */
+	{ UART_B_WFIFO, 0, 0xffffffff, 0, 1, 0 },
+#endif
 };
 
 /* for all the storage parameter */
@@ -550,7 +555,7 @@ storage_parameter_t __store_para __attribute__ ((section(".store_param"))) = {
 		.version			= 0x01,
 		.device_fip_container_size	= BOARD_DEVFIP_SIZE,
 		.device_fip_container_copies	= ((BOARD_BL2EX_BACKUPS << 16) |
-						   BOARD_DEVFIP_BACKUPS),
+						BOARD_DEVFIP_BACKUPS),
 		.ddr_fip_container_size		= BOARD_DDRFIP_SIZE,
 	},
 	.nand					= {

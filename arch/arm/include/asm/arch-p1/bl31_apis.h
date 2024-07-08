@@ -57,6 +57,9 @@
 /* SECUREOS DEFINITION*/
 /* SMC Identifiers for non-secure world functions */
 #define CALL_TRUSTZONE_HAL_API                  0x5
+#define GET_SHARE_MEM_INFORMATION		0x8200002a
+	#define GET_SHARE_VERSION_ADDR		 0x3	//for secure use
+	#define GET_SHARE_VERSION_DATA		 0x4	//for none secure use
 
 /* EFUSE */
 #define EFUSE_READ					0x82000030
@@ -114,12 +117,21 @@
 /* Secure HAL APIs */
 #define TRUSTZONE_HAL_API_SRAM                  0x400
 
-/*start hifi4 */
-#define START_HIFI4			0x82000090
-#define DSP_SEC_POWERSET		0x82000092
-#define DSP_SEC_REMAP_SET	0x82000096
-#define START_M4            0x82000097
+/*hifi dsp*/
+#define SMC_SUBID_SHIFT				8
+#define PACK_SMC_SUBID_ID(subid, id) (((subid) << SMC_SUBID_SHIFT) | (id))
+/*hifi dsp*/
+#define HIFI_DSP				0x82000090
+	#define HIFI_DSP_BOOT			0x10
+	#define HIFI_DSP_REMAP			0x11
+	#define HIFI_DSP_PWRCTRL_ACCESS		0x12
+	#define HIFI_DSP_PWR_SET		0x13
 
+/* BL40 BOOTUP */
+#define START_MFH				0x8200004E
+	/*soc:p1*/
+	#define MFH_V2_START			0x21
+	#define MFH_V2_RESET			0x22
 
 #define SRAM_HAL_API_CHECK_EFUSE 0x403
 struct sram_hal_api_arg {
@@ -160,8 +172,6 @@ struct sram_hal_api_arg {
 	#define GXB_IMG_DEC_DTB   (1<<2)
 	#define GXB_IMG_DEC_ALL   (GXB_IMG_DEC_KNL|GXB_IMG_DEC_RMD|GXB_IMG_DEC_DTB)
 
-#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
-
 void aml_set_jtag_state(unsigned state, unsigned select);
 unsigned aml_get_reboot_reason(void);
 unsigned aml_reboot(uint64_t function_id, uint64_t arg0, uint64_t arg1, uint64_t arg2);
@@ -183,6 +193,6 @@ void set_boot_first_timeout(uint64_t arg0);
 int bl31_get_cornerinfo(uint8_t *outbuf, int size);
 int32_t set_boot_params(const keymaster_boot_params*);
 int32_t get_avbkey_from_fip(uint8_t *buf, uint32_t buflen);
-void start_m4(unsigned int cpu_id,unsigned int bin_addr, uint32_t bank, uint32_t cmd);
-
+void start_m4(unsigned int id, unsigned int bin_addr, uint32_t bank);
+int32_t aml_get_bootloader_version(uint8_t *outbuf);
 #endif

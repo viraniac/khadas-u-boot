@@ -85,6 +85,7 @@
         "panel_type=lcd_1\0" \
         "outputmode=1080p60hz\0" \
 	"hdmimode=none\0" \
+	"qms_en=1\0" \
         "colorattribute=444,8bit\0"\
         "cvbsmode=576cvbs\0" \
         "vout_init=disable\0" \
@@ -102,6 +103,7 @@
         "hdmichecksum=0x00000000\0" \
         "frac_rate_policy=1\0" \
         "hdr_policy=0\0" \
+	"config_csc_en=1\0" \
         "hdmi_read_edid=1\0" \
         "usb_burning=" CONFIG_USB_TOOL_ENTRY "\0" \
         "fdt_high=0x20000000\0"\
@@ -126,6 +128,7 @@
 		"storeargs="\
 			"get_bootloaderversion;" \
 			"run storeargs_base;"\
+			"setenv bootargs ${bootargs} config_csc_en=${config_csc_en};"\
             "run cmdline_keys;"\
 			"\0"\
 		"switch_bootmode="\

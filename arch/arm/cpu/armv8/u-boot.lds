@@ -24,6 +24,7 @@ SECTIONS
 	. = ALIGN(8);
 	.text :
 	{
+		__RO_START__ = .;
 		*(.__image_copy_start)
 		CPUDIR/start.o (.text*)
 	}
@@ -99,7 +100,8 @@ SECTIONS
 		*(.__rodata_start)
 	}
 	.rodata : { *(SORT_BY_ALIGNMENT(SORT_BY_NAME(.rodata*))) }
-
+	. = ALIGN(4096);
+	__RO_END__ = .;
 #ifdef CONFIG_AML_UASAN
 	/* uasan global register */
 	.init_array :

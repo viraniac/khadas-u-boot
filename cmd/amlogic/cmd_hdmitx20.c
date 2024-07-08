@@ -966,6 +966,7 @@ void scene_process(struct hdmitx_dev *hdev,
 	scene_output_info_t *scene_output_info)
 {
 	hdmi_data_t hdmidata;
+	int dv_support = 0;
 
 	if (!hdev || !scene_output_info)
 		return;
@@ -976,7 +977,7 @@ void scene_process(struct hdmitx_dev *hdev,
 	/* 2. dolby vision scene process */
 	/* only for tv support dv and box enable dv */
 	if (is_dv_preference(hdev)) {
-		dolbyvision_scene_process(&hdmidata, scene_output_info);
+		dv_support = dolbyvision_scene_process(&hdmidata, scene_output_info);
 	} else if (is_dolby_enabled()) {
 		/* for enable dolby vision core when
 		 * first boot connecting non dv tv
@@ -989,13 +990,13 @@ void scene_process(struct hdmitx_dev *hdev,
 		 */
 		/* scene_output_info->final_dv_type = DOLBY_VISION_DISABLE; */
 	}
-	/* 3.sdr scene process */
+	/* 3.hdr/sdr scene process */
 	/* decide final display mode and deepcolor */
-	if (is_dv_preference(hdev)) {
+	if (is_dv_preference(hdev) && dv_support == 0) {
 		/* do nothing
 		 * already done above, just sync with sysctrl
 		 */
-	} else if (is_hdr_preference(hdev)) {
+	} else if (is_hdr_preference(hdev) || dv_support != 0) {
 		hdr_scene_process(&hdmidata, scene_output_info);
 	} else {
 		sdr_scene_process(&hdmidata, scene_output_info);
@@ -1146,7 +1147,7 @@ static int do_get_parse_edid(cmd_tbl_t * cmdtp, int flag, int argc,
 				last_dv_status);
 		}
 	}
-	/* three cases need to decide output by uboot mode select policy:
+	/* 4 cases need to decide output by uboot mode select policy:
 	 * 1.TV changed
 	 * 2.either hdmimode or colorattribute is NULL or "none",
 	 * which means that user have not slected mode or colorattribute,
@@ -1155,17 +1156,13 @@ static int do_get_parse_edid(cmd_tbl_t * cmdtp, int flag, int argc,
 	 * means mode select policy or edid parse between sysctrl and
 	 * uboot have some gap), then need to find proper output mode
 	 * with uboot policy.
+	 * 4.user selected mode is over writen by system policy
 	 */
 	if (hdev->RXCap.edid_changed || no_manual_output || !mode_support || over_write) {
 		/* find proper mode if EDID changed */
 		scene_process(hdev, &scene_output_info);
 		env_set("hdmichecksum", hdev->RXCap.checksum);
 		if (edid_parsing_ok(hdev)) {
-			/* SWPL-34712: if EDID parsing error case, not save env,
-			 * only output default mode(480p,RGB,8bit). after
-			 * EDID read OK, systemcontrol will recover the hdmi
-			 * mode from env, to avoid keep the default hdmi output
-			 */
 			env_set("outputmode",
 			       scene_output_info.final_displaymode);
 			env_set("colorattribute",
@@ -1215,6 +1212,20 @@ static int do_get_parse_edid(cmd_tbl_t * cmdtp, int flag, int argc,
 	return 0;
 }
 
+#ifdef CONFIG_EFUSE_OBJ_API
+static int do_efuse_show(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
+{
+	struct hdmitx_dev *hdev = hdmitx_get_hdev();
+
+	pr_info("FEAT_DISABLE_HDMI_60HZ = %d\n", hdev->efuse_dis_hdmi_4k60);
+	pr_info("FEAT_DISABLE_OUTPUT_4K = %d\n", hdev->efuse_dis_output_4k);
+	pr_info("FEAT_DISABLE_HDCP_TX_22 = %d\n", hdev->efuse_dis_hdcp_tx22);
+	pr_info("FEAT_DISABLE_HDMI_TX_3D = %d\n", hdev->efuse_dis_hdmi_tx3d);
+
+	return 0;
+}
+#endif
+
 static cmd_tbl_t cmd_hdmi_sub[] = {
 	U_BOOT_CMD_MKENT(hpd, 1, 1, do_hpd_detect, "", ""),
 	U_BOOT_CMD_MKENT(edid, 3, 1, do_edid, "", ""),
@@ -1226,6 +1237,9 @@ static cmd_tbl_t cmd_hdmi_sub[] = {
 	U_BOOT_CMD_MKENT(info, 1, 1, do_info, "", ""),
 	U_BOOT_CMD_MKENT(reg, 3, 1, do_reg, "", ""),
 	U_BOOT_CMD_MKENT(get_parse_edid, 1, 1, do_get_parse_edid, "", ""),
+#ifdef CONFIG_EFUSE_OBJ_API
+	U_BOOT_CMD_MKENT(efuse, 1, 1, do_efuse_show, "", ""),
+#endif
 };
 
 static int do_hdmitx(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])

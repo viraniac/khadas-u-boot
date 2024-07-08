@@ -51,6 +51,7 @@ extern int nand_store_write(const char *name, loff_t off, size_t size, void *buf
 #define SYSTEM_SPACE_OFFSET_IN_MISC 32 * 1024
 #define SYSTEM_SPACE_SIZE_IN_MISC 32 * 1024
 
+#define MERGE_STATE_FILE "/ota/state"
 
 #define AB_METADATA_MISC_PARTITION_OFFSET 2048
 
@@ -150,6 +151,17 @@ typedef struct slot_metadata {
 	uint8_t reserved : 7;
 } slot_metadata;
 
+enum UpdateState {
+	None = 0,
+	Initiated,
+	Unverified,
+	Merging,
+	MergeNeedsReboot,
+	MergeCompleted,
+	MergeFailed,
+	Cancelled
+};
+
 /* Bootloader Control AB
  *
  * This struct can be used to manage A/B metadata. It is designed to
@@ -176,7 +188,8 @@ typedef struct bootloader_control {
 	// Per-slot information.  Up to 4 slots.
 	struct slot_metadata slot_info[4];
 	// Reserved for further use.
-	uint8_t reserved1[8];
+	uint8_t merge_flag;
+	uint8_t reserved1[7];
 	// CRC32 of all 28 bytes preceding this field (little endian
 	// format).
 	uint32_t crc32_le;
@@ -288,6 +301,7 @@ void boot_info_reset(bootloader_control* boot_ctrl)
 	boot_ctrl->version = BOOT_CTRL_VERSION;
 	boot_ctrl->nb_slot = 2;
 	boot_ctrl->roll_flag = 0;
+	boot_ctrl->merge_flag = -1;
 
 	for (slot = 0; slot < 4; ++slot) {
 		slot_metadata entry = {};
@@ -602,6 +616,60 @@ static void set_ddr_size(void)
 	env_set("ddr_size", ddr_size_str);
 }
 
+static int is_f2fs_by_name(char *name)
+{
+	int ret = -1;
+#ifdef CONFIG_AML_SD_EMMC
+	struct partitions *partition = NULL;
+
+	partition = find_mmc_partition_by_name(name);
+	if (!partition)
+		return ret;
+	ret = (partition->mask_flags >> 12) & 0x1;
+#endif
+
+	return ret;
+}
+
+/**
+ *get merge status
+ */
+int check_mergestatus(const char *filename)
+{
+	if (!filename)
+		return -1;
+
+#ifdef CONFIG_AML_SD_EMMC
+	int part_no = -1;
+	char cmd[256] = {0};
+
+	part_no = get_partition_num_by_name("metadata");
+	if (part_no < 0) {
+		printf("fail find part index for metadata\n");
+		return -1;
+	}
+
+	void *loadaddr = (void *)simple_strtoul("0x1080000", NULL, 16);
+
+	sprintf(cmd, "ext4load mmc 1:0x%X 0x1080000 %s",
+			part_no,
+			filename);
+
+	if (run_command(cmd, 0)) {
+		printf("command[%s] failed\n", cmd);
+		return -1;
+	}
+
+	char *pData = (char *)loadaddr;
+
+	printf("merge_state: %d\n", pData[1]);
+
+	if (pData[1] == Initiated || pData[1] == Unverified)
+		return 1;
+#endif
+	return 0;
+}
+
 static void update_after_failed_rollback(void)
 {
 	run_command("run init_display; run storeargs; run update;", 0);
@@ -641,6 +709,7 @@ static int do_GetValidSlot(
 			boot_info_save(&boot_ctrl, miscbuf);
 		} else {
 			printf("update from normal ab to virtual ab\n");
+			env_set("normal_to_virtual", "1");
 			AB_mode = 1;
 		}
 	}
@@ -927,6 +996,8 @@ static int do_SetUpdateTries(
 	int ret = -1;
 	bool nocs_mode = false;
 	int update_flag = 0;
+	int merge_ret = -1;
+	char *rebootmode = env_get("reboot_mode");
 
 	if (has_boot_slot == 0) {
 		printf("device is not ab mode\n");
@@ -964,8 +1035,38 @@ static int do_SetUpdateTries(
 		}
 	}
 
+	printf("boot_ctrl.merge_flag = %d\n", boot_ctrl.merge_flag);
+
 	if (update_flag == 1)
 		boot_info_save(&boot_ctrl, miscbuf);
+
+	if (boot_ctrl.merge_flag < 1) {
+		printf("can't get merge_flag from bootctrl\n");
+		printf("try to read it from metadata\n");
+		if (is_f2fs_by_name("metadata") == 0) {
+			printf("metadata is ext4\n");
+			merge_ret = check_mergestatus(MERGE_STATE_FILE);
+		}
+	} else if (boot_ctrl.merge_flag == Initiated ||
+		boot_ctrl.merge_flag == Unverified) {
+		printf("merge_flag is Initiated or Unverified\n");
+		merge_ret = 1;
+	}
+
+	if (rebootmode && (!strcmp(rebootmode, "fastboot")) &&
+		update_flag == 1 &&
+		merge_ret == 1) {
+		printf("reboot bootloader during merge, rollback\n");
+		if (slot == 0 && bootable_a) {
+			if (boot_ctrl.slot_info[0].successful_boot == 0)
+				boot_ctrl.slot_info[0].tries_remaining = 0;
+		} else if (slot == 1 && bootable_b) {
+			if (boot_ctrl.slot_info[1].successful_boot == 0)
+				boot_ctrl.slot_info[1].tries_remaining = 0;
+		}
+		boot_info_save(&boot_ctrl, miscbuf);
+		run_command("reboot", 0);
+	}
 
 	printf("do_SetUpdateTries boot_ctrl.roll_flag = %d\n", boot_ctrl.roll_flag);
 	if (boot_ctrl.roll_flag == 1) {
@@ -997,6 +1098,56 @@ static int do_SetUpdateTries(
 			}
 		}
 	}
+	return 0;
+}
+
+static int do_CheckABState(cmd_tbl_t *cmdtp,
+	int flag,
+	int argc,
+	char * const argv[])
+{
+	char miscbuf[MISCBUF_SIZE] = {0};
+	bootloader_control boot_ctrl;
+	bool bootable_a, bootable_b;
+	int slot;
+	int retry_times = 0;
+
+	if (has_boot_slot == 0) {
+		printf("device is not ab mode\n");
+		return -1;
+	}
+
+	boot_info_open_partition(miscbuf);
+	boot_info_load(&boot_ctrl, miscbuf);
+
+	if (!boot_info_validate(&boot_ctrl)) {
+		printf("boot-info is invalid. Resetting\n");
+		boot_info_reset(&boot_ctrl);
+		boot_info_save(&boot_ctrl, miscbuf);
+	}
+
+	slot = get_active_slot(&boot_ctrl);
+	bootable_a = slot_is_bootable(&boot_ctrl.slot_info[0]);
+	bootable_b = slot_is_bootable(&boot_ctrl.slot_info[1]);
+
+	if ((slot == 0 && bootable_a &&
+		boot_ctrl.slot_info[0].successful_boot == 1) ||
+		(slot == 1 && bootable_b &&
+		boot_ctrl.slot_info[1].successful_boot == 1) ||
+		(!bootable_a && !bootable_b))
+		return 0;
+
+	if (slot == 0 && bootable_a &&
+		boot_ctrl.slot_info[0].successful_boot == 0)
+		retry_times = boot_ctrl.slot_info[0].tries_remaining;
+
+	if (slot == 1 && bootable_b &&
+		boot_ctrl.slot_info[1].successful_boot == 0)
+		retry_times = boot_ctrl.slot_info[1].tries_remaining;
+
+	printf("ab update mode, try %d times again\n", retry_times + 1);
+	run_command("reset", 0);
+
 	return 0;
 }
 
@@ -1055,6 +1206,38 @@ static int do_CopySlot(
 	return 0;
 }
 
+int do_UpdateDt(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	printf("write dtb from ${boot_part}\n");
+	run_command("imgread dtb ${boot_part} ${dtb_mem_addr}", 0);
+	run_command("emmc dtb_write ${dtb_mem_addr} 0", 0);
+
+	env_set("update_dt", "0");
+#if CONFIG_IS_ENABLED(AML_UPDATE_ENV)
+	run_command("update_env_part -p update_dt;", 0);
+#else
+	run_command("saveenv", 0);
+#endif
+
+	char *part_changed = env_get("part_changed");
+
+	if (part_changed && (!strcmp(part_changed, "1"))) {
+		env_set("part_changed", "0");
+#if CONFIG_IS_ENABLED(AML_UPDATE_ENV)
+		run_command("update_env_part -p part_changed;", 0);
+#else
+		run_command("saveenv", 0);
+#endif
+
+		printf("part changes, reset\n");
+		run_command("reset", 0);
+	}
+
+	return 0;
+}
+
+#endif /* CONFIG_BOOTLOADER_CONTROL_BLOCK */
+
 static int do_GetSystemMode(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 #ifdef CONFIG_SYSTEM_AS_ROOT
@@ -1077,32 +1260,6 @@ static int do_GetAvbMode(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv
 	return 0;
 }
 
-int do_UpdateDt(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
-{
-	char *update_dt = env_get("update_dt");
-	char *part_changed = env_get("part_changed");
-
-	printf("update_dt %s, part_changed: %s\n", update_dt, part_changed);
-	if (update_dt && (!strcmp(update_dt, "1"))) {
-		printf("write dtb\n");
-		run_command("imgread dtb ${boot_part} ${dtb_mem_addr}", 0);
-		run_command("emmc dtb_write ${dtb_mem_addr} 0", 0);
-
-		env_set("update_dt", "0");
-		run_command("saveenv", 0);
-
-		if (part_changed && (!strcmp(part_changed, "1"))) {
-			env_set("part_changed", "0");
-			run_command("saveenv", 0);
-
-			run_command("reset", 0);
-		}
-	}
-	return 0;
-}
-
-#endif /* CONFIG_BOOTLOADER_CONTROL_BLOCK */
-
 #ifdef CONFIG_UNIFY_BOOTLOADER
 bootctl_func_handles *get_bootctl_cmd_func_vab(void)
 {
@@ -1113,12 +1270,13 @@ bootctl_func_handles *get_bootctl_cmd_func_vab(void)
 	vab_cmd_bootctrl_handles.do_SetUpdateTries_func = do_SetUpdateTries;
 	vab_cmd_bootctrl_handles.do_GetSystemMode_func = do_GetSystemMode;
 	vab_cmd_bootctrl_handles.do_GetAvbMode_func = do_GetAvbMode;
+	vab_cmd_bootctrl_handles.do_CheckABState_func = do_CheckABState;
 
 	return &vab_cmd_bootctrl_handles;
 }
 
 #else
-
+#ifdef CONFIG_BOOTLOADER_CONTROL_BLOCK
 U_BOOT_CMD(
 	get_valid_slot, 2, 0, do_GetValidSlot,
 	"get_valid_slot",
@@ -1148,12 +1306,27 @@ U_BOOT_CMD
 	"So you can execute command: copy_slot_bootable 2 1"
 );
 
+U_BOOT_CMD
+(check_ab, 2, 0, do_CheckABState,
+	"check_ab",
+	"\nThis command will check ab sate\n"
+	"So you can execute command: check_ab"
+);
+
 U_BOOT_CMD(
 	update_tries, 2, 0, do_SetUpdateTries,
 	"update_tries",
 	"\nThis command will change tries_remaining in misc\n"
 	"So you can execute command: update_tries"
 );
+
+U_BOOT_CMD
+(update_dt, 1,	0, do_UpdateDt,
+	"update_dt",
+	"\nThis command will update dt\n"
+	"So you can execute command: update_dt"
+);
+#endif
 
 U_BOOT_CMD(
 	get_system_as_root_mode, 1,	0, do_GetSystemMode,
@@ -1167,12 +1340,6 @@ U_BOOT_CMD(
 	"get_avb_mode",
 	"\nThis command will get avb mode\n"
 	"So you can execute command: get_avb_mode"
-);
-U_BOOT_CMD
-(update_dt, 1,	0, do_UpdateDt,
-	"update_dt",
-	"\nThis command will update dt\n"
-	"So you can execute command: update_dt"
 );
 #endif
 

@@ -21,6 +21,7 @@
 #include <amlogic/aml_v2_burning.h>
 #include <linux/mtd/partitions.h>
 #include <asm/arch/bl31_apis.h>
+#include <asm/arch/stick_mem.h>
 #ifdef CONFIG_AML_VPU
 #include <amlogic/media/vpu/vpu.h>
 #endif
@@ -40,6 +41,9 @@
 #include <amlogic/aml_hdmirx.h>
 #endif
 #include <amlogic/storage.h>
+#ifdef CONFIG_CMD_SND
+#include "amlogic/auge_sound.h"
+#endif
 #include <amlogic/board.h>
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -207,25 +211,13 @@ void SetCurrentDtbFile(void)
 	switch (ddr_size) {
 	case CONFIG_T7_4G_SIZE:
 		if (cpu_id.chip_rev == 0xA || cpu_id.chip_rev == 0xb) {
-			#ifdef CONFIG_HDMITX_ONLY
 			strncpy(fdtfile_name,
-				"t7_a311d2_an400_drm_hdmitx_only_debian.dtb\0",
-				sizeof(fdtfile_name));
-			#else
-			strncpy(fdtfile_name,
-					"t7_a311d2_an400_debian.dtb\0",
+					"t7_a311d2_an400_linux.dtb\0",
 					sizeof(fdtfile_name));
-			#endif
 		} else if (cpu_id.chip_rev == 0xC) {
-			#ifdef CONFIG_HDMITX_ONLY
 			strncpy(fdtfile_name,
-				"t7c_a311d2_an400_linux_drm_hdmitx_only_debian.dtb\0",
-				sizeof(fdtfile_name));
-			#else
-			strncpy(fdtfile_name,
-					"t7c_a311d2_an400_debian.dtb\0",
+					"t7c_a311d2_an400_linux.dtb\0",
 					sizeof(fdtfile_name));
-			#endif
 		}
 		break;
 	default:
@@ -243,8 +235,9 @@ void SetCurrentDtbFile(void)
 int board_late_init(void)
 {
 	printf("board late init\n");
-
+	env_set("defenv_para", "-c -b0");
 	aml_board_late_init_front(NULL);
+	get_stick_reboot_flag_mbx();
 
 #ifdef CONFIG_T7_AN400_LPDDR4X_DEBIAN
 	/* Select fdtfile */
@@ -262,6 +255,13 @@ int board_late_init(void)
 	hdmitx_set_hdmi_5v();
 	hdmitx21_chip_type_init(MESON_CPU_ID_T7);
 	hdmitx21_init();
+#endif
+#ifdef CONFIG_CMD_SND
+	/* Bandgap for HDMITX */
+	writel(0x0b4242, ANACTRL_HDMIPHY_CTRL0);
+	/* pinmux HDMITX_HPD_IN: GPIOW_15,  */
+	update_bits(PADCTRL_PIN_MUX_REGN, 0xf << 28, 0x1 << 28);
+	earcrx_init(EARC_RX_ANA_V2);
 #endif
 #ifdef CONFIG_AML_VPP
 	vpp_init();
@@ -521,13 +521,13 @@ int checkhw(char * name)
 	switch (ddr_size) {
 	case CONFIG_T7_4G_SIZE:
 		if (cpu_id.chip_rev == 0xA || cpu_id.chip_rev == 0xb) {
-			#ifdef CONFIG_HDMITX_ONLY
+			#if defined(CONFIG_HDMITX_ONLY) && !defined(CONFIG_AML_DT_OVERLAY)
 			strcpy(loc_name, "t7_a311d2_an400-hdmitx-only\0");
 			#else
 			strcpy(loc_name, "t7_a311d2_an400\0");
 			#endif
 		} else if (cpu_id.chip_rev == 0xC) {
-			#ifdef CONFIG_HDMITX_ONLY
+			#if defined(CONFIG_HDMITX_ONLY) && !defined(CONFIG_AML_DT_OVERLAY)
 			strcpy(loc_name, "t7c_a311d2_an400-hdmitx-only-4g\0");
 			#else
 			strcpy(loc_name, "t7c_a311d2_an400-4g\0");
@@ -564,16 +564,9 @@ int checkhw(char * name)
 	return 0;
 }
 
-const char * const _env_args_reserve_[] =
-{
-	"lock",
-	"upgrade_step",
-	"bootloader_version",
-	"dts_to_gpt",
-	"fastboot_step",
-	"reboot_status",
-	"expect_index",
-
+const char * const _board_env_reserv_array0[] = {
+	"model_name",
+	"connector_type",
 	NULL//Keep NULL be last to tell END
 };
 

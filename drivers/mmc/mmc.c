@@ -26,6 +26,12 @@
 #include <asm/arch/secure_apb.h>
 #include <asm/arch/sd_emmc.h>
 #include <amlogic/cpu_id.h>
+#if defined(CONFIG_CMD_EFUSE)
+#include <asm/arch/efuse.h>
+#if defined(CONFIG_EFUSE_OBJ_API)
+extern efuse_obj_field_t efuse_field;
+#endif /* CONFIG_EFUSE_OBJ_API */
+#endif /* CONFIG_CMD_EFUSE */
 
 #define stamp_after(a, b) ((int)(b) - (int)(a) < 0)
 
@@ -530,6 +536,7 @@ ulong mmc_bread(struct blk_desc *block_dev, lbaint_t start, lbaint_t blkcnt,
 	int dev_num = block_dev->devnum;
 	int err;
 	lbaint_t cur, blocks_todo = blkcnt;
+	u32 desc_num = 1;
 
 	if (blkcnt == 0)
 		return 0;
@@ -561,9 +568,12 @@ ulong mmc_bread(struct blk_desc *block_dev, lbaint_t start, lbaint_t blkcnt,
 	if (!emmckey_is_access_range_legal(mmc, start, blkcnt))
 		return 0;
 
+	desc_num = dev_read_u32_default(mmc->dev, "desc-num", 1);
+
 	do {
-		cur = (blocks_todo > (MMC_MAX_DESC_NUM * mmc->cfg->b_max)) ?
-			(MMC_MAX_DESC_NUM * mmc->cfg->b_max) : blocks_todo;
+		cur = (blocks_todo > (desc_num * mmc->cfg->b_max)) ?
+			(desc_num * mmc->cfg->b_max) : blocks_todo;
+
 		if (mmc_read_blocks(mmc, dst, start, cur) != cur) {
 			pr_debug("%s: Failed to read blocks\n", __func__);
 			return 0;
@@ -2902,8 +2912,8 @@ static int mmc_complete_init(struct mmc *mmc)
 		mmc->has_init = 0;
 	else
 		mmc->has_init = 1;
-
-	enable_mmc_reset(mmc);
+	if (!IS_SD(mmc))
+		enable_mmc_reset(mmc);
 	return err;
 }
 
@@ -3004,6 +3014,29 @@ int mmc_init(struct mmc *mmc)
 		}
 	}
 	info_disprotect &= ~DISPROTECT_KEY;
+
+#if defined(CONFIG_CMD_EFUSE) && \
+defined(CONFIG_EFUSE_OBJ_API) && \
+defined(CONFIG_USER_PARTITION_DISABLE)
+	if (err)
+		return err;
+
+	char *str;
+	// check and disable user partition
+	str = env_get("upgrade_step");
+	// only done when first upgrade
+	if (str && !strncmp(str, "0", 1)) {
+		if (aml_gpt_valid(mmc))
+			return err;
+
+		err = efuse_obj_get_data("FEAT_DISABLE_EMMC_USER");
+		if (err || *efuse_field.data)
+			return err;
+
+		err = efuse_obj_set_license("FEAT_DISABLE_EMMC_USER");
+		printf("Disable USER Partition %s\n", err ? "failed" : "success");
+	}
+#endif /* CONFIG_CMD_EFUSE && CONFIG_EFUSE_OBJ_API && CONFIG_USER_PARTITION_DISABLE */
 
 	return err;
 }
@@ -3362,7 +3395,7 @@ static int _key_read(struct mmc *mmc, u64 blk, u64 cnt, void * addr)
 	return (n != cnt);
 }
 
-static int _verify_key_checksum(struct mmc *mmc, void *addr, int cpy)
+static int _verify_key_checksum(struct mmc *mmc, void *addr, int cpy, unsigned int size)
 {
 	u64 checksum;
 	int ret = 0;
@@ -3382,13 +3415,13 @@ static int _verify_key_checksum(struct mmc *mmc, void *addr, int cpy)
 
 	memcpy(&key_infos[cpy], checksum_info, sizeof(struct aml_key_info));
 
-	checksum = _calc_key_checksum(addr, vpart->size);
+	checksum = _calc_key_checksum(addr, size);
 	printf("calc %llx, store %llx\n", checksum, key_infos[cpy].checksum);
 
 	return !(checksum == key_infos[cpy].checksum);
 }
 
-static int update_key_info(struct mmc *mmc, unsigned char *addr)
+static int update_key_info(struct mmc *mmc, unsigned char *addr, unsigned int size)
 {
 	int ret = 0;
 	u64 blk, cnt, key_glb_offset;
@@ -3403,7 +3436,7 @@ static int update_key_info(struct mmc *mmc, unsigned char *addr)
 
 	while (cpy >= 0) {
 		blk = (key_glb_offset + cpy * (vpart->size)) / MMC_BLOCK_SIZE;
-		cnt = vpart->size / mmc->read_bl_len;
+		cnt = size / mmc->read_bl_len;
 		ret = _key_read(mmc, blk, cnt, addr);
 		if (ret) {
 			printf("%s: block # %#llx, cnt # %#llx ERROR!\n",
@@ -3411,7 +3444,7 @@ static int update_key_info(struct mmc *mmc, unsigned char *addr)
 			return -1;
 		}
 
-		ret = _verify_key_checksum(mmc, addr, cpy);
+		ret = _verify_key_checksum(mmc, addr, cpy, size);
 		if (!ret && key_infos[cpy].magic != 0)
 			valid_flag += cpy + 1;
 		else
@@ -3440,7 +3473,7 @@ static int _key_write(struct mmc *mmc, u64 blk, u64 cnt, void *addr)
 	return (n != cnt);
 }
 
-static int write_invalid_key(struct mmc *mmc, void *addr, int valid_flag)
+static int write_invalid_key(struct mmc *mmc, void *addr, unsigned int size, int valid_flag)
 {
 	u64 blk, cnt, key_glb_offset;
 	int ret;
@@ -3456,71 +3489,40 @@ static int write_invalid_key(struct mmc *mmc, void *addr, int valid_flag)
 	key_glb_offset = part->offset + vpart->offset;
 
 	blk = (key_glb_offset + (valid_flag - 1) * (vpart->size)) / MMC_BLOCK_SIZE;
-	cnt = vpart->size / mmc->read_bl_len;
+	cnt = size / mmc->read_bl_len;
 
 	if (_key_read(mmc, blk, cnt, addr)) {
-	printf("%s: block # %#llx,cnt # %#llx ERROR!\n",
-			__func__, blk, cnt);
+		printf("%s: block # %#llx,cnt # %#llx ERROR!\n", __func__, blk, cnt);
 		ret = -2;
 	}
 	/* fixme, update the invalid one - key1 */
 	blk = (key_glb_offset + (valid_flag % 2) * vpart->size) / MMC_BLOCK_SIZE;
 	if (_key_write(mmc, blk, cnt, addr)) {
-		printf("%s: block # %#llx,cnt # %#llx ERROR!\n",
-			__func__, blk, cnt);
+		printf("%s: block # %#llx,cnt # %#llx ERROR!\n", __func__, blk, cnt);
 		ret = -4;
 	}
 
 	memcpy(checksum_info, &key_infos[valid_flag - 1], sizeof(struct aml_key_info));
 	blk = (key_glb_offset + 2 * (vpart->size)) / MMC_BLOCK_SIZE + valid_flag % 2;
 	if (_key_write(mmc, blk, 1, checksum_info)) {
-		printf("%s: block # %#llx,cnt # %#llx ERROR!\n",
-			__func__, blk, cnt);
+		printf("%s: block # %#llx,cnt # %#llx ERROR!\n", __func__, blk, cnt);
 		ret = -4;
 	}
 
 	return ret;
 }
 
-static int update_invalid_key(struct mmc *mmc, void *addr, int valid_flag)
+static int update_invalid_key(struct mmc *mmc, void *addr, unsigned int size, int valid_flag)
 {
-	int ret = 0, dev = EMMC_KEY_DEV;
-	u64 blk, cnt, key_glb_offset;
-	struct partitions * part = NULL;
-	struct virtual_partition *vpart = NULL;
-	char checksum_info[512] = {0};
+	int ret = 0;
 
-	vpart = aml_get_virtual_partition_by_name(MMC_KEY_NAME);
-	part = aml_get_partition_by_name(MMC_RESERVED_NAME);
-	key_glb_offset = part->offset + vpart->offset;
-	cnt = vpart->size / mmc->read_bl_len;
+	printf("update key%d\n", (valid_flag == 2) ? 1 : 2);
+	ret = write_invalid_key(mmc, addr, size, valid_flag);
 
-	if (valid_flag == 2) {
-		printf("update key1");
-		ret = write_invalid_key(mmc, addr, valid_flag);
-		if (ret)
-			ret = -2;
-	} else {
-		printf("update key2");
-		blk = (key_glb_offset + vpart->size) / MMC_BLOCK_SIZE;
-		if (_key_write(mmc, blk, cnt, addr)) {
-			printf("%s: dev # %d, block # %#llx,cnt # %#llx ERROR!\n",
-				__func__, dev, blk, cnt);
-			ret = -2;
-		}
-		memcpy(checksum_info, &key_infos[valid_flag - 1],
-				sizeof(struct aml_key_info));
-		blk = (key_glb_offset + 2 * (vpart->size)) / MMC_BLOCK_SIZE + valid_flag % 2;
-		if (_key_write(mmc, blk, 1, checksum_info)) {
-			printf("%s: block # %#llx,cnt # %#llx ERROR!\n",
-				__func__, blk, cnt);
-			ret = -4;
-		}
-	}
 	return ret;
 }
 
-int update_old_key(struct mmc *mmc, void *addr)
+int update_old_key(struct mmc *mmc, void *addr, unsigned int size)
 {
 	int ret = 0;
 	int valid_flag;
@@ -3536,7 +3538,7 @@ int update_old_key(struct mmc *mmc, void *addr)
 		return ret;
 	}
 
-	ret = write_invalid_key(mmc, addr, valid_flag);
+	ret = write_invalid_key(mmc, addr, size, valid_flag);
 	/*update key*/
 	if (ret)
 		ret = -3;
@@ -3560,8 +3562,7 @@ static struct mmc *_rsv_init(void)
 	return mmc;
 }
 
-static int mmc_key_write_backup(const char *name,
-			      unsigned char *addr, unsigned int size)
+static int mmc_key_write_backup(const char *name, unsigned char *addr, unsigned int size)
 {
 	int ret = 0;
 	u64 blk, cnt, key_glb_offset;
@@ -3581,7 +3582,7 @@ static int mmc_key_write_backup(const char *name,
 
 	key_infos[0].stamp =  mmc->key_stamp + 1;
 	key_infos[0].magic = 9;
-	key_infos[0].checksum = _calc_key_checksum(addr, vpart->size);
+	key_infos[0].checksum = _calc_key_checksum(addr, size);
 	printf("new stamp %d, checksum 0x%llx, magic %d\n",
 		key_infos[0].stamp, key_infos[0].checksum, key_infos[0].magic);
 
@@ -3589,7 +3590,7 @@ static int mmc_key_write_backup(const char *name,
 
 	for (cpy = 0; cpy < KEY_COPIES; cpy++) {
 		blk = (key_glb_offset + cpy * (vpart->size)) / MMC_BLOCK_SIZE;
-		cnt = vpart->size / mmc->read_bl_len;
+		cnt = size / mmc->read_bl_len;
 		ret |= _key_write(mmc, blk, cnt, addr);
 
 		blk = (key_glb_offset + 2 * (vpart->size)) / MMC_BLOCK_SIZE + cpy;
@@ -3604,8 +3605,7 @@ static int mmc_key_write_backup(const char *name,
 	return ret;
 }
 
-static int mmc_key_read_backup(const char *name,
-			      unsigned char *addr, unsigned int size)
+static int mmc_key_read_backup(const char *name, unsigned char *addr, unsigned int size)
 {
 	int valid = 0;
 	struct mmc *mmc;
@@ -3615,7 +3615,7 @@ static int mmc_key_read_backup(const char *name,
 		return -10;
 
 	/* check valid key flag , addr save the first key content */
-	valid = update_key_info(mmc, addr);
+	valid = update_key_info(mmc, addr, size);
 	switch (valid) {
 		/* none is valid, using the 1st one for compatibility*/
 		case 0:
@@ -3623,15 +3623,15 @@ static int mmc_key_read_backup(const char *name,
 		break;
 		/* only first is valid, using the first update the second */
 		case 1:
-			update_invalid_key(mmc, addr, 1);
+			update_invalid_key(mmc, addr, size, 1);
 		break;
 		/* only second is valid, using the second */
 		case 2:
-			update_invalid_key(mmc, addr, 2);
+			update_invalid_key(mmc, addr, size, 2);
 		break;
 		case 3:
 		/*update the old key */
-			update_old_key(mmc, addr);
+			update_old_key(mmc, addr, size);
 		break;
 		default:
 			printf("impossible valid values.\n");
@@ -3645,32 +3645,33 @@ _out:
 
 int mmc_key_write(unsigned char *buf, unsigned int size, uint32_t *actual_length)
 {
-	ulong blkcnt, ret;
+	ulong ret;
 	unsigned char * temp_buf = buf;
+	struct virtual_partition *vpart = NULL;
 #ifndef KEY_BACKUP
 	int dev = EMMC_DTB_DEV;
 	int i = 2;
 	struct mmc *mmc;
-	ulong start, start_blk;
-	struct virtual_partition *vpart = NULL;
-	vpart = aml_get_virtual_partition_by_name(MMC_KEY_NAME);
+	ulong start, start_blk, blkcnt;
 	struct partitions * part = NULL;
-	part = aml_get_partition_by_name(MMC_RESERVED_NAME);
-
-	mmc = find_mmc_device(dev);
-	start_blk = (start / MMC_BLOCK_SIZE);
-	start = part->offset + vpart->offset;
 #endif
-	blkcnt = (size / MMC_BLOCK_SIZE);
+	vpart = aml_get_virtual_partition_by_name(MMC_KEY_NAME);
 	info_disprotect |= DISPROTECT_KEY;
 #ifdef KEY_BACKUP
-	ret = mmc_key_write_backup(MMC_KEY_NAME, temp_buf, blkcnt);
+	if (size > vpart->size)
+		size = vpart->size;
+	ret = mmc_key_write_backup(MMC_KEY_NAME, temp_buf, size);
 	if (ret != 0) {
 		pr_err("[%s] %d, mmc_bwrite error\n",
 			__func__, __LINE__);
 		return 1;
 	}
 #else
+	part = aml_get_partition_by_name(MMC_RESERVED_NAME);
+	mmc = find_mmc_device(dev);
+	start = part->offset + vpart->offset;
+	start_blk = (start / MMC_BLOCK_SIZE);
+	blkcnt = size / MMC_BLOCK_SIZE;
 	do {
 		ret = blk_dwrite(mmc_get_blk_desc(mmc), start_blk, blkcnt, temp_buf);
 		if (ret != blkcnt) {
@@ -3682,38 +3683,38 @@ int mmc_key_write(unsigned char *buf, unsigned int size, uint32_t *actual_length
 	} while (--i);
 #endif
 	info_disprotect &= ~DISPROTECT_KEY;
+	*actual_length = size;
 	return 0;
 }
 
 int mmc_key_read(unsigned char *buf, unsigned int size, uint32_t *actual_length)
 {
-	ulong blkcnt, ret;
+	ulong ret;
 	unsigned char *temp_buf = buf;
+	struct virtual_partition *vpart = NULL;
 #ifndef KEY_BACKUP
 	struct mmc *mmc;
 	int dev = EMMC_DTB_DEV;
-	ulong start, start_blk;
+	ulong start, start_blk, blkcnt;
 	struct partitions * part = NULL;
-	struct virtual_partition *vpart = NULL;
-	vpart = aml_get_virtual_partition_by_name(MMC_KEY_NAME);
-	part = aml_get_partition_by_name(MMC_RESERVED_NAME);
-
-	mmc = find_mmc_device(dev);
-	start = part->offset + vpart->offset;
-	start_blk = (start / MMC_BLOCK_SIZE);
 #endif
-
-	*actual_length =  0x40000;/*key size is 256KB*/
-	blkcnt = (size / MMC_BLOCK_SIZE);
+	vpart = aml_get_virtual_partition_by_name(MMC_KEY_NAME);
 	info_disprotect |= DISPROTECT_KEY;
 #ifdef KEY_BACKUP
-	ret = mmc_key_read_backup(MMC_KEY_NAME, temp_buf, blkcnt);
+	if (size > vpart->size)
+		size = vpart->size;
+	ret = mmc_key_read_backup(MMC_KEY_NAME, temp_buf, size);
 	if (ret != 0) {
 		pr_err("[%s] %d, mmc_bread error\n",
 			__func__, __LINE__);
 		return 1;
 	}
 #else
+	part = aml_get_partition_by_name(MMC_RESERVED_NAME);
+	mmc = find_mmc_device(dev);
+	start = part->offset + vpart->offset;
+	start_blk = (start / MMC_BLOCK_SIZE);
+	blkcnt = size / MMC_BLOCK_SIZE;
 	ret = blk_dread(mmc_get_blk_desc(mmc), start_blk, blkcnt, temp_buf);
 	if (ret != blkcnt) {
 		pr_err("[%s] %d, mmc_bread error\n",
@@ -3722,6 +3723,7 @@ int mmc_key_read(unsigned char *buf, unsigned int size, uint32_t *actual_length)
 	}
 #endif
 	info_disprotect &= ~DISPROTECT_KEY;
+	*actual_length = size;
 	return 0;
 }
 

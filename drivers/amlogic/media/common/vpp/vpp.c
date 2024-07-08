@@ -1973,12 +1973,14 @@ void vpp_viu2_matrix_update(int type)
 
 	switch (type) {
 	case VPP_CM_RGB:
-		/* default RGB */
-		#ifndef AML_T7_DISPLAY
-		set_viu2_osd_matrix_rgb2yuv(0);
-		#else
+		#if defined(AML_T7_DISPLAY)
 		/* vpp_top1: yuv2rgb */
 		vpp_top_post2_matrix_yuv2rgb(1);
+		#elif defined(AML_S5_DISPLAY)
+		/* vpp_top1: use vpp post csc to do yuv2rgb */
+		#else
+		/* default RGB */
+		set_viu2_osd_matrix_rgb2yuv(0);
 		#endif
 		break;
 	case VPP_CM_YUV:
@@ -2120,6 +2122,19 @@ void hdr_tx_pkt_cb(void)
 			hdr_func(OSD4_HDR, SDR_HDR);
 		amvecm_cp_hdr_info(&hdr_data, BT2020_PQ);
 		hdmitx_set_drm_pkt(&hdr_data);
+	} else if ((hdrinfo && hdrinfo->hdr_sup_eotf_hlg) &&
+		(hdr_policy == 0 || hdr_policy == 3)) {
+		if (is_hdmi_mode(env_get("outputmode"))) {
+			hdr_func(OSD1_HDR, SDR_HLG);
+			hdr_func(OSD2_HDR, SDR_HLG);
+			hdr_func(VD1_HDR, SDR_HLG);
+		}
+		if (is_hdmi_mode(env_get("outputmode2")))
+			hdr_func(OSD3_HDR, SDR_HLG);
+		if (is_hdmi_mode(env_get("outputmode3")))
+			hdr_func(OSD4_HDR, SDR_HLG);
+		amvecm_cp_hdr_info(&hdr_data, BT2020_HLG);
+		hdmitx_set_drm_pkt(&hdr_data);
 	}
 
 	if ((hdrinfo && hdrinfo->hdr_sup_eotf_smpte_st_2084) &&
@@ -2175,6 +2190,30 @@ static bool is_vpp_supported(int chip_id)
 		return true;
 }
 
+static void vpp_wb_init_reg(void)
+{
+	int chip_id;
+
+	chip_id = vpp_get_chip_type();
+
+	if (chip_id != MESON_CPU_MAJOR_ID_T3X)
+		return;
+
+	vpp_reg_write(0x2550, 0x84000400);
+	vpp_reg_write(0x2650, 0x84000400);
+
+	/* vpp_reg_write(0x2550, 0xc4000400); */
+	/* vpp_reg_write(0x2650, 0xc4000400); */
+	vpp_reg_write(0x2551, 0x04000000);
+	vpp_reg_write(0x2651, 0x04000000);
+	vpp_reg_write(0x2552, 0x00000000);
+	vpp_reg_write(0x2652, 0x00000000);
+	vpp_reg_write(0x2553, 0x00000000);
+	vpp_reg_write(0x2653, 0x00000000);
+	vpp_reg_write(0x2554, 0x00000000);
+	vpp_reg_write(0x2654, 0x00000000);
+}
+
 void vpp_init(void)
 {
 	int chip_id;
@@ -2186,6 +2225,9 @@ void vpp_init(void)
 		return;
 	}
 	vpp_init_flag = 1;
+
+	if (chip_id == MESON_CPU_MAJOR_ID_T3X)
+		vpp_wb_init_reg();
 
 	/* init vpu fifo control register */
 	vpp_ofifo_init();

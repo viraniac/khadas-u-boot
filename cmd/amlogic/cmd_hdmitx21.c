@@ -54,6 +54,10 @@ static int do_edid(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 
 	struct hdmitx_dev *hdev = get_hdmitx21_device();
 
+	if (!hdev) {
+		printf("null hdmitx dev\n");
+		return CMD_RET_FAILURE;
+	}
 	memset(edid_raw_buf, 0, ARRAY_SIZE(edid_raw_buf));
 
 READ_EDID:
@@ -88,6 +92,10 @@ static int do_rx_det(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 	unsigned char st = 0;
 	struct hdmitx_dev *hdev = get_hdmitx21_device();
 
+	if (!hdev) {
+		printf("null hdmitx dev\n");
+		return CMD_RET_FAILURE;
+	}
 	memset(edid_raw_buf, 0, ARRAY_SIZE(edid_raw_buf));
 
 	// read edid raw data
@@ -188,6 +196,79 @@ static void hdmitx_mask_rx_info(struct hdmitx_dev *hdev)
 		memset(&hdev->RXCap.hdr_info, 0, sizeof(struct hdr_info));
 }
 
+/* If environment qms_en is true, and RX supports QMS, and the
+ * output mode is BRR then enable TX QMS
+ */
+static void qms_scene_pre_process(struct hdmitx_dev *hdev)
+{
+	bool env_qms_en = 0;
+	bool rx_qms_cap = 0;
+	enum hdmi_vic qms_brr_vic = HDMI_UNKNOWN;
+	const struct hdmi_timing *t = NULL;
+	char *color = NULL;
+	const char *i_modes[3] = {
+		"480i", "576i", "1080i",
+	};
+	char *mode;
+	int i;
+
+	hdev->qms_en = 0; /* default as 0 */
+	/* if current mode is interlaced mode, then skip QMS */
+	mode = env_get("hdmimode");
+	if (!mode)
+		return;
+	for (i = 0; i < 3; i++) {
+		if (strstr(mode, i_modes[i]))
+			return;
+	}
+
+	/* check uboot environment */
+	if (env_get("qms_en") && (env_get_ulong("qms_en", 10, 0) == 1))
+		env_qms_en = 1;
+
+	rx_qms_cap = hdev->RXCap.qms;
+
+	qms_brr_vic = hdmitx_find_brr_vic(hdev->vic);
+
+	if (env_qms_en && rx_qms_cap && qms_brr_vic != HDMI_UNKNOWN)
+		hdev->qms_en = 1;
+	pr_info("QMS: env %d rx %d vic %d brr_vic %d\n", env_qms_en, rx_qms_cap,
+		hdev->vic, qms_brr_vic);
+	if (!hdev->qms_en)
+		return;
+	hdev->brr_vic = qms_brr_vic;
+	/* reconfig the hdmi para */
+	t = hdmitx21_gettiming_from_vic(hdev->brr_vic);
+	if (!t) {
+		pr_info("not find brr_vic %d timing\n", hdev->brr_vic);
+		return;
+	}
+	color = env_get("user_colorattribute");
+	if (!color || !strcmp(color, "none"))
+		color = env_get("colorattribute");
+	/* save brr_vic to vic without the environment */
+	hdev->vic = hdev->brr_vic;
+	hdev->para = hdmitx21_get_fmtpara(t->sname ? t->sname : t->name, color);
+}
+
+static void qms_scene_post_process(struct hdmitx_dev *hdev)
+{
+	const struct hdmi_timing *t = NULL;
+
+	// Init QMS parameter
+	vrr_init_qms_para(hdev);
+
+	/* set the BRR name as hdmimode and outputmode */
+	if (hdev->qms_en) {
+		t = hdmitx21_gettiming_from_vic(hdev->brr_vic);
+		if (t) {
+			env_set("hdmimode", t->sname ? t->sname : t->name);
+			env_set("outputmode", env_get("hdmimode")); /* reassing to outputmode */
+			pr_info("set outputmode as %s %d\n", env_get("outputmode"), hdev->brr_vic);
+		}
+	}
+}
+
 static int do_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 {
 	const struct hdmi_timing *timing = NULL;
@@ -195,6 +276,10 @@ static int do_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 
 	if (argc < 1)
 		return cmd_usage(cmdtp);
+	if (!hdev) {
+		printf("null hdmitx dev\n");
+		return CMD_RET_FAILURE;
+	}
 
 	if (strcmp(argv[1], "list") == 0) {
 		hdev->hwop.list_support_modes();
@@ -215,6 +300,10 @@ static int do_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 			mode = simple_strtoul(argv[2], NULL, 10);
 		hdev->hwop.test_bist(mode);
 	} else if (strcmp(argv[1], "prbs") == 0) {
+		if (!hdev->para) {
+			printf("null hdmitx para\n");
+			return CMD_RET_FAILURE;
+		}
 		hdev->para->cs = HDMI_COLORSPACE_RGB;
 		hdev->para->cd = COLORDEPTH_24B;
 		hdev->vic = HDMI_16_1920x1080p60_16x9;
@@ -253,11 +342,17 @@ static int do_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 		if (!env_get("colorattribute"))
 			env_set("colorattribute", "444,8bit");
 		hdev->para = hdmitx21_get_fmtpara(argv[1], env_get("colorattribute"));
+		if (!hdev->para) {
+			printf("null hdmitx para\n");
+			return CMD_RET_FAILURE;
+		}
 		hdev->vic = hdev->para->timing.vic;
 		if (hdev->vic == HDMI_UNKNOWN) {
 			/* Not find VIC */
 			printf("Not find '%s' mapped VIC\n", argv[1]);
 			return CMD_RET_FAILURE;
+		} else {
+			printf("set hdmitx VIC = %d\n", hdev->vic);
 		}
 		if (strstr(argv[1], "hz420"))
 			hdev->para->cs = HDMI_COLORSPACE_YUV420;
@@ -302,6 +397,7 @@ static int do_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 		}
 		printf("set hdmitx VIC = %d CS = %d CD = %d\n",
 			hdev->vic, hdev->para->cs, hdev->para->cd);
+		qms_scene_pre_process(hdev);
 		/* currently, hdmi mode is always set, if
 		 * mode set abort/exit, need to add return
 		 * result of mode setting, so that vout
@@ -309,6 +405,7 @@ static int do_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 		 * mode setting again when vout init in kernel
 		 */
 		hdmitx21_set(hdev);
+		qms_scene_post_process(hdev);
 		if (hdev->frl_rate && !hdev->flt_train_st) {
 			/* FLT training failed, need go to tmds mode */
 			printf("hdmitx frl training failed, set tmds mode\n");
@@ -388,6 +485,10 @@ static int do_off(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 {
 	struct hdmitx_dev *hdev = get_hdmitx21_device();
 
+	if (!hdev) {
+		printf("null hdmitx dev\n");
+		return CMD_RET_FAILURE;
+	}
 	hdev->vic = HDMI_UNKNOWN;
 	if (hdev->chip_type == MESON_CPU_ID_S5)
 		hdmitx_module_disable();
@@ -399,6 +500,11 @@ static int do_off(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 static int do_dump(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 {
 	struct hdmitx_dev *hdev = get_hdmitx21_device();
+
+	if (!hdev) {
+		printf("null hdmitx dev\n");
+		return CMD_RET_FAILURE;
+	}
 
 	hdev->hwop.dump_regs();
 	return 1;
@@ -448,6 +554,7 @@ static void disp_cap_show(struct hdmitx_dev *hdev)
 	const struct hdmi_timing *timing = NULL;
 	enum hdmi_vic vic;
 	int i;
+	enum hdmi_vic prefer_vic = HDMI_UNKNOWN;
 
 	if (!hdev)
 		return;
@@ -458,6 +565,13 @@ static void disp_cap_show(struct hdmitx_dev *hdev)
 		vic = rxcap->VIC[i];
 		if (check_vic_exist(hdev, vic, i))
 			continue;
+		prefer_vic = hdmitx21_get_prefer_vic(hdev, vic);
+		/* if mode_prefer_vic is support by RX, try 16x9 first */
+		if (prefer_vic != vic) {
+			printf("%s: check best vic:%d exist, ignore [%d].\n",
+					__func__, prefer_vic, vic);
+			continue;
+		}
 		timing = hdmitx21_gettiming_from_vic(vic);
 		if (timing && vic < HDMITX_VESA_OFFSET && !is_vic_over_limited_1080p(vic))
 			printf("  %s\n", timing->sname ? timing->sname : timing->name);
@@ -742,6 +856,10 @@ static int xtochar(int num, char *checksum)
 {
 	struct hdmitx_dev *hdev = get_hdmitx21_device();
 
+	if (!hdev) {
+		printf("null hdmitx dev\n");
+		return -1;
+	}
 	if (((hdev->rawedid[num] >> 4) & 0xf) <= 9)
 		checksum[0] = ((hdev->rawedid[num] >> 4) & 0xf) + '0';
 	else
@@ -940,6 +1058,7 @@ void scene_process(struct hdmitx_dev *hdev,
 	struct scene_output_info *scene_output_info)
 {
 	struct input_hdmi_data hdmidata;
+	int dv_support = 0;
 
 	if (!hdev || !scene_output_info)
 		return;
@@ -950,7 +1069,7 @@ void scene_process(struct hdmitx_dev *hdev,
 	/* 2. dolby vision scene process */
 	/* only for tv support dv and box enable dv */
 	if (is_dv_preference(hdev)) {
-		dolbyvision_scene_process(&hdmidata, scene_output_info);
+		dv_support = dolbyvision_scene_process(&hdmidata, scene_output_info);
 	} else if (is_dolby_enabled()) {
 		/* for enable dolby vision core when
 		 * first boot connecting non dv tv
@@ -963,13 +1082,13 @@ void scene_process(struct hdmitx_dev *hdev,
 		 */
 		/* scene_output_info->final_dv_type = DOLBY_VISION_DISABLE; */
 	}
-	/* 3.sdr scene process */
+	/* 3.hdr/sdr scene process */
 	/* decide final display mode and deepcolor */
-	if (is_dv_preference(hdev)) {
+	if (is_dv_preference(hdev) && dv_support == 0) {
 		/* do nothing
 		 * already done above, just sync with sysctrl
 		 */
-	} else if (is_hdr_preference(hdev)) {
+	} else if (is_hdr_preference(hdev) || dv_support != 0) {
 		hdr_scene_process(&hdmidata, scene_output_info);
 	} else {
 		sdr_scene_process(&hdmidata, scene_output_info);
@@ -1013,6 +1132,10 @@ static int do_get_parse_edid(cmd_tbl_t *cmdtp, int flag, int argc, char *const a
 	 */
 	bool no_manual_output = false;
 
+	if (!hdev) {
+		printf("null hdmitx dev\n");
+		return CMD_RET_FAILURE;
+	}
 	if (!hdev->hpd_state) {
 		printf("HDMI HPD low, no need parse EDID\n");
 		return 1;
@@ -1121,7 +1244,7 @@ static int do_get_parse_edid(cmd_tbl_t *cmdtp, int flag, int argc, char *const a
 				last_dv_status);
 		}
 	}
-	/* three cases need to decide output by uboot mode select policy:
+	/* 4 cases need to decide output by uboot mode select policy:
 	 * 1.TV changed
 	 * 2.either hdmimode or colorattribute is NULL or "none",
 	 * which means that user have not slected mode or colorattribute,
@@ -1130,6 +1253,7 @@ static int do_get_parse_edid(cmd_tbl_t *cmdtp, int flag, int argc, char *const a
 	 * means mode select policy or edid parse between sysctrl and
 	 * uboot have some gap), then need to find proper output mode
 	 * with uboot policy.
+	 * 4.user selected mode is over writen by system policy
 	 */
 	if (hdev->RXCap.edid_changed || no_manual_output || !mode_support || over_write) {
 		/* find proper mode if EDID changed */
@@ -1274,6 +1398,20 @@ static int do_manual_dfm_type(cmd_tbl_t *cmdtp, int flag, int argc, char *const 
 	return 0;
 }
 
+#ifdef CONFIG_EFUSE_OBJ_API
+static int do_efuse_show(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
+{
+	struct hdmitx_dev *hdev = get_hdmitx21_device();
+
+	pr_info("FEAT_DISABLE_HDMI_60HZ = %d\n", hdev->efuse_dis_hdmi_4k60);
+	pr_info("FEAT_DISABLE_OUTPUT_4K = %d\n", hdev->efuse_dis_output_4k);
+	pr_info("FEAT_DISABLE_HDCP_TX_22 = %d\n", hdev->efuse_dis_hdcp_tx22);
+	pr_info("FEAT_DISABLE_HDMI_TX_3D = %d\n", hdev->efuse_dis_hdmi_tx3d);
+
+	return 0;
+}
+#endif
+
 static cmd_tbl_t cmd_hdmi_sub[] = {
 	U_BOOT_CMD_MKENT(hpd, 1, 1, do_hpd_detect, "", ""),
 	U_BOOT_CMD_MKENT(edid, 3, 1, do_edid, "", ""),
@@ -1289,6 +1427,9 @@ static cmd_tbl_t cmd_hdmi_sub[] = {
 	U_BOOT_CMD_MKENT(dsc_policy, 1, 1, do_dsc_policy, "", ""),
 	U_BOOT_CMD_MKENT(frl_rate, 1, 1, do_manual_frl_rate, "", ""),
 	U_BOOT_CMD_MKENT(dfm_type, 1, 1, do_manual_dfm_type, "", ""),
+#ifdef CONFIG_EFUSE_OBJ_API
+	U_BOOT_CMD_MKENT(efuse, 1, 1, do_efuse_show, "", ""),
+#endif
 };
 
 static int do_hdmitx(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])

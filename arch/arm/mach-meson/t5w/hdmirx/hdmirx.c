@@ -37,7 +37,7 @@ unsigned char edid_14[] = {
 
 static unsigned first_bit_set(uint32_t data)
 {
-	unsigned n = 32;
+	unsigned n = 31;
 
 	if (data != 0) {
 		for (n = 0; (data & 1) == 0; n++)

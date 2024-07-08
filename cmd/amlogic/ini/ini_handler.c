@@ -35,16 +35,9 @@ int bin_file_read(const char* filename, unsigned char *file_buf) {
     int tmp_ret = -1, rd_cnt = 0, file_size = 0;
     unsigned char *tmp_buf = NULL;
 
-    if (!iniIsFileExist(filename)) {
-        ALOGE("%s, file \"%s\" is not exist!\n", __FUNCTION__, filename);
-        return -1;
-    }
-
-    file_size = iniGetFileSize(filename);
-    if (file_size <= 0) {
-        ALOGE("%s, file \"%s\" size error!\n", __FUNCTION__, filename);
-        return -1;
-    }
+	file_size = iniGetFileSize(filename);
+	if (file_size <= 0)
+		return -1;
 
     tmp_buf = (unsigned char *) malloc(file_size * 2);
     if (tmp_buf != NULL) {
@@ -70,16 +63,9 @@ int ini_file_parse(const char* filename, INI_HANDLER_DATA *pHandlerData) {
     int tmp_ret = -1, rd_cnt = 0, file_size = 0;
     unsigned char *tmp_buf = NULL;
 
-    if (!iniIsFileExist(filename)) {
-        ALOGE("%s, file \"%s\" is not exist!\n", __FUNCTION__, filename);
-        return -1;
-    }
-
-    file_size = iniGetFileSize(filename);
-    if (file_size <= 0) {
-        ALOGE("%s, file \"%s\" size error!\n", __FUNCTION__, filename);
-        return -1;
-    }
+	file_size = iniGetFileSize(filename);
+	if (file_size <= 0)
+		return -1;
 
     tmp_buf = (unsigned char *) malloc(file_size * 2);
     if (tmp_buf != NULL) {
@@ -224,10 +210,9 @@ void ini_list_section(INI_HANDLER_DATA *pHandlerData) {
 
 static INI_SECTION* getSection(const char* section, INI_HANDLER_DATA *pHandlerData) {
     INI_SECTION* pSec = NULL;
-    for (pSec = pHandlerData->mpFirstSection; pSec != NULL; pSec = pSec->pNext) {
-        if (strncmp(pSec->Name, section, strlen(section)) == 0) {
-            return pSec;
-        }
+	for (pSec = pHandlerData->mpFirstSection; pSec != NULL; pSec = pSec->pNext) {
+		if (strcmp(pSec->Name, section) == 0)
+			return pSec;
     }
 
     return NULL;
@@ -235,11 +220,10 @@ static INI_SECTION* getSection(const char* section, INI_HANDLER_DATA *pHandlerDa
 
 static INI_LINE* getKeyLineAtSec(INI_SECTION* pSec, const char* key) {
     INI_LINE* pLine = NULL;
-    for (pLine = pSec->pLine; pLine != NULL; pLine = pLine->pNext) {
-        if (strncmp(pLine->Name, key, strlen(key)) == 0) {
-            return pLine;
-        }
-    }
+	for (pLine = pSec->pLine; pLine != NULL; pLine = pLine->pNext) {
+		if (strcmp(pLine->Name, key) == 0)
+			return pLine;
+	}
     return NULL;
 }
 

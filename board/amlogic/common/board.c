@@ -19,6 +19,19 @@
 #include <amlogic/board.h>
 #include <asm/arch/secure_apb.h>
 #include <asm/arch/romboot.h>
+#ifdef CONFIG_AML_VPU
+#include <vpu.h>
+#endif
+#include <vpp.h>
+#ifdef CONFIG_RX_RTERM
+#include <amlogic/aml_hdmirx.h>
+#endif
+#ifdef CONFIG_AML_LCD
+#include <amlogic/media/vout/lcd/lcd_vout.h>
+#endif
+#ifdef CONFIG_ARMV8_MULTIENTRY
+#include <asm/arch-meson/smp.h>
+#endif
 
 DECLARE_GLOBAL_DATA_PTR;
 #define UNUSED(x) (void)(x)
@@ -87,6 +100,12 @@ static int aml_misc_confirm_yesno(const int tm/*timeout in ms*/)
 int misc_init_r(void)
 {
 	printf("board common misc_init\n");
+#if defined(CONFIG_MDUMP_COMPRESS) || \
+	((defined CONFIG_SUPPORT_BL33Z) && \
+	(defined CONFIG_FULL_RAMDUMP))
+	extern void ramdump_init(void);
+	ramdump_init();
+#endif
 	if (!aml_misc_confirm_yesno(5000))
 		return 0;
 
@@ -302,6 +321,84 @@ int aml_board_late_init_tail(void *arg)
 }
 #endif//#ifdef CONFIG_BOARD_LATE_INIT
 
+static void aml_board_display_env_handler(void)
+{
+	char *bootup_display;
+#ifdef CONFIG_AML_LCD
+	char lcd_init_str[8];
+#endif
+
+	run_command("get_rebootmode", 0);
+	printf("reboot_mode: %s\n", env_get("reboot_mode"));
+	run_command("run check_display", 0);
+	bootup_display = env_get("bootup_display");
+	if (!bootup_display)
+		return;
+
+	printf("bootup_display: %s\n", bootup_display);
+#ifdef CONFIG_AML_LCD
+	if (strcmp(bootup_display, "on") == 0)
+		snprintf(lcd_init_str, 8, "%d", LCD_INIT_LEVEL_NORMAL);
+	else
+		snprintf(lcd_init_str, 8, "%d", LCD_INIT_LEVEL_PWR_OFF);
+
+	env_set("lcd_init_level", lcd_init_str);
+	//printf("lcd_init_level: %s\n", env_get("lcd_init_level"));
+#endif
+}
+
+#ifdef CONFIG_ARMV8_MULTIENTRY
+static void aml_display_on_pre(unsigned char vout_idx)
+{
+	run_command("run init_display_pre", 0);
+	printf("display on pre done\n");
+}
+
+//param bit[0:7]:curr vout idx;
+static void aml_display_on_post_job(unsigned long param)
+{
+	run_command("run init_display_post", 0);
+	printf("display on post smp done\n");
+	secondary_off();
+}
+#endif
+
+// each bit refers to vout index, eg. 0x5=(vout+vout3)
+void aml_board_display_init(unsigned char vout_bit)
+{
+#ifdef CONFIG_AML_VPU
+	vpu_probe();
+#endif
+#ifdef CONFIG_AML_VPP
+	vpp_init();
+#endif
+	run_command("ini_model", 0);
+	aml_board_display_env_handler();
+
+#ifdef CONFIG_RX_RTERM
+	rx_set_phy_rterm();
+#endif
+#ifdef CONFIG_AML_CVBS
+	run_command("cvbs init", 0);
+#endif
+#ifdef CONFIG_AML_LCD
+	lcd_probe();
+#endif
+
+#ifdef CONFIG_ARMV8_MULTIENTRY
+	int smp_ret;
+
+	if (!(unsigned char)env_get_ulong("display_on_smp", 10, 0))
+		return;
+
+	aml_display_on_pre(vout_bit);
+
+	smp_ret = run_smp_function(1, &aml_display_on_post_job, vout_bit);
+	if (smp_ret)
+		printf("display smp failed\n");
+#endif
+}
+
 static int board_get_bootid(void)
 {
 	const cpu_id_t cpuid = get_cpu_id();
@@ -360,3 +457,23 @@ void board_set_boot_source(void)
 	env_set("boot_source", source);
 	printf("%s, boot_source: %s\n", __func__, source);
 }
+
+#ifdef CONFIG_AML_DEFENV
+const char * const _aml_env_reserv_array[] = {
+	"lock",
+	"upgrade_step",
+	"bootloader_version",
+	"hdmimode",
+	"dts_to_gpt",
+	"fastboot_step",
+	"reboot_status",
+	"expect_index",
+	"recovery_check_part",
+	"defenv_para",	//set in board_late_init
+#ifndef CONFIG_CMD_CAR_PARAMS
+	"outputmode",
+	"connector_type",
+#endif
+	NULL//Keep NULL be last to tell END
+};
+#endif//#ifdef CONFIG_AML_DEFENV

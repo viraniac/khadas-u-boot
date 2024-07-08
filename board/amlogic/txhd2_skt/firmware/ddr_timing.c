@@ -151,7 +151,7 @@ ddr_set_ps0_only_t __attribute__ ((aligned(4))) __ddr_setting[] __attribute__ ((
 		.cfg_board_SI_setting_ps.max_core_timmming_frequency = 0,
 		// 1 //real chip stk lp4
 		.cfg_board_common_setting.dbi_enable = 0x00000000,
-		.cfg_board_common_setting.ddr_rfc_type = DDR_RFC_TYPE_DDR4_2Gbx8,
+		.cfg_board_common_setting.ddr_rfc_type = DDR_RFC_TYPE_DDR4_2Gbx4,
 
 #ifdef CONFIG_BOARD_TIMMING     //skt lp4 board
 #define TDQS2DQ  ((0 * 128 * DDR4_CLK_DDR0) / 1000000)
@@ -905,7 +905,7 @@ ddr_set_ps0_only_t __attribute__ ((aligned(4))) __ddr_setting[] __attribute__ ((
 		.cfg_board_SI_setting_ps.max_core_timmming_frequency = 0,
 		// 1 //real chip stk lp4
 		.cfg_board_common_setting.dbi_enable = 0x00000000,
-		.cfg_board_common_setting.ddr_rfc_type = DDR_RFC_TYPE_DDR4_2Gbx8,
+		.cfg_board_common_setting.ddr_rfc_type = DDR_RFC_TYPE_DDR4_2Gbx4,
 
 #ifdef CONFIG_BOARD_TIMMING     //skt lp4 board
 #define TDQS2DQ_DDR1  ((0 * 128 * DDR4_CLK_DDR1) / 1000000)
@@ -1717,7 +1717,7 @@ ddr_set_ps0_only_t __attribute__ ((aligned(4))) __ddr_setting[] __attribute__ ((
 		.cfg_board_SI_setting_ps.max_core_timmming_frequency = 0,
 		// 1 //real chip stk lp4
 		.cfg_board_common_setting.dbi_enable = 0x00000000,
-		.cfg_board_common_setting.ddr_rfc_type = DDR_RFC_TYPE_DDR4_2Gbx8,
+		.cfg_board_common_setting.ddr_rfc_type = DDR_RFC_TYPE_DDR4_2Gbx4,
 
 #ifdef CONFIG_BOARD_TIMMING     //skt lp4 board
 #define TDQS2DQ  ((0 * 128 * DDR4_CLK_DDR0) / 1000000)
@@ -2464,7 +2464,7 @@ ddr_set_ps0_only_t __attribute__ ((aligned(4))) __ddr_setting[] __attribute__ ((
 		.cfg_board_SI_setting_ps.max_core_timmming_frequency = 0,
 		// 1 //real chip stk lp4
 		.cfg_board_common_setting.dbi_enable = 0x00000000,
-		.cfg_board_common_setting.ddr_rfc_type = DDR_RFC_TYPE_DDR4_2Gbx8,
+		.cfg_board_common_setting.ddr_rfc_type = DDR_RFC_TYPE_DDR4_2Gbx4,
 
 #ifdef CONFIG_BOARD_TIMMING     //skt lp4 board
 #define TDQS2DQ_DDR1  ((0 * 128 * DDR4_CLK_DDR1) / 1000000)

@@ -92,7 +92,7 @@ static int splitFilePath(const char *file_path, char part_name[], char file_name
                 ALOGE("%s, the file path \"%s\" doesn't have ext name!!!\n", __FUNCTION__, file_path);
                 return -1;
             } else {
-                if (strncmp(tmp_end_ptr + 1, ext_name, 128)) {
+                if (strcmp(tmp_end_ptr + 1, ext_name)) {
                     ALOGE("%s, the ext name of file path \"%s\" not equal to the special ext name \"%s\"!!!\n", __FUNCTION__, file_path, ext_name);
                     return -1;
                 }
@@ -183,9 +183,13 @@ int iniGetFileSize(const char *file_path) {
         return -1;
     }
 
-    if (fs_size(file_name, &file_size)) {
-        return -1;
-    }
+	if (fs_size(file_name, &file_size)) {
+		ALOGE("%s, file \"%s\" is not exist!\n", __func__, file_name);
+		return -1;
+	}
+
+	if (file_size == 0)
+		ALOGE("%s, file \"%s\" size error!\n", __func__, file_name);
 
     return file_size;
 #endif

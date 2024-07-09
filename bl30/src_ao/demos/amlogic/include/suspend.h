@@ -48,7 +48,13 @@
 #define EXIT_REASON_EXTENSION_FLAG	(1 << 7)
 
 /* power mode flag */
-#define PM_SHUTDOWN_FLAG	0xF
+#define POWER_MODE_MASK 0xF
+#define POWER_MODE_SUSPEND_1 0x0
+#define POWER_MODE_SUSPEND_2 0x3
+#define POWER_MODE_POWER_OFF 0xF
+
+#define DELAY_TIME_MS 20	//20ms
+#define POWERON_VDDCPU_DELAY (pdMS_TO_TICKS(DELAY_TIME_MS) + 1)
 
 typedef struct {
 	char* name;
@@ -59,6 +65,8 @@ void vDDR_resume(uint32_t st_f);
 uint32_t parse_suspend_msg(void *msg);
 void vCLK_suspend(uint32_t st_f);
 void vCLK_resume(uint32_t st_f);
+void vDSP_suspend(uint32_t st_f);
+void vDSP_resume(uint32_t st_f);
 extern void create_str_task(void);
 extern void STR_Start_Sem_Give_FromISR(void);
 extern void STR_Start_Sem_Give(void);

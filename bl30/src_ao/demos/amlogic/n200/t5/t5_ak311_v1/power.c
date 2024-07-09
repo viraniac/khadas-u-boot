@@ -84,8 +84,8 @@ void str_hw_init(void)
 	xTaskCreate(vCEC_task, "CECtask", configMINIMAL_STACK_SIZE,
 		    NULL, CEC_TASK_PRI, &cecTask);
 	vBackupAndClearGpioIrqReg();
-	vKeyPadInit();
 	vGpioIRQInit();
+	vKeyPadInit();
 	Bt_GpioIRQRegister();
 #ifdef CONFIG_HDMIRX_PLUGIN_WAKEUP
 	hdmirx_GpioIRQRegister();
@@ -108,6 +108,24 @@ void str_hw_disable(void)
 #ifdef CONFIG_HDMIRX_PLUGIN_WAKEUP
 	hdmirx_GpioIRQFree();
 #endif
+}
+
+static void str_gpio_backup(void)
+{
+	// TODO:
+
+	// Example:
+	// if (xBankStateBackup("A"))
+	// 	printf("xBankStateBackup fail\n");
+}
+
+static void str_gpio_restore(void)
+{
+	// TODO:
+
+	// Example:
+	// if (xBankStateRestore("A"))
+	// 	printf("xBankStateRestore fail\n");
 }
 
 void str_power_on(int shutdown_flag)
@@ -142,17 +160,21 @@ void str_power_on(int shutdown_flag)
 		return;
 	}
 
-	/*Wait 20ms for VDDCPU stable*/
-	vTaskDelay(pdMS_TO_TICKS(20));
+	/*Wait POWERON_VDDCPU_DELAY for VDDCPU stable*/
+	vTaskDelay(POWERON_VDDCPU_DELAY);
 	//printf("vdd_cpu on\n");
 
 	/***power on 5v***/
 	REG32(AO_GPIO_TEST_N) = REG32(AO_GPIO_TEST_N) | (1 << 31);
+
+	str_gpio_restore();
 }
 
 void str_power_off(int shutdown_flag)
 {
 	int ret;
+
+	str_gpio_backup();
 
 	printf("poweroff 5v\n");
 	printf("0x%x\n", REG32(AO_GPIO_TEST_N));

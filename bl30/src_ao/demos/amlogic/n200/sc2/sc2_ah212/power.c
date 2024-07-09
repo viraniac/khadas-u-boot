@@ -34,7 +34,7 @@
 #include "pwm_plat.h"
 #include "keypad.h"
 #include "wifi_bt_wake.h"
-
+#include "dsp_suspend.h"
 #include "hdmi_cec.h"
 
 #include "interrupt_control_eclic.h"
@@ -43,6 +43,8 @@
 #ifdef UART_BT_QCOM
 #include "uart_bt.h"
 #endif
+
+#define ALWAYS_ON_5V_PW
 
 static TaskHandle_t cecTask = NULL;
 static int vdd_ee;
@@ -88,16 +90,17 @@ void str_hw_init(void)
 		    NULL, CEC_TASK_PRI, &cecTask);
 
 	vBackupAndClearGpioIrqReg();
-	vKeyPadInit();
 	vGpioIRQInit();
+	vKeyPadInit();
 
 #ifdef UART_BT_QCOM
-	if (get_power_mode() != PM_SHUTDOWN_FLAG) {  // skip poweroff sdandby
+	if (get_power_mode() != POWER_MODE_POWER_OFF) {  // skip poweroff sdandby
 		bt_suspend_handle();
 	}
 #endif
 
 	wifi_bt_wakeup_init();
+	vDSPVadWakeupInit();
 }
 
 void str_hw_disable(void)
@@ -116,6 +119,25 @@ void str_hw_disable(void)
 	vKeyPadDeinit();
 	printf("vGpioKeyDisable\n");
 	vRestoreGpioIrqReg();
+	vDSPVadWakeupDeinit();
+}
+
+static void str_gpio_backup(void)
+{
+	// TODO:
+
+	// Example:
+	// if (xBankStateBackup("A"))
+	// 	printf("xBankStateBackup fail\n");
+}
+
+static void str_gpio_restore(void)
+{
+	// TODO:
+
+	// Example:
+	// if (xBankStateRestore("A"))
+	// 	printf("xBankStateRestore fail\n");
 }
 
 void str_power_on(int shutdown_flag)
@@ -130,6 +152,7 @@ void str_power_on(int shutdown_flag)
 		return;
 	}
 
+#ifndef ALWAYS_ON_5V_PW
     /***power on vcc_5v***/
 	ret = xPinmuxSet(GPIOH_8,PIN_FUNC0);
 	if (ret < 0) {
@@ -142,6 +165,9 @@ void str_power_on(int shutdown_flag)
 		printf("vcc_5v set gpio dir fail\n");
 		return;
 	}
+#else
+	printf("Need to keep 5V always on..\n");
+#endif
 
     /***power on vdd_cpu***/
 	ret = xGpioSetDir(GPIO_TEST_N,GPIO_DIR_OUT);
@@ -155,14 +181,18 @@ void str_power_on(int shutdown_flag)
 		printf("vdd_cpu set gpio val fail\n");
 		return;
 	}
-	/*Wait 20ms for VDDCPU stable*/
-	vTaskDelay(pdMS_TO_TICKS(20));
+	/*Wait POWERON_VDDCPU_DELAY for VDDCPU stable*/
+	vTaskDelay(POWERON_VDDCPU_DELAY);
 	printf("vdd_cpu on\n");
+
+	str_gpio_restore();
 }
 
 void str_power_off(int shutdown_flag)
 {
 	int ret;
+
+	str_gpio_backup();
 
 	shutdown_flag = shutdown_flag;
 
@@ -179,6 +209,7 @@ void str_power_off(int shutdown_flag)
 		return;
 	}
 
+#ifndef ALWAYS_ON_5V_PW
     /***power off vcc_5v***/
 	ret = xPinmuxSet(GPIOH_8,PIN_FUNC0);
 	if (ret < 0) {
@@ -191,6 +222,9 @@ void str_power_off(int shutdown_flag)
 		printf("vcc_5v set gpio dir fail\n");
 		return;
 	}
+#else
+	printf("Need to keep 5V always on..\n");
+#endif
 
 	/***power off vdd_cpu***/
 	ret = xGpioSetDir(GPIO_TEST_N,GPIO_DIR_OUT);

@@ -17,19 +17,6 @@ source fip/build_bl33.sh
 source fip/build_bl40.sh
 source fip/check_coverity.sh
 
-declare -a  COMPILE_PARA_LIST=("--h" "--help" "--config" "--chip-varient" "--check-compile" \
-			"--cov" "--cov-high" "--enable-ramdump" "--uasan" "--enable-bl33z" \
-			"--disable-bl33z" "--compress-bl2e" "--chipid" "--build-version" \
-			"--ab-update" "--hdmitx-only" "--clean"\
-			"--distclean" "--bl2" "--bl2e" "--bl2x" "--bl30" "--bl31" \
-			"--bl32" "--bl40" "--ddr-fip" "--sign-bl40" "--update-bl2" \
-			"--update-bl2e" "--update-bl2x" "--update-ddr-fip" "--update-bl30" \
-			"--update-bl31" "--update-bl32" "--bl2-branch" "--ddrfw" \
-			"--jenkins-sign" "--former-sign" "--build-unsign" "--build-nogit" \
-			"--nasc_nagra_tier_1" "--cas" "--systemroot" "--avb2" "--vab" \
-			"--fastboot-write" "--signpipe" "--avb2-recovery" "--patch" "--gpt" \
-			)
-
 function parse_bl33_global_config() {
 	local oldifs="$IFS"
 	IFS=$'\n'
@@ -286,8 +273,12 @@ function build() {
 
 	# pre-build, get .config defines
 	if [ ! $BOARD_COMPILE_HDMITX_ONLY ]; then
-            echo "export BOARD_COMPILE_HDMITX_ONLY=null"
-	    export BOARD_COMPILE_HDMITX_ONLY=null
+		echo "export BOARD_COMPILE_HDMITX_ONLY=null"
+		export BOARD_COMPILE_HDMITX_ONLY=null
+	fi
+	if [ ! $BOARD_DISPLAY_PIPELINE ]; then
+		echo "export BOARD_DISPLAY_PIPELINE=null"
+		export BOARD_DISPLAY_PIPELINE=null
 	fi
 	pre_build_uboot $@
 
@@ -484,6 +475,13 @@ function parser() {
 				export CONFIG_AML_UASAN=1
 				export UASAN_DDR_SIZE
 				continue ;;
+			# this option can be used to control log output of each blx
+			# eg: enable silent in bl33 when enable this option
+			--noverbose)
+				echo ~~~~~~ noverbose build ~~~~~~
+				CONFIG_NOVERBOSE_BUILD=1
+				export CONFIG_NOVERBOSE_BUILD=1
+				continue;;
 			--enable-bl33z)
 				CONFIG_SUPPORT_BL33Z=1
 				export CONFIG_SUPPORT_BL33Z
@@ -523,6 +521,10 @@ function parser() {
 			--hdmitx-only)
 				echo "export BOARD_COMPILE_HDMITX_ONLY=true"
 				export BOARD_COMPILE_HDMITX_ONLY=true
+				continue ;;
+			--display-pipeline)
+				export BOARD_DISPLAY_PIPELINE="${argv[$i]}"
+				echo "export BOARD_DISPLAY_PIPELINE="${argv[$i]}""
 				continue ;;
 			--clean|--distclean)
 				clean

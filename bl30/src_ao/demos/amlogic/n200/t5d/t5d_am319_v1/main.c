@@ -41,6 +41,7 @@
 #include "hdmi_cec.h"
 #include "stick_mem.h"
 #include "eth.h"
+#include "uart.h"
 #define INT_TEST_NEST_DEPTH  6
 #define INT_TEST_GPIO_NUM  6
 #define INT_TEST_TASK_DELAY  50 // ms
@@ -172,13 +173,12 @@ int main(void)
 	// Initialize GPIOs, PIC and timer
 	//vGPIOInit();
 	vPICInit();
-	stick_mem_init();
-	//write watchdog flag
-	stick_mem_write(STICK_REBOOT_FLAG, 0xd);
 
 	// Delay
 	for (uint32_t i = 0; i < 0xffff; ++i);
 
+	stick_mem_init();
+	stick_mem_write(STICK_REBOOT_FLAG, WATCHDOG_REBOOT);
 	vMbInit();
 	vCoreFsmIdleInit();
 	// Create timer
@@ -199,6 +199,15 @@ int main(void)
 	vRtcInit();
 	vETHMailboxCallback();
 	create_str_task();
+
+#if configBL30_VERSION_SAVE
+	bl30_plat_save_version();
+#endif
+
+#if defined(ACS_DIS_PRINT_FLAG) && configSUPPORT_STICK_MEM
+	if (REG32(ACS_DIS_PRINT_REG) & ACS_DIS_PRINT_FLAG)
+		vBL30PrintControlInit();
+#endif
 
 	vUartPuts("Starting task scheduler ...\n");
 

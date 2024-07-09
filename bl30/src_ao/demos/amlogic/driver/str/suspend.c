@@ -49,18 +49,22 @@
 #include "stick_mem.h"
 #include "pm.h"
 #include "irq.h"
-#include "gpio.h"
+#include "uart.h"
+
+#ifndef UNUSED
+#define UNUSED(x) ((void)x)
+#endif
 
 void system_resume(uint32_t pm);
 void system_suspend(uint32_t pm);
 void set_reason_flag(char exit_reason);
 void create_str_task(void);
 uint32_t get_reason_flag(void);
-uint32_t get_stick_reboot_flag(void);
 void *xMboxGetWakeupReason(void *msg);
 void *xMboxClrWakeupReason(void *msg);
 void *xMboxGetStickRebootFlag(void *msg);
 void set_suspend_flag(void);
+void check_poweroff_status(void);
 
 SemaphoreHandle_t xSTRSemaphore = NULL;
 QueueHandle_t xSTRQueue = NULL;
@@ -139,13 +143,29 @@ __attribute__((weak)) void vCLK_resume(uint32_t st_f)
 	st_f = st_f;
 }
 
+__attribute__((weak)) void vDSP_suspend(uint32_t st_f)
+{
+	st_f = st_f;
+}
+
+__attribute__((weak)) void vDSP_resume(uint32_t st_f)
+{
+	st_f = st_f;
+}
+
+__attribute__((weak)) void check_poweroff_status(void)
+{
+	vTaskDelay(pdMS_TO_TICKS(500));
+}
+
 void system_resume(uint32_t pm)
 {
 	uint32_t shutdown_flag = 0;
 
-	if (pm == PM_SHUTDOWN_FLAG)
+	if (pm == POWER_MODE_POWER_OFF)
 		shutdown_flag = 1;
 
+	vDSP_resume(shutdown_flag);
 	vCLK_resume(shutdown_flag);
 	/*Need clr alarm ASAP*/
 	alarm_clr();
@@ -167,7 +187,7 @@ void system_suspend(uint32_t pm)
 {
 	uint32_t shutdown_flag = 0;
 
-	if (pm == PM_SHUTDOWN_FLAG)
+	if (pm == POWER_MODE_POWER_OFF)
 		shutdown_flag = 1;
 
 	/*Need set alarm ASAP*/
@@ -175,11 +195,12 @@ void system_suspend(uint32_t pm)
 	str_hw_init();
 	/*Set flag befor delay. It can be wakeup during delay*/
 	set_suspend_flag();
-	/*Delay 500ms for FSM switch to off*/
-	vTaskDelay(pdMS_TO_TICKS(500));
+	/*Wait for FSM switch to off*/
+	check_poweroff_status();
 	vDDR_suspend(shutdown_flag);
 	str_power_off(shutdown_flag);
 	vCLK_suspend(shutdown_flag);
+	vDSP_suspend(shutdown_flag);
 }
 
 void set_reason_flag(char exit_reason)
@@ -197,16 +218,6 @@ uint32_t get_reason_flag(void)
 	return REG32(WAKEUP_REASON_STICK_REG) & 0x7f;
 }
 
-uint32_t get_stick_reboot_flag(void)
-{
-#if (configSUPPORT_STICK_MEM == 1)
-	return last_stick_reboot_flag;
-#else
-	printf("Don't support stick memory!\r\n");
-	return 0;
-#endif
-}
-
 void *xMboxGetWakeupReason(void *msg)
 {
 	*(uint32_t *)msg = get_reason_flag();
@@ -221,8 +232,12 @@ void *xMboxClrWakeupReason(void *msg)
 
 void *xMboxGetStickRebootFlag(void *msg)
 {
+#if (configSUPPORT_STICK_MEM == 1)
 	*(uint32_t *)msg = get_stick_reboot_flag();
-
+#else
+	UNUSED(msg);
+	printf("Don't support stick memory!\r\n");
+#endif
 	return NULL;
 }
 
@@ -272,22 +287,23 @@ void STR_Wakeup_src_Queue_Send(uint32_t *src)
 
 void *xMboxSuspend_Sem(void *msg)
 {
-	int ret;
-
 	power_mode = *(uint32_t *)msg;
 
-	printf("power_mode=0x%x\n",power_mode);
-	if (PM_SHUTDOWN_FLAG == power_mode) {
-		ret = xGpioSetDir(GPIOZ_4,GPIO_DIR_OUT);
-		if (ret < 0) {
-			printf("GPIOZ_4 set gpio dir fail\n");
-		}
+#ifdef ACS_DIS_PRINT_FLAG
+	enable_bl30_print(1);
+#endif
 
-		ret = xGpioSetValue(GPIOZ_4,GPIO_LEVEL_HIGH);
-		if (ret < 0) {
-			printf("GPIOZ_4 set gpio val fail\n");
-		}
-		printf("power off->GPIOZ_4 pull hight\n");
+	switch (power_mode & POWER_MODE_MASK) {
+	case POWER_MODE_SUSPEND_1:
+	case POWER_MODE_SUSPEND_2:
+		printf("power_mode: SUSPEND\n");
+		break;
+	case POWER_MODE_POWER_OFF:
+		printf("power_mode: POWER OFF\n");
+		break;
+	default:
+		printf("power_mode: UNKNOWN\n");
+		break;
 	}
 
 	STR_Start_Sem_Give();
@@ -302,6 +318,10 @@ void *xMboxpm_sem(void *msg);
 void *xMboxpm_sem(void *msg)
 {
 	uint32_t mode = *(uint32_t *)msg;
+
+#ifdef ACS_DIS_PRINT_FLAG
+	enable_bl30_print(1);
+#endif
 
 	if (mode == FREEZE_ENTER) {
 		pm_enter();
@@ -368,6 +388,8 @@ static void vSTRTask( void *pvParameters )
 					exit_reason = WOL_WAKEUP;
 					break;
 				default:
+					printf("unknown exit_reason %d\n", exit_reason);
+					set_suspend_flag();
 					break;
 			}
 

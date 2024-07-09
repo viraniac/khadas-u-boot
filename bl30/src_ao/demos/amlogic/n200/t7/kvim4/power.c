@@ -34,7 +34,7 @@
 #include "pwm_plat.h"
 #include "keypad.h"
 #include "meson_i2c.h"
-
+#include "wifi_bt_wake.h"
 #include "hdmi_cec.h"
 #include "hdmirx_wake.h"
 #include "interrupt_control_eclic.h"
@@ -73,8 +73,6 @@ void str_hw_init(void);
 void str_hw_disable(void);
 void str_power_on(int shutdown_flag);
 void str_power_off(int shutdown_flag);
-void Bt_GpioIRQRegister(void);
-void Bt_GpioIRQFree(void);
 
 void str_hw_init(void)
 {
@@ -85,9 +83,11 @@ void str_hw_init(void)
 		    NULL, CEC_TASK_PRI, &cecTask);
 
 	vBackupAndClearGpioIrqReg();
-	vKeyPadInit();
 	vGpioIRQInit();
-	Bt_GpioIRQRegister();
+	vKeyPadInit();
+
+	wifi_bt_wakeup_init();
+
 #ifdef CONFIG_HDMIRX_PLUGIN_WAKEUP
 	hdmirx_GpioIRQRegister();
 #endif
@@ -103,12 +103,31 @@ void str_hw_disable(void)
 		vTaskDelete(cecTask);
 		cec_req_irq(0);
 	}
-	Bt_GpioIRQFree();
+
+	wifi_bt_wakeup_deinit();
 	vKeyPadDeinit();
 	vRestoreGpioIrqReg();
 #ifdef CONFIG_HDMIRX_PLUGIN_WAKEUP
 	hdmirx_GpioIRQFree();
 #endif
+}
+
+static void str_gpio_backup(void)
+{
+	// TODO:
+
+	// Example:
+	// if (xBankStateBackup("A"))
+	// 	printf("xBankStateBackup fail\n");
+}
+
+static void str_gpio_restore(void)
+{
+	// TODO:
+
+	// Example:
+	// if (xBankStateRestore("A"))
+	// 	printf("xBankStateRestore fail\n");
 }
 
 void str_power_on(int shutdown_flag)
@@ -161,9 +180,11 @@ void str_power_on(int shutdown_flag)
 		return;
 	}
 
-	/*Wait 20ms for VDDCPU stable*/
-	vTaskDelay(pdMS_TO_TICKS(20));
+	/*Wait POWERON_VDDCPU_DELAY for VDDCPU stable*/
+	vTaskDelay(POWERON_VDDCPU_DELAY);
 	printf("vdd_cpu on\n");
+
+	str_gpio_restore();
 }
 
 void mcu_i2c_init(void);
@@ -182,6 +203,8 @@ void mcu_i2c_init(void)
 void str_power_off(int shutdown_flag)
 {
 	int ret;
+
+	str_gpio_backup();
 
 	shutdown_flag = shutdown_flag;
 

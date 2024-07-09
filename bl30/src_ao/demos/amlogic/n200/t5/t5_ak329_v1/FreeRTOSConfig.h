@@ -62,7 +62,7 @@ your application. */
 /* Hook function related definitions. */
 #define configUSE_IDLE_HOOK                     1
 #define configUSE_TICK_HOOK                     0
-#define configCHECK_FOR_STACK_OVERFLOW          1
+#define configCHECK_FOR_STACK_OVERFLOW          2
 #define configUSE_MALLOC_FAILED_HOOK            1
 #define configUSE_DAEMON_TASK_STARTUP_HOOK      0
 
@@ -86,8 +86,11 @@ your application. */
 #define configMAX_SYSCALL_INTERRUPT_PRIORITY    6
 #define configMAX_API_CALL_INTERRUPT_PRIORITY   6
 
-#define configDEFAULT_HEAP_ADDR			0xfffc0000
-#define configDEFAULT_HEAP_SIZE			32 * 1024
+#define configSUPPORT_STICK_MEM 1
+#define configSTICK_MEM_SIZE 128
+#define configDEFAULT_HEAP_ADDR 0xfffc0000
+#define configDEFAULT_HEAP_SIZE (32 * 1024 - configSTICK_MEM_SIZE)
+#define configSTICK_MEM_ADDR (configDEFAULT_HEAP_ADDR + configDEFAULT_HEAP_SIZE)
 
 #define portCRITICAL_NESTING_IN_TCB				1
 //#include "uart.h"

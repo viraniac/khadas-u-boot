@@ -49,6 +49,7 @@
 #include "vrtc.h"
 #include "mailbox-api.h"
 #include "version.h"
+#include "stick_mem.h"
 
 //#include "printf.h"
 #define INT_TEST_NEST_DEPTH  6
@@ -159,8 +160,9 @@ int main(void)
 	for (i = 0; i < 4; ++i)
 		printf("AOCPU_IRQ_SEL=0x%x\n",REG32(AOCPU_IRQ_SEL0 + i*4));
 
+	stick_mem_init();
+	stick_mem_write(STICK_REBOOT_FLAG, WATCHDOG_REBOOT);
 	vMbInit();
-
 
 	// Create timer
 	xSoftTimer = xTimerCreate("Timer", pdMS_TO_TICKS(100), pdTRUE, NULL, vPrintSystemStatus);
@@ -174,6 +176,15 @@ int main(void)
 	vCecCallbackInit(CEC_CHIP_SC2);
 	vRtcInit();
 	create_str_task();
+
+#if configBL30_VERSION_SAVE
+	bl30_plat_save_version();
+#endif
+
+#if defined(ACS_DIS_PRINT_FLAG) && configSUPPORT_STICK_MEM
+	if (REG32(ACS_DIS_PRINT_REG) & ACS_DIS_PRINT_FLAG)
+		vBL30PrintControlInit();
+#endif
 
 	printf("Starting task scheduler ...\r\n");
 	vTaskStartScheduler();

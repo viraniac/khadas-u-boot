@@ -50,8 +50,8 @@ void str_hw_init(void)
 	/*enable device & wakeup source interrupt*/
 #if DEF_P1_AWAKE_SOURCE  //TODO
 	vBackupAndClearGpioIrqReg();
-	vKeyPadInit();
 	vGpioIRQInit();
+	vKeyPadInit();
 #endif
 }
 
@@ -63,6 +63,24 @@ void str_hw_disable(void)
 	vKeyPadDeinit();
 	vRestoreGpioIrqReg();
 #endif
+}
+
+static void str_gpio_backup(void)
+{
+	// TODO:
+
+	// Example:
+	// if (xBankStateBackup("A"))
+	// 	printf("xBankStateBackup fail\n");
+}
+
+static void str_gpio_restore(void)
+{
+	// TODO:
+
+	// Example:
+	// if (xBankStateRestore("A"))
+	// 	printf("xBankStateRestore fail\n");
 }
 
 void str_power_on(int shutdown_flag)
@@ -91,14 +109,20 @@ void str_power_on(int shutdown_flag)
 		printf("vdd_cpu set gpio val fail\n");
 		return;
 	}
-	/*Wait 20ms for VDDCPU stable*/
-	vTaskDelay(pdMS_TO_TICKS(20));
+	/*Wait POWERON_VDDCPU_DELAY for VDDCPU stable*/
+	vTaskDelay(POWERON_VDDCPU_DELAY);
 #endif
 	printf("vdd_cpu on\n");
+
+	/*Wait 20ms for VDDIO stable*/
+	vTaskDelay(pdMS_TO_TICKS(20));
+	str_gpio_restore();
 }
 
 void str_power_off(int shutdown_flag)
 {
+	str_gpio_backup();
+
 	shutdown_flag = shutdown_flag;
 #if DEF_PWM_PWR    //todo for pmic
 	int ret;

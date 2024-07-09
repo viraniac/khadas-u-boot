@@ -33,8 +33,8 @@
 #include "pwm.h"
 #include "pwm_plat.h"
 #include "keypad.h"
-#include "btwake.h"
 #include "meson_i2c.h"
+
 
 #include "hdmi_cec.h"
 #include "btwake.h"
@@ -78,7 +78,6 @@ void str_hw_disable(void);
 void str_power_on(int shutdown_flag);
 void str_power_off(int shutdown_flag);
 
-
 void str_hw_init(void)
 {
 	/*enable device & wakeup source interrupt*/
@@ -88,8 +87,8 @@ void str_hw_init(void)
 		    NULL, CEC_TASK_PRI, &cecTask);
 
 	vBackupAndClearGpioIrqReg();
-	vKeyPadInit();
 	vGpioIRQInit();
+	vKeyPadInit();
 	bt_task_init();
 }
 
@@ -106,6 +105,24 @@ void str_hw_disable(void)
 	bt_task_deinit();
 	vKeyPadDeinit();
 	vRestoreGpioIrqReg();
+}
+
+static void str_gpio_backup(void)
+{
+	// TODO:
+
+	// Example:
+	// if (xBankStateBackup("A"))
+	// 	printf("xBankStateBackup fail\n");
+}
+
+static void str_gpio_restore(void)
+{
+	// TODO:
+
+	// Example:
+	// if (xBankStateRestore("A"))
+	// 	printf("xBankStateRestore fail\n");
 }
 
 void str_power_on(int shutdown_flag)
@@ -145,9 +162,11 @@ void str_power_on(int shutdown_flag)
 		printf("vdd_cpu set gpio val fail\n");
 		return;
 	}
-	/*Wait 20ms for VDDCPU stable*/
-	vTaskDelay(pdMS_TO_TICKS(20));
+	/*Wait POWERON_VDDCPU_DELAY for VDDCPU stable*/
+	vTaskDelay(POWERON_VDDCPU_DELAY);
 	printf("vdd_cpu on\n");
+
+	str_gpio_restore();
 }
 
 void mcu_i2c_init(void);
@@ -166,6 +185,8 @@ void mcu_i2c_init(void)
 void str_power_off(int shutdown_flag)
 {
 	int ret;
+
+	str_gpio_backup();
 
 	shutdown_flag = shutdown_flag;
 	/***set vdd_ee val***/

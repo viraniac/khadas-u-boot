@@ -33,10 +33,17 @@ void pmp_open_all_space(void){
 #ifndef N200_REVA
 static uint32_t pmpcfg_order_get(uint32_t pmp_size)
 {
-	int pmpcfg_order = 10;
+	int pmpcfg_order = 0;
 
-	for (uint32_t i = 0x400; i*2 <= pmp_size; i *= 2)
+	if ((pmp_size & (pmp_size - 1)) != 0) {
+		printf("error: pmp_size is not 2^n\n");
+		return 0;
+	}
+
+	while (pmp_size > 1) {
+		pmp_size >>= 1;
 		pmpcfg_order++;
+	}
 
 	return pmpcfg_order;
 }
@@ -74,17 +81,17 @@ uint32_t config_pmp(void)
 			start_text_addr, end_text_addr);
 
 	while (text_len_left > 0) {
-		if (text_len_left >= SIZE_32K && (pmp_region_base & (SIZE_32K - 1)) == 0)
+		if ((text_len_left >= SIZE_32K) && ((pmp_region_base & (SIZE_32K - 1)) == 0))
 			next_seg_len = SIZE_32K;
-		else if (text_len_left >= SIZE_16K && (pmp_region_base & (SIZE_16K - 1)) == 0)
+		else if ((text_len_left >= SIZE_16K) && ((pmp_region_base & (SIZE_16K - 1)) == 0))
 			next_seg_len = SIZE_16K;
-		else if (text_len_left >= SIZE_8K && (pmp_region_base & (SIZE_8K - 1)) == 0)
+		else if ((text_len_left >= SIZE_8K) && ((pmp_region_base & (SIZE_8K - 1)) == 0))
 			next_seg_len = SIZE_8K;
-		else if (text_len_left >= SIZE_4K && (pmp_region_base & (SIZE_4K - 1)) == 0)
+		else if ((text_len_left >= SIZE_4K) && ((pmp_region_base & (SIZE_4K - 1)) == 0))
 			next_seg_len = SIZE_4K;
-		else if (text_len_left >= SIZE_2K && (pmp_region_base & (SIZE_2K - 1)) == 0)
+		else if ((text_len_left >= SIZE_2K) && ((pmp_region_base & (SIZE_2K - 1)) == 0))
 			next_seg_len = SIZE_2K;
-		else if (text_len_left >= SIZE_1K && (pmp_region_base & (SIZE_1K - 1)) == 0)
+		else if ((text_len_left >= SIZE_1K) && ((pmp_region_base & (SIZE_1K - 1)) == 0))
 			next_seg_len = SIZE_1K;
 
 		if (next_seg_len == 0) {

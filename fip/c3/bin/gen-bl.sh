@@ -8,7 +8,6 @@ set -e
 #
 
 EXEC_BASEDIR=$(dirname $(readlink -f $0))
-ACPU_IMAGETOOL=${EXEC_BASEDIR}/../binary-tool/acpu-imagetool
 CP=cp
 
 BASEDIR_TOP=$(readlink -f ${EXEC_BASEDIR}/..)
@@ -25,16 +24,20 @@ BASEDIR_INPUT_BLOB=$3
 
 BASEDIR_OUTPUT=$4
 
-if [ ".1m" == "$5" ]; then
-	CHIPSET_VARIANT_SUFFIX=$6
-	CHIPSET_VARIANT_MIN_SUFFIX=$5
-else
+if [ ".fastboot" == "$5" ]; then
 	CHIPSET_VARIANT_SUFFIX=$5
-	CHIPSET_VARIANT_MIN_SUFFIX=""
+	CHIPSET_VARIANT_MIN_SUFFIX=$6
+else
+	CHIPSET_VARIANT_SUFFIX=""
+	CHIPSET_VARIANT_MIN_SUFFIX=$5
 fi
 
-if [ ".fastboot" == "${CHIPSET_VARIANT_SUFFIX}" ]; then
+if [ "" != "${CHIPSET_VARIANT_MIN_SUFFIX}" ] && [ ".fastboot" == "${CHIPSET_VARIANT_SUFFIX}" ]; then
+	ACPU_IMAGETOOL=${EXEC_BASEDIR}/../binary-tool/acpu-imagetool-fastboot-oversea
+elif [ "" == "${CHIPSET_VARIANT_MIN_SUFFIX}" ] && [ ".fastboot" == "${CHIPSET_VARIANT_SUFFIX}" ]; then
 	ACPU_IMAGETOOL=${EXEC_BASEDIR}/../binary-tool/acpu-imagetool-fastboot
+else
+	ACPU_IMAGETOOL=${EXEC_BASEDIR}/../binary-tool/acpu-imagetool
 fi
 
 #
@@ -52,15 +55,18 @@ EXEC_ARGS="${EXEC_ARGS} --infile-bl33-payload=${BASEDIR_PAYLOAD}/bl33-payload.bi
 
 ### Input: chipset blobs ###
 
-EXEC_ARGS="${EXEC_ARGS} --infile-blob-bl40=${BASEDIR_INPUT_BLOB}/blob-bl40.bin.signed"
+EXEC_ARGS="${EXEC_ARGS} --infile-blob-bl40=${BASEDIR_INPUT_BLOB}/blob-bl40${CHIPSET_VARIANT_SUFFIX}.bin.signed"
 EXEC_ARGS="${EXEC_ARGS} --infile-blob-bl31=${BASEDIR_INPUT_BLOB}/blob-bl31${CHIPSET_VARIANT_SUFFIX}.bin.signed"
-EXEC_ARGS="${EXEC_ARGS} --infile-blob-bl32=${BASEDIR_INPUT_BLOB}/blob-bl32${CHIPSET_VARIANT_MIN_SUFFIX}.bin.signed"
+EXEC_ARGS="${EXEC_ARGS} --infile-blob-bl32=${BASEDIR_INPUT_BLOB}/blob-bl32${CHIPSET_VARIANT_MIN_SUFFIX}${CHIPSET_VARIANT_SUFFIX}.bin.signed"
 
 ### Features, flags and switches ###
 
 ### Output: Device FIP ###
 EXEC_ARGS="${EXEC_ARGS} --outfile-device-fip=${BASEDIR_OUTPUT}/device-fip.bin.signed"
 
+if [ "" == "${CHIPSET_VARIANT_MIN_SUFFIX}" ] && [ ".fastboot" == "${CHIPSET_VARIANT_SUFFIX}" ]; then
+	EXEC_ARGS="${EXEC_ARGS}	--header-layout=full"
+fi
 #echo ${EXEC_ARGS}
 
 #

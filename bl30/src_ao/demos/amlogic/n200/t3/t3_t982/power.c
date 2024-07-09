@@ -44,6 +44,7 @@
 #include "eth.h"
 
 #define CONFIG_HDMIRX_PLUGIN_WAKEUP
+#define PWR_STATE_WAIT_ON	16
 
 static TaskHandle_t cecTask = NULL;
 static int vdd_ee;
@@ -83,6 +84,29 @@ static void *xMboxVadWakeup(void *msg)
 	return NULL;
 }
 
+void check_poweroff_status(void);
+void check_poweroff_status(void)
+{
+	const TickType_t xTimeout = pdMS_TO_TICKS(500);	//Set timeout duration to 500ms
+	TickType_t xStartTick;
+
+	xStartTick = xTaskGetTickCount();
+
+	/*Wait for cputop fsm switch to WAIT_ON*/
+	while (((REG32(PWRCTRL_CPUTOP_FSM_STS0) >> 12) & 0x1F) != PWR_STATE_WAIT_ON) {
+		if (xTaskGetTickCount() - xStartTick >= xTimeout) {
+			printf("cputop fsm check timed out!\n");
+			printf("PWRCTRL_CPUTOP_FSM_STS0: %x\n", REG32(PWRCTRL_CPUTOP_FSM_STS0));
+			printf("PWRCTRL_CPU0_FSM_STS0: %x\n", REG32(PWRCTRL_CPU0_FSM_STS0));
+			printf("PWRCTRL_CPU1_FSM_STS0: %x\n", REG32(PWRCTRL_CPU1_FSM_STS0));
+			printf("PWRCTRL_CPU2_FSM_STS0: %x\n", REG32(PWRCTRL_CPU2_FSM_STS0));
+			printf("PWRCTRL_CPU3_FSM_STS0: %x\n", REG32(PWRCTRL_CPU3_FSM_STS0));
+			vTaskSuspend(NULL);
+		}
+		vTaskDelay(1);
+	}
+}
+
 void str_hw_init(void);
 void str_hw_disable(void);
 void str_power_on(int shutdown_flag);
@@ -99,15 +123,17 @@ void str_hw_init(void)
 		    NULL, CEC_TASK_PRI, &cecTask);
 
 	vBackupAndClearGpioIrqReg();
-	vKeyPadInit();
 	vGpioIRQInit();
+	vKeyPadInit();
 	Bt_GpioIRQRegister();
 
 	ret = xInstallRemoteMessageCallbackFeedBack(AODSPA_CHANNEL, MBX_CMD_VAD_AWE_WAKEUP, xMboxVadWakeup, 0);
 	if (ret == MBOX_CALL_MAX)
 		printf("mbox cmd 0x%x register fail\n", MBX_CMD_VAD_AWE_WAKEUP);
 #ifdef CONFIG_HDMIRX_PLUGIN_WAKEUP
-	hdmirx_GpioIRQRegister();
+	/*ctrl of 5v wake up*/
+	if (REG32(TOP_EDID_RAM_OVR0_DATA) & 0x1)
+		hdmirx_GpioIRQRegister();
 #endif
 }
 
@@ -126,7 +152,9 @@ void str_hw_disable(void)
 	vRestoreGpioIrqReg();
 	xUninstallRemoteMessageCallback(AODSPA_CHANNEL, MBX_CMD_VAD_AWE_WAKEUP);
 #ifdef CONFIG_HDMIRX_PLUGIN_WAKEUP
-	hdmirx_GpioIRQFree();
+	/*ctrl of 5v wake up*/
+	if (REG32(TOP_EDID_RAM_OVR0_DATA) & 0x1)
+		hdmirx_GpioIRQFree();
 #endif
 }
 
@@ -166,6 +194,24 @@ static void vcc5v_ctrl(int is_on)
 #define power_off_vcc5v()	vcc5v_ctrl(0)
 
 
+static void str_gpio_backup(void)
+{
+	// TODO:
+
+	// Example:
+	// if (xBankStateBackup("A"))
+	// 	printf("xBankStateBackup fail\n");
+}
+
+static void str_gpio_restore(void)
+{
+	// TODO:
+
+	// Example:
+	// if (xBankStateRestore("A"))
+	// 	printf("xBankStateRestore fail\n");
+}
+
 void str_power_on(int shutdown_flag)
 {
 	int ret;
@@ -193,13 +239,17 @@ void str_power_on(int shutdown_flag)
 	/***power on vcc5v***/
 	power_on_vcc5v();
 
-	/*Wait 20ms for VDDCPU stable*/
-	vTaskDelay(pdMS_TO_TICKS(20));
+	/*Wait POWERON_VDDCPU_DELAY for VDDCPU stable*/
+	vTaskDelay(POWERON_VDDCPU_DELAY);
+
+	str_gpio_restore();
 }
 
 void str_power_off(int shutdown_flag)
 {
 	int ret;
+
+	str_gpio_backup();
 
 	shutdown_flag = shutdown_flag;
 

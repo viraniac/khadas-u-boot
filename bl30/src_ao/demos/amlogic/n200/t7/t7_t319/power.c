@@ -82,8 +82,8 @@ void str_hw_init(void)
 		    NULL, CEC_TASK_PRI, &cecTask);
 
 	vBackupAndClearGpioIrqReg();
-	vKeyPadInit();
 	vGpioIRQInit();
+	vKeyPadInit();
 #ifdef CONFIG_HDMIRX_PLUGIN_WAKEUP
 	hdmirx_GpioIRQRegister();
 #endif
@@ -105,6 +105,24 @@ void str_hw_disable(void)
 #ifdef CONFIG_HDMIRX_PLUGIN_WAKEUP
 	hdmirx_GpioIRQFree();
 #endif
+}
+
+static void str_gpio_backup(void)
+{
+	// TODO:
+
+	// Example:
+	// if (xBankStateBackup("A"))
+	// 	printf("xBankStateBackup fail\n");
+}
+
+static void str_gpio_restore(void)
+{
+	// TODO:
+
+	// Example:
+	// if (xBankStateRestore("A"))
+	// 	printf("xBankStateRestore fail\n");
 }
 
 void str_power_on(int shutdown_flag)
@@ -133,13 +151,17 @@ void str_power_on(int shutdown_flag)
 		return;
 	}
 #endif
-	/*Wait 20ms for VDDCPU stable*/
-	vTaskDelay(pdMS_TO_TICKS(20));
+	/*Wait POWERON_VDDCPU_DELAY for VDDCPU stable*/
+	vTaskDelay(POWERON_VDDCPU_DELAY);
 	printf("vdd_cpu on\n");
+
+	str_gpio_restore();
 }
 
 void str_power_off(int shutdown_flag)
 {
+	str_gpio_backup();
+
 	shutdown_flag = shutdown_flag;
 
 #if 0

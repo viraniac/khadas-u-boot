@@ -96,8 +96,8 @@ void str_hw_init(void)
 		    NULL, CEC_TASK_PRI, &cecTask);
 
 	vBackupAndClearGpioIrqReg();
-	vKeyPadInit();
 	vGpioIRQInit();
+	vKeyPadInit();
 	Bt_GpioIRQRegister();
 
 	ret = xInstallRemoteMessageCallbackFeedBack(AODSPA_CHANNEL, MBX_CMD_VAD_AWE_WAKEUP, xMboxVadWakeup, 0);
@@ -162,6 +162,24 @@ static void vcc5v_ctrl(int is_on)
 #define power_on_vcc5v()	vcc5v_ctrl(1)
 #define power_off_vcc5v()	vcc5v_ctrl(0)
 
+static void str_gpio_backup(void)
+{
+	// TODO:
+
+	// Example:
+	// if (xBankStateBackup("A"))
+	// 	printf("xBankStateBackup fail\n");
+}
+
+static void str_gpio_restore(void)
+{
+	// TODO:
+
+	// Example:
+	// if (xBankStateRestore("A"))
+	// 	printf("xBankStateRestore fail\n");
+}
+
 void str_power_on(int shutdown_flag)
 {
 	int ret;
@@ -189,13 +207,17 @@ void str_power_on(int shutdown_flag)
 	/***power on vcc5v***/
 	power_on_vcc5v();
 
-	/*Wait 20ms for VDDCPU stable*/
-	vTaskDelay(pdMS_TO_TICKS(20));
+	/*Wait POWERON_VDDCPU_DELAY for VDDCPU stable*/
+	vTaskDelay(POWERON_VDDCPU_DELAY);
+
+	str_gpio_restore();
 }
 
 void str_power_off(int shutdown_flag)
 {
 	int ret;
+
+	str_gpio_backup();
 
 	shutdown_flag = shutdown_flag;
 

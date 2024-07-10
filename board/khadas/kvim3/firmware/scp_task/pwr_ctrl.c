@@ -11,8 +11,11 @@
 #ifdef CONFIG_CEC_WAKEUP
 #include <hdmi_cec_arc.h>
 #endif
+#include <gpio.c>
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
+unsigned char gpio_groups[] = {};
 
 static void set_vddee_voltage(unsigned int target_voltage)
 {
@@ -54,6 +57,8 @@ static void power_off_at_24M(unsigned int suspend_from)
 	writel(readl(PREG_PAD_GPIO3_EN_N) & (~(1 << 8)), PREG_PAD_GPIO3_EN_N);
 	writel(readl(PERIPHS_PIN_MUX_C) & (~(0xf)), PERIPHS_PIN_MUX_C);
 
+	gpio_state_backup(gpio_groups, ARRAY_SIZE(gpio_groups));
+
 	/*set gpioao_4 low to power off vcck_a*/
 	writel(readl(AO_GPIO_O) & (~(1 << 4)), AO_GPIO_O);
 	writel(readl(AO_GPIO_O_EN_N) & (~(1 << 4)), AO_GPIO_O_EN_N);
@@ -81,7 +86,9 @@ static void power_on_at_24M(unsigned int suspend_from)
 	writel(readl(AO_GPIO_O) | (1 << 4), AO_GPIO_O);
 	writel(readl(AO_GPIO_O_EN_N) & (~(1 << 4)), AO_GPIO_O_EN_N);
 	writel(readl(AO_RTI_PIN_MUX_REG) & (~(0xf << 16)), AO_RTI_PIN_MUX_REG);
-	_udelay(100);
+
+	_udelay(10000);
+	gpio_state_restore(gpio_groups, ARRAY_SIZE(gpio_groups));
 	/*set gpioH_8 low to power on vcc 5v*/
 	writel(readl(PREG_PAD_GPIO3_EN_N) | (1 << 8), PREG_PAD_GPIO3_EN_N);
 	writel(readl(PERIPHS_PIN_MUX_C) & (~(0xf)), PERIPHS_PIN_MUX_C);

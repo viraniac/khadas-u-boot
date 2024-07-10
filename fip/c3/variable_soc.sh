@@ -59,42 +59,54 @@ declare -a BLX_BIN_NAME=("bb1st.sto${CHIPSET_VARIANT_SUFFIX}.bin.signed"     \
 			 "blob-bl2e.usb${CHIPSET_VARIANT_SUFFIX}.bin.signed" \
 			 "blob-bl2x${CHIPSET_VARIANT_SUFFIX}.bin.signed"     \
 			 "blob-bl31${CHIPSET_VARIANT_SUFFIX}.bin.signed"     \
-			 "blob-bl32${CHIPSET_VARIANT_MIN_SUFFIX}.bin.signed" \
-			 "blob-bl40.bin.signed")
+			 "blob-bl32${CHIPSET_VARIANT_MIN_SUFFIX}${CHIPSET_VARIANT_SUFFIX}.bin.signed" \
+			 "blob-bl40${CHIPSET_VARIANT_SUFFIX}.bin.signed")
 fi
 
-if [ "fastboot" == "${CONFIG_CHIPSET_VARIANT}" ]; then
-declare -a BLX_BIN_SIZE=("169984"	\
-			 "169984"	\
-			 "74864"	\
-			 "74864"	\
-			 "66672"	\
-			 "266240"	\
-			 "8192"	\
-			 "8192")
-declare BL30_BIN_SIZE="65536"
-declare BL33_BIN_SIZE="524288"
+if [ "" != "${CHIPSET_VARIANT_MIN_SUFFIX}" ] && [ "fastboot" == "${CONFIG_CHIPSET_VARIANT}" ]; then
+	declare -a BLX_BIN_SIZE=("169984"	\
+				 "169984"	\
+				 "74864"	\
+				 "74864"	\
+				 "66672"	\
+				 "266240"	\
+				 "528384"	\
+				 "8192")
+	declare BL30_BIN_SIZE="65536"
+	declare BL33_BIN_SIZE="524288"
+elif [ "" == "${CHIPSET_VARIANT_MIN_SUFFIX}" ] && [ "fastboot" == "${CONFIG_CHIPSET_VARIANT}" ]; then
+	declare -a BLX_BIN_SIZE=("169984"	\
+				"169984"	\
+				"74864"	\
+				"74864"	\
+				"66672"	\
+				"98304"	\
+				"8192"	\
+				"8192")
+	declare BL30_BIN_SIZE="4096"
+	declare BL33_BIN_SIZE="323584"
 else
-declare -a BLX_BIN_SIZE=("169984"	\
-			 "169984"	\
-			 "74864"	\
-			 "74864"	\
-			 "66672"	\
-			 "266240"	\
-			 "528384"	\
-			 "102400")
-declare BL30_BIN_SIZE="65536"
-declare BL33_BIN_SIZE="1572864"
+	declare -a BLX_BIN_SIZE=("169984"	\
+				"169984"	\
+				"74864"	\
+				"74864"	\
+				"66672"	\
+				"266240"	\
+				"528384"	\
+				"102400")
+	declare BL30_BIN_SIZE="65536"
+	declare BL33_BIN_SIZE="1572864"
 fi
+
 declare DEV_ACS_BIN_SIZE="4096"
 declare -a BLX_RAWBIN_NAME=("bl2.bin.sto"	\
-			    "bl2.bin.usb"	\
-			    "bl2e.bin.sto"	\
-			    "bl2e.bin.usb"	\
-			    "bl2x.bin"		\
-			    "bl31.bin"		\
-			    "bl32.bin"		\
-			    "bl40.bin")
+				"bl2.bin.usb"	\
+				"bl2e.bin.sto"	\
+				"bl2e.bin.usb"	\
+				"bl2x.bin"		\
+				"bl31.bin"		\
+				"bl32.bin"		\
+				"bl40.bin")
 
 declare -a BLX_IMG_NAME=("NULL"	\
 			 "NULL"	\

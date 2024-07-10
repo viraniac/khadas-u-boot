@@ -63,11 +63,6 @@ function init_vari() {
 		CHIPSET_VARIANT_SUFFIX=""
 	fi
 
-	#special case for c3(min bl32)
-	if [ "${CONFIG_CHIPSET_VARIANT_MIN}" == "1m" ]; then
-		CHIPSET_VARIANT_MIN_SUFFIX=".1m"
-	fi
-
 	if [ -n "${CONFIG_AMLOGIC_KEY_TYPE}" ]; then
 		AMLOGIC_KEY_TYPE="${CONFIG_AMLOGIC_KEY_TYPE}"
 	fi
@@ -609,32 +604,29 @@ function build_fip() {
 }
 
 function process_blx() {
-	local extra_arg=""
-
-	if [ "fastboot" == "${CONFIG_CHIPSET_VARIANT}" ]; then
-		extra_arg="--extraArgs ${CONFIG_CHIPSET_VARIANT}"
-	fi
 
 	# process loop
 	for loop in ${!BLX_NAME[@]}; do
+		if [ "${CONFIG_CHIPSET_VARIANT}" == "fastboot" ]; then
+			extra_args="--extra_args  ${CONFIG_CHIPSET_VARIANT}"
+			extraArgs="--extraArgs  ${CONFIG_CHIPSET_VARIANT}"
+		fi
 		if [ "NULL" != "${BLX_RAWBIN_NAME[$loop]}" ] && \
 			[ -n "${BLX_RAWBIN_NAME[$loop]}" ] && \
 			[ -f ${BUILD_PATH}/${BLX_RAWBIN_NAME[$loop]} ]; then
 			if [ -n "${CONFIG_FORMER_SIGN}" ]; then
 					./${FIP_FOLDER}${CUR_SOC}/bin/sign-blx.sh --blxname ${BLX_NAME[$loop]} --input ${BUILD_PATH}/${BLX_RAWBIN_NAME[$loop]} \
 						--output ${BUILD_PATH}/${BLX_BIN_NAME[$loop]} --chipset_name ${CHIPSET_NAME} --chipset_variant ${CHIPSET_VARIANT} \
-						--key_type ${AMLOGIC_KEY_TYPE} --soc ${CUR_SOC} --chip_acs ${BUILD_PATH}/chip_acs.bin --ddr_type ${DDRFW_TYPE} \
-						${extra_arg}
+						--key_type ${AMLOGIC_KEY_TYPE} --soc ${CUR_SOC} --chip_acs ${BUILD_PATH}/chip_acs.bin --ddr_type ${DDRFW_TYPE} ${extra_args}
 			else
 					if [ -n "${CONFIG_JENKINS_SIGN}" ]; then
 						/usr/bin/python3 ./sign.py --type ${BLX_NAME[$loop]} --in ${BUILD_PATH}/${BLX_RAWBIN_NAME[$loop]} \
 							--out ${BUILD_PATH}/${BLX_BIN_NAME[$loop]} --chip ${CHIPSET_NAME}  --chipVariant ${CHIPSET_VARIANT} \
-							--keyType ${AMLOGIC_KEY_TYPE}  --chipAcsFile ${BUILD_PATH}/chip_acs.bin --ddrType ${DDRFW_TYPE} \
-							${extra_arg}
+							--keyType ${AMLOGIC_KEY_TYPE}  --chipAcsFile ${BUILD_PATH}/chip_acs.bin --ddrType ${DDRFW_TYPE} ${extraArgs}
 					else
 						/usr/bin/python3 ./${FIP_FOLDER}/jenkins_sign.py --type ${BLX_NAME[$loop]} --in ${BUILD_PATH}/${BLX_RAWBIN_NAME[$loop]} \
 							--out ${BUILD_PATH}/${BLX_BIN_NAME[$loop]} --chip ${CHIPSET_NAME} --chipVariant ${CHIPSET_VARIANT} --keyType ${AMLOGIC_KEY_TYPE} \
-							--chipAcsFile ${BUILD_PATH}/chip_acs.bin --ddrType ${DDRFW_TYPE} ${extra_arg}
+							--chipAcsFile ${BUILD_PATH}/chip_acs.bin --ddrType ${DDRFW_TYPE} ${extraArgs}
 					fi
 			fi
 		fi
@@ -642,15 +634,6 @@ function process_blx() {
 		    [ "NULL" != "${BLX_BIN_NAME[$loop]}" ] && \
 			[ -n "${BLX_BIN_NAME[$loop]}" ] && \
 			[ -f ${BUILD_PATH}/${BLX_BIN_NAME[$loop]} ]; then
-if [ "fastboot" == "${CONFIG_CHIPSET_VARIANT}" ]; then
-			if [ "bl32" == "${BLX_NAME[$loop]}" ] || \
-				[ "bl40" == "${BLX_NAME[$loop]}" ]; then
-				cp ${BUILD_PATH}/${BLX_BIN_NAME[$loop]}  ${BUILD_PATH}/temp
-				dd if=${BUILD_PATH}/temp of=${BUILD_PATH}/${BLX_BIN_NAME[$loop]}   bs=${BLX_BIN_SIZE[$loop]}  count=1
-				echo $loop
-				rm ${BUILD_PATH}/temp
-			fi
-fi
 			blx_size=`stat -c %s ${BUILD_PATH}/${BLX_BIN_NAME[$loop]}`
 			if [ $blx_size -ne ${BLX_BIN_SIZE[$loop]} ]; then
 				echo "Error: ${BUILD_PATH}/${BLX_BIN_NAME[$loop]} size not match"
@@ -716,11 +699,7 @@ fi
 
 	if [ ! -f ${BUILD_PATH}/blob-bl40.bin.signed ]; then
 		echo "Warning: local bl40"
-if [ "fastboot" == "${CONFIG_CHIPSET_VARIANT}" ]; then
-		dd if=bl40/bin/${CUR_SOC}/${BLX_BIN_SUB_CHIP}/blob-bl40.bin.signed of=${BUILD_PATH}/blob-bl40.bin.signed bs=${BLX_BIN_SIZE[7]}  count=1
-else
-		cp bl40/bin/${CUR_SOC}/${BLX_BIN_SUB_CHIP}/blob-bl40.bin.signed ${BUILD_PATH}
-fi
+		cp bl40/bin/${CUR_SOC}/${BLX_BIN_SUB_CHIP}/blob-bl40${CHIPSET_VARIANT_SUFFIX}.bin.signed ${BUILD_PATH}
 	fi
 	if [ ! -f ${BUILD_PATH}/device-fip-header.bin ]; then
 		echo "Warning: local device fip header templates"
@@ -741,8 +720,8 @@ function build_signed() {
 		mk_ddr_fip ${BUILD_PATH}
 	fi
 
-	if [ ".1m" == "${CHIPSET_VARIANT_MIN_SUFFIX}" ]; then
-		./${FIP_FOLDER}${CUR_SOC}/bin/gen-bl.sh ${BUILD_PATH} ${BUILD_PATH} ${BUILD_PATH} ${BUILD_PATH} ${CHIPSET_VARIANT_MIN_SUFFIX} ${CHIPSET_VARIANT_SUFFIX}
+	if [ "" != "${CHIPSET_VARIANT_MIN_SUFFIX}" ]; then
+		./${FIP_FOLDER}${CUR_SOC}/bin/gen-bl.sh ${BUILD_PATH} ${BUILD_PATH} ${BUILD_PATH} ${BUILD_PATH} ${CHIPSET_VARIANT_SUFFIX} ${CHIPSET_VARIANT_MIN_SUFFIX}
 	else
 		./${FIP_FOLDER}${CUR_SOC}/bin/gen-bl.sh ${BUILD_PATH} ${BUILD_PATH} ${BUILD_PATH} ${BUILD_PATH} ${CHIPSET_VARIANT_SUFFIX}
 	fi
@@ -751,9 +730,11 @@ function build_signed() {
 	mk_uboot ${BUILD_PATH} ${BUILD_PATH} ${postfix} .sto ${CHIPSET_VARIANT_SUFFIX}
 	mk_uboot ${BUILD_PATH} ${BUILD_PATH} ${postfix} .usb ${CHIPSET_VARIANT_SUFFIX}
 
-	list_pack="${BUILD_PATH}/bb1st.sto${CHIPSET_VARIANT_SUFFIX}.bin.signed ${BUILD_PATH}/bb1st.usb${CHIPSET_VARIANT_SUFFIX}.bin.signed"
-	list_pack="$list_pack ${BUILD_PATH}/blob-bl2e.sto${CHIPSET_VARIANT_SUFFIX}.bin.signed ${BUILD_PATH}/blob-bl2e.usb${CHIPSET_VARIANT_SUFFIX}.bin.signed"
-	list_pack="$list_pack ${BUILD_PATH}/blob-bl2x${CHIPSET_VARIANT_SUFFIX}.bin.signed ${BUILD_PATH}/blob-bl31${CHIPSET_VARIANT_SUFFIX}.bin.signed ${BUILD_PATH}/blob-bl32${CHIPSET_VARIANT_MIN_SUFFIX}.bin.signed ${BUILD_PATH}/blob-bl40.bin.signed"
+	# process loop
+	list_pack=
+	for loop in ${!BLX_NAME[@]}; do
+		list_pack="$list_pack ${BUILD_PATH}/${BLX_BIN_NAME[$loop]}"
+	done
 	list_pack="$list_pack ${BUILD_PATH}/bl30-payload.bin ${BUILD_PATH}/bl33-payload.bin ${BUILD_PATH}/dvinit-params.bin"
 	if [ -f ${BUILD_PATH}/ddr-fip.bin ]; then
 		list_pack="$list_pack ${BUILD_PATH}/ddr-fip.bin"

@@ -194,6 +194,10 @@ int parse_ini_file_2_valid_lines(const char* filePath, char* iniBuf, const unsig
             err("file size 0x%x illegal, > bufSz 0x%x\n", fileSz, bufSz);
             return 0;
     }
+	if (fileSz >= (1 << 20)) {
+		err("ini file size 0x%x > 1m not supported\n", fileSz);
+		return 0;
+	}
     DWN_MSG("ini sz 0x%xB\n", fileSz);
 
     hFile = do_fat_fopen(filePath);

@@ -38,6 +38,22 @@
 #define CONFIG_CMD_SARADC 1
 #define CONFIG_SARADC_CH  2
 
+//#define CONFIG_AML_PRODUCT_MODE 1 //
+#ifdef CONFIG_AML_PRODUCT_MODE
+#define CONFIG_SILENT_CONSOLE
+#define CONFIG_NO_FASTBOOT_FLASHING
+#define CONFIG_USB_TOOL_ENTRY   "echo product mode"
+#define CONFIG_KNL_LOG_LEVEL    "loglevel=1"
+#else
+#define CONFIG_USB_TOOL_ENTRY   "update 1500"
+#define CONFIG_KNL_LOG_LEVEL    ""
+#define CONFIG_CMD_BOOTI        1
+#define CONFIG_CMD_MEMORY       1
+#define CONFIG_CMD_JTAG	        1
+#define CONFIG_CMD_AUTOSCRIPT   1
+#define CONFIG_USB_STORAGE      1
+#endif
+
 /*dsp boot*/
 #define CONFIG_CMD_STARTDSP 1
 #define CONFIG_CMD_DSPJTAGRESET 1
@@ -76,6 +92,9 @@
 #define STR1(R) #R
 #define STR2(R) STR1(R)
 
+/*smc*/
+#define CONFIG_ARM_SMCCC       1
+
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \
@@ -104,7 +123,7 @@
         "fb_width=1920\0" \
         "fb_height=1080\0" \
         "frac_rate_policy=1\0" \
-        "usb_burning=update 1000\0" \
+        "usb_burning=" CONFIG_USB_TOOL_ENTRY "\0" \
         "otg_device=1\0"\
         "fdt_high=0x20000000\0"\
         "try_auto_burn=update 700 750;\0"\
@@ -138,7 +157,7 @@
         "Irq_check_en=0\0"\
         "fs_type=""rootfstype=ramfs""\0"\
         "initargs="\
-            "init=/init console=ttyS0,115200 no_console_suspend earlycon=aml-uart,0xff803000 printk.devkmsg=on ramoops.pstore_en=1 ramoops.record_size=0x8000 ramoops.console_size=0x4000 loop.max_part=4 "\
+            "init=/init " CONFIG_KNL_LOG_LEVEL " console=ttyS0,115200 no_console_suspend earlycon=aml-uart,0xff803000 printk.devkmsg=on ramoops.pstore_en=1 ramoops.record_size=0x8000 ramoops.console_size=0x4000 loop.max_part=4 "\
             "\0"\
         "upgrade_check="\
             "echo upgrade_step=${upgrade_step}; "\
@@ -150,6 +169,7 @@
             "get_bootloaderversion;" \
             "setenv bootargs ${initargs} otg_device=${otg_device} logo=${display_layer},loaded,${fb_addr} powermode=${powermode} fb_width=${fb_width} fb_height=${fb_height} display_bpp=${display_bpp} outputmode=${outputmode} vout=${outputmode},enable panel_type=${panel_type} hdmimode=${hdmimode} cvbsmode=${cvbsmode} osd_reverse=${osd_reverse} video_reverse=${video_reverse} androidboot.selinux=${EnableSelinux} androidboot.firstboot=${firstboot} jtag=${jtag}; "\
 	"setenv bootargs ${bootargs} androidboot.hardware=amlogic androidboot.bootloader=${bootloader_version} androidboot.build.expect.baseband=N/A;"\
+	"setenv bootargs ${bootargs} androidboot.bootreason=${reboot_mode};"\
             "run cmdline_keys;"\
             "\0"\
         "cec_init="\
@@ -302,23 +322,38 @@
             "run recovery_from_flash;"\
             "\0"\
         "recovery_from_sdcard="\
-            "if fatload mmc 0 ${loadaddr} aml_autoscript; then autoscr ${loadaddr}; fi;"\
+	"if fatload mmc 0 ${loadaddr} aml_autoscript; then "\
+		"if avb memory recovery ${loadaddr}; then " \
+		"avb recovery 1;" \
+		"autoscr ${loadaddr}; fi;"\
+	"fi;"\
             "if fatload mmc 0 ${loadaddr} recovery.img; then "\
+	    "if avb memory recovery ${loadaddr}; then " \
+	    "avb recovery 1;" \
                     "if fatload mmc 0 ${dtb_mem_addr} dtb.img; then echo sd dtb.img loaded; fi;"\
                     "wipeisb; "\
                     "bootm ${loadaddr};fi;"\
+	    "fi;"\
             "\0"\
         "recovery_from_udisk="\
-            "if fatload usb 0 ${loadaddr} aml_autoscript; then autoscr ${loadaddr}; fi;"\
+	"if fatload usb 0 ${loadaddr} aml_autoscript; then " \
+		"if avb memory recovery ${loadaddr}; then " \
+		"avb recovery 1;" \
+		"autoscr ${loadaddr}; fi;" \
+	"fi;"\
             "if fatload usb 0 ${loadaddr} recovery.img; then "\
+	    "if avb memory recovery ${loadaddr}; then " \
+	    "avb recovery 1;" \
                 "if fatload usb 0 ${dtb_mem_addr} dtb.img; then echo udisk dtb.img loaded; fi;"\
                 "wipeisb; "\
                 "bootm ${loadaddr};fi;"\
+		"fi;"\
             "\0"\
         "recovery_from_flash="\
             "echo active_slot: ${active_slot};"\
             "if test ${active_slot} = normal; then "\
                 "setenv bootargs ${bootargs} ${fs_type} aml_dt=${aml_dt} recovery_part=${recovery_part} recovery_offset=${recovery_offset};"\
+		"avb recovery 1;" \
                 "if itest ${upgrade_step} == 3; then "\
                     "if ext4load mmc 1:2 ${dtb_mem_addr} /recovery/dtb.img; then echo cache dtb.img loaded; fi;"\
                     "if ext4load mmc 1:2 ${loadaddr} /recovery/recovery.img; then echo cache recovery.img loaded; wipeisb; bootm ${loadaddr}; fi;"\
@@ -612,7 +647,6 @@
 	#define CONFIG_USB_PHY_20				0xff636000
 	#define CONFIG_USB_PHY_21				0xff63A000
 	#define CONFIG_USB_PHY_22				0xff658000
-	#define CONFIG_USB_STORAGE      1
 	#define CONFIG_USB_XHCI		1
 	#define CONFIG_USB_XHCI_AMLOGIC_V2 1
 	#define CONFIG_USB_GPIO_PWR  			GPIOEE(GPIOH_6)
@@ -679,17 +713,13 @@
 
 /* commands */
 #define CONFIG_CMD_CACHE 1
-#define CONFIG_CMD_BOOTI 1
 #define CONFIG_CMD_EFUSE 1
 #define CONFIG_CMD_I2C 1
-#define CONFIG_CMD_MEMORY 1
 #define CONFIG_CMD_FAT 1
 #define CONFIG_CMD_GPIO 1
 #define CONFIG_CMD_RUN
 #define CONFIG_CMD_REBOOT 1
 #define CONFIG_CMD_ECHO 1
-#define CONFIG_CMD_JTAG	1
-#define CONFIG_CMD_AUTOSCRIPT 1
 #define CONFIG_CMD_MISC 1
 #define CONFIG_CMD_PLLTEST 1
 #define CONFIG_CMD_INI 1

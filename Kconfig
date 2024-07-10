@@ -149,6 +149,11 @@ config SYS_TEXT_BASE
 	help
 	  TODO: Move CONFIG_SYS_TEXT_BASE for all the architecture
 
+config AB_SYSTEM
+	bool "Enable dual backup system function"
+	help
+	  The dual backup system function was enabled.
+
 endmenu		# Boot images
 
 source "arch/Kconfig"

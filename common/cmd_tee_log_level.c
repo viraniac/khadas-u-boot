@@ -7,10 +7,9 @@
  */
 
 #include <common.h>
+#include <linux/arm-smccc.h>
 
 #define FUNCID_UPDATE_TEE_TRACE_LEVEL        0xb2000016
-
-#define __asmeq(x, y) ".ifnc " x "," y " ; .err ; .endif\n\t"
 
 static int atoi(const char* str)
 {
@@ -33,19 +32,10 @@ static int atoi(const char* str)
 
 static uint32_t update_log_level(uint32_t log_level)
 {
-	register uint32_t x0 asm("x0") = FUNCID_UPDATE_TEE_TRACE_LEVEL;
-	register uint32_t x1 asm("x1") = log_level;
-	do {
-			asm volatile(
-				__asmeq("%0", "x0")
-				__asmeq("%1", "x0")
-				__asmeq("%2", "x1")
-				"smc    #0\n"
-				: "=r"(x0)
-				: "r"(x0), "r"(x1));
-	} while (0);
+	struct arm_smccc_res res;
 
-	return x0;
+	arm_smccc_smc(FUNCID_UPDATE_TEE_TRACE_LEVEL, log_level, 0, 0, 0, 0, 0, 0, &res);
+	return res.a0;
 }
 
 int exec(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])

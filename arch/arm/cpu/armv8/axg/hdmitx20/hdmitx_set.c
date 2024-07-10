@@ -15,6 +15,7 @@
 #include "hdmitx_tvenc.h"
 #include "mach_reg.h"
 #include "hw_enc_clk_config.h"
+#include <linux/arm-smccc.h>
 
 struct hdmitx_dev hdmitx_device;
 
@@ -420,15 +421,11 @@ int hdmi_outputmode_check(char *mode, unsigned int frac)
 	return ret;
 }
 
-#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
 static void hdcp14_init(void)
 {
-	register long x0 asm("x0") = 0x82000012;
-	asm volatile(
-		__asmeq("%0", "x0")
-		"smc #0\n"
-		: : "r"(x0)
-	);
+	struct arm_smccc_res res;
+
+	arm_smccc_smc(0x82000012, 0, 0, 0, 0, 0, 0, 0, &res);
 }
 
 #define NUM_INT_VSYNC   INT_VEC_VIU1_VSYNC

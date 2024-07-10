@@ -14,6 +14,7 @@
 #include <stdio_dev.h>
 #include <exports.h>
 #include <environment.h>
+#include <asm/arch/cpu_config.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 

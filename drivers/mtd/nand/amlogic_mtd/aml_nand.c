@@ -1884,7 +1884,7 @@ static void inline nand_get_chip(void )
 		AMLNF_WRITE_REG(P_PERIPHS_PIN_MUX_0, 0x11111111);
 		AMLNF_WRITE_REG(P_PERIPHS_PIN_MUX_1,
 			((AMLNF_READ_REG(P_PERIPHS_PIN_MUX_1) & (~0xFFFFF)) | 0x22222));
-		writel(0xFFFFFFFF, P_PAD_DS_REG0A);
+		writel(readl(P_PAD_DS_REG0A) | 0x3FFFFFF, P_PAD_DS_REG0A);
 	} else {
 		printk("%s() %d: cpuid 0x%x not support yet!\n",
 			__func__, __LINE__, cpu_id.family_id);

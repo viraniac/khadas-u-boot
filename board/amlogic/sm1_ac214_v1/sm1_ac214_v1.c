@@ -824,9 +824,9 @@ phys_size_t get_effective_memsize(void)
 {
 	// >>16 -> MB, <<20 -> real size, so >>16<<20 = <<4
 #if defined(CONFIG_SYS_MEM_TOP_HIDE)
-	return (((readl(AO_SEC_GP_CFG0)) & 0xFFFF0000) << 4) - CONFIG_SYS_MEM_TOP_HIDE;
+	return (((readl(AO_SEC_GP_CFG0)) & 0xFFF80000) << 4) - CONFIG_SYS_MEM_TOP_HIDE;
 #else
-	return (((readl(AO_SEC_GP_CFG0)) & 0xFFFF0000) << 4);
+	return (((readl(AO_SEC_GP_CFG0)) & 0xFFF80000) << 4);
 #endif
 }
 
@@ -851,7 +851,7 @@ int checkhw(char * name)
 	if (MESON_CPU_MAJOR_ID_SM1 == cpu_id.family_id) {
 		switch (ddr_size) {
 			case 0x80000000:
-				if (!strcmp(ddr_mode, "1g")) {
+				if (ddr_mode && !strcmp(ddr_mode, "1g")) {
 					strcpy(loc_name, "sm1_ac214_1g\0");
 					break;
 				}
@@ -871,7 +871,7 @@ int checkhw(char * name)
 	else {
 		switch (ddr_size) {
 			case 0x80000000:
-				if (!strcmp(ddr_mode, "1g")) {
+				if (ddr_mode && !strcmp(ddr_mode, "1g")) {
 					strcpy(loc_name, "g12a_u212_1g\0");
 					break;
 				}

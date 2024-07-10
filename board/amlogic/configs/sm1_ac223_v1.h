@@ -48,6 +48,7 @@
 #define CONFIG_CMD_MEMORY       1
 #define CONFIG_CMD_JTAG	        1
 #define CONFIG_CMD_AUTOSCRIPT   1
+#define CONFIG_USB_STORAGE      1
 #endif
 
 /*if disable uboot console, enable it*/
@@ -89,6 +90,9 @@
 /*config the default parameters for adc power key*/
 #define CONFIG_ADC_POWER_KEY_CHAN   2  /*channel range: 0-7*/
 #define CONFIG_ADC_POWER_KEY_VAL    0  /*sample value range: 0-1023*/
+
+/*smc*/
+#define CONFIG_ARM_SMCCC       1
 
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
@@ -257,25 +261,40 @@
             "run recovery_from_flash;"\
             "\0"\
         "recovery_from_sdcard="\
-            "if fatload mmc 0 ${loadaddr} aml_autoscript; then autoscr ${loadaddr}; fi;"\
+	"if fatload mmc 0 ${loadaddr} aml_autoscript; then "\
+		"if avb memory recovery ${loadaddr}; then " \
+		"avb recovery 1;" \
+		"autoscr ${loadaddr}; fi;"\
+	"fi;"\
             "if fatload mmc 0 ${loadaddr} recovery.img; then "\
+	    "if avb memory recovery ${loadaddr}; then " \
+	    "avb recovery 1;" \
                     "if fatload mmc 0 ${dtb_mem_addr} dtb.img; then echo sd dtb.img loaded; fi;"\
                     "wipeisb; "\
                     "setenv bootargs ${bootargs} ${fs_type};"\
                     "bootm ${loadaddr};fi;"\
+		    "fi;"\
             "\0"\
         "recovery_from_udisk="\
-            "if fatload usb 0 ${loadaddr} aml_autoscript; then autoscr ${loadaddr}; fi;"\
+	"if fatload usb 0 ${loadaddr} aml_autoscript; then " \
+		"if avb memory recovery ${loadaddr}; then " \
+		"avb recovery 1;" \
+		"autoscr ${loadaddr}; fi;" \
+	"fi;"\
             "if fatload usb 0 ${loadaddr} recovery.img; then "\
+	    "if avb memory recovery ${loadaddr}; then " \
+	    "avb recovery 1;" \
                 "if fatload usb 0 ${dtb_mem_addr} dtb.img; then echo udisk dtb.img loaded; fi;"\
                 "wipeisb; "\
                 "setenv bootargs ${bootargs} ${fs_type};"\
                 "bootm ${loadaddr};fi;"\
+		"fi;"\
             "\0"\
         "recovery_from_flash="\
             "echo active_slot: ${active_slot};"\
             "if test ${active_slot} = normal; then "\
                 "setenv bootargs ${bootargs} ${fs_type} aml_dt=${aml_dt} recovery_part=${recovery_part} recovery_offset=${recovery_offset};"\
+		"avb recovery 1;" \
                 "if itest ${upgrade_step} == 3; then "\
                     "if ext4load mmc 1:2 ${dtb_mem_addr} /recovery/dtb.img; then echo cache dtb.img loaded; fi;"\
                     "if ext4load mmc 1:2 ${loadaddr} /recovery/recovery.img; then echo cache recovery.img loaded; wipeisb; bootm ${loadaddr}; fi;"\
@@ -316,7 +335,7 @@
             "else "\
                 "setenv reboot_mode_android ""normal"";"\
                 "run storeargs;"\
-                "hdmitx hpd;hdmitx get_preferred_mode;osd open;osd clear;imgread pic logo bootup $loadaddr;bmp display $bootup_offset;bmp scale;vout output ${outputmode};vpp hdrpkt;"\
+                "hdmitx hpd;hdmitx get_parse_edid;osd open;osd clear;imgread pic logo bootup $loadaddr;bmp display $bootup_offset;bmp scale;vout output ${outputmode};vpp hdrpkt;"\
             "fi;fi;"\
             "\0"\
         "cmdline_keys="\
@@ -566,7 +585,6 @@
 	#define CONFIG_GXL_USB_PHY3_BASE        0xffe09080
 	#define CONFIG_USB_PHY_20				0xff636000
 	#define CONFIG_USB_PHY_21				0xff63A000
-	#define CONFIG_USB_STORAGE      1
 	#define CONFIG_USB_XHCI		1
 	#define CONFIG_USB_XHCI_AMLOGIC_V2 1
 	#define CONFIG_USB_GPIO_PWR  			GPIOEE(GPIOH_6)
@@ -658,6 +676,7 @@
 #define CONFIG_FS_FAT 1
 #define CONFIG_FS_EXT4 1
 #define CONFIG_LZO 1
+#define CONFIG_LZMA 1
 
 /* Cache Definitions */
 //#define CONFIG_SYS_DCACHE_OFF

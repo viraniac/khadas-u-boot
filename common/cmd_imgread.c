@@ -15,6 +15,7 @@
 #include <asm/arch/bl31_apis.h>
 #include <asm/arch/secure_apb.h>
 #include <libfdt.h>
+#include <linux/compat.h>
 #include <partition_table.h>
 #include <malloc.h>
 #include <emmc_partitions.h>
@@ -33,6 +34,10 @@
 #define IMG_PRELOAD_SZ  (1U<<20) //Total read 1M at first to read the image header
 #define PIC_PRELOAD_SZ  (8U<<10) //Total read 4k at first to read the image header
 #define RES_OLD_FMT_READ_SZ (8U<<20)
+
+#define MAX_RAMDISK_SIZE	SZ_64M
+#define MAX_KERNEL_SIZE		SZ_64M
+#define MAX_DTB_SIZE		SZ_16M
 
 typedef struct __aml_enc_blk{
         unsigned int  nOffset;
@@ -205,7 +210,7 @@ static int do_image_read_dtb(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
     unsigned int nFlashLoadLen = 0;
     unsigned secureKernelImgSz = 0;
     const int preloadSz = 4096;
-    int pageSz = 0;
+    unsigned int pageSz = 0;
 
     if (2 < argc) {
         loadaddr = (unsigned char*)simple_strtoul(argv[2], NULL, 16);
@@ -295,10 +300,22 @@ static int do_image_read_dtb(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
     }
     debugP("lflashReadOff=0x%llx, nFlashLoadLen=0x%x\n", lflashReadOff, nFlashLoadLen);
     debugP("page sz %u\n", hdr_addr->page_size);
-    if (!nFlashLoadLen) {
-        errorP("NO second part in kernel image\n");
+
+    if (pageSz > PAGE_SIZE) {
+        errorP("Wrong pageSz:%d\n", pageSz);
         return __LINE__;
     }
+
+    if (!nFlashLoadLen || nFlashLoadLen > MAX_DTB_SIZE) {
+        errorP("Wrong nFlashLoadLen:%d\n", nFlashLoadLen);
+        return __LINE__;
+    }
+
+    if (lflashReadOff > (MAX_RAMDISK_SIZE + MAX_KERNEL_SIZE)) {
+        errorP("Wrong lflashReadOff:%lld\n", lflashReadOff);
+        return __LINE__;
+    }
+
     unsigned long rdOffAlign = lflashReadOff;
     unsigned char* dtImgAddr = (unsigned char*)loadaddr + lflashReadOff;
 #ifdef CONFIG_AML_MTD
@@ -356,6 +373,12 @@ static int do_image_read_dtb(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
         return CMD_RET_FAILURE;
     }
     const unsigned fdtsz    = fdt_totalsize((char*)fdtAddr);
+
+    if (fdtsz >= SZ_1M) {
+        errorP("bad fdt size:%d\n", fdtsz);
+        return CMD_RET_FAILURE;
+    }
+
     memmove(dtDestAddr, (char*)fdtAddr, fdtsz);
 
     return nReturn;
@@ -545,6 +568,16 @@ static int do_image_read_kernel(cmd_tbl_t *cmdtp, int flag, int argc, char * con
         ramdisk_size   = ALIGN(hdr_addr_v3->ramdisk_size,0x1000);
 		MsgP("kernel_size 0x%x, totalSz 0x%x\n", hdr_addr_v3->kernel_size, kernel_size);
 		MsgP("ramdisk_size 0x%x, totalSz 0x%x\n", hdr_addr_v3->ramdisk_size, ramdisk_size);
+		if (kernel_size > MAX_KERNEL_SIZE) {
+			errorP("kernel size limit 0x%x,0x%x\n", kernel_size,
+					MAX_KERNEL_SIZE);
+			return __LINE__;
+		}
+		if (ramdisk_size > MAX_RAMDISK_SIZE) {
+			errorP("ramdisk size limit 0x%x,0x%x\n", ramdisk_size,
+					MAX_RAMDISK_SIZE);
+			return __LINE__;
+		}
 
         actualBootImgSz = kernel_size + ramdisk_size + 0x1000;
 
@@ -856,6 +889,20 @@ load_left_r:
             debugP("kernel_size 0x%x, page_size 0x%x, totalSz 0x%x\n", hdr_addr->kernel_size, hdr_addr->page_size, kernel_size);
             debugP("ramdisk_size 0x%x, totalSz 0x%x\n", hdr_addr->ramdisk_size, ramdisk_size);
             debugP("dtbSz 0x%x, Total actualBootImgSz 0x%x\n", dtbSz, actualBootImgSz);
+			if (kernel_size > MAX_KERNEL_SIZE) {
+				errorP("kernel size limit 0x%x,0x%x\n", kernel_size,
+					MAX_KERNEL_SIZE);
+				return __LINE__;
+			}
+			if (ramdisk_size > MAX_RAMDISK_SIZE) {
+				errorP("ramdisk size limit 0x%x,0x%x\n", ramdisk_size,
+					MAX_RAMDISK_SIZE);
+				return __LINE__;
+			}
+			if (dtbSz > MAX_DTB_SIZE) {
+				errorP("dtb size limit 0x%x,0x%x\n", dtbSz, MAX_DTB_SIZE);
+				return __LINE__;
+			}
         }
 
 #if defined(CONFIG_IMAGE_FORMAT_LEGACY) || defined(CONFIG_FIT)
@@ -939,6 +986,7 @@ typedef struct {
 #pragma pack(pop)
 
 #define LOGO_OLD_FMT_READ_SZ (8U<<20)//if logo format old, read 8M
+#define LOGO_TOTAL_ITEM		(16)
 
 static int img_res_check_log_header(const AmlResImgHead_t* pResImgHead)
 {
@@ -953,6 +1001,11 @@ static int img_res_check_log_header(const AmlResImgHead_t* pResImgHead)
         errorP("res version 0x%x != 0x%x\n", pResImgHead->version, AML_RES_IMG_VERSION_V2);
         return 2;
     }
+	if (pResImgHead->imgItemNum > LOGO_TOTAL_ITEM) {
+		errorP("logo size err 0x%x != 0x%x\n", pResImgHead->imgItemNum,
+				LOGO_TOTAL_ITEM);
+		return 3;
+	}
 
     return 0;
 }
@@ -1131,6 +1184,19 @@ static int do_image_read_pic(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
                 errorP("item magic 0x%x != 0x%x\n", pItem->magic, IH_MAGIC);
                 return __LINE__;
             }
+
+			if (pItem->start > CONFIG_MAX_PIC_LEN) {
+				errorP("item data offset err 0x%x != 0x%x\n", pItem->start,
+					CONFIG_MAX_PIC_LEN);
+				return __LINE__;
+			}
+
+			if (pItem->size > CONFIG_MAX_PIC_LEN) {
+				errorP("item data size err 0x%x != 0x%x\n", pItem->size,
+					CONFIG_MAX_PIC_LEN);
+				return __LINE__;
+			}
+
             const char* itemName = pItem->name;
             if (!strcmp(thisName, itemName)) {
                 itemFound = pItem;
@@ -1148,8 +1214,8 @@ static int do_image_read_pic(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
         char env_name[IH_NMLEN*2];
         char env_data[IH_NMLEN*2];
         unsigned long picLoadAddr = (unsigned long)loadaddr + (unsigned)pItem->start;
-        int         itemSz      = pItem->size;
-        int         uncompSz    = 0;
+		unsigned int  itemSz      = pItem->size;
+		unsigned long uncompSz    = 0;
 
         if (pItem->start + itemSz > flashReadOff)
         {
@@ -1167,8 +1233,8 @@ static int do_image_read_pic(cmd_tbl_t *cmdtp, int flag, int argc, char * const 
         //uncompress supported format
         unsigned long uncompLoadaddr = picLoadAddr + itemSz + 7;
         uncompLoadaddr &= ~(0x7U);
-        rc = imgread_uncomp_pic((unsigned char*)picLoadAddr, itemSz, (unsigned char*)uncompLoadaddr,
-                CONFIG_MAX_PIC_LEN, (unsigned long*)&uncompSz);
+		rc = imgread_uncomp_pic((unsigned char *)picLoadAddr, itemSz,
+				(unsigned char *)uncompLoadaddr, CONFIG_MAX_PIC_LEN, &uncompSz);
         if (rc) {
             errorP("Fail in uncomp pic,rc[%d]\n", rc);
             return __LINE__;

@@ -48,7 +48,7 @@ int aml_check_is_ready_for_sdc_produce(void)
         setenv("sdcburncfg", sdc_cfg_file);
     }
 
-    cmd = "fatsize mmc 0 ${sdcburncfg}";
+	cmd = "fatload mmc 0 $loadaddr ${sdcburncfg} 64";
     ret = run_command(cmd, 0);
     filesize = getenv("filesize");
     if (NULL == filesize || strcmp(filesize, "0") == 0) {

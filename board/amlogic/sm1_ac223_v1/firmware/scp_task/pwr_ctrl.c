@@ -14,8 +14,11 @@
 #endif
 #define ON 1
 #define OFF 0
+#include <gpio.c>
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
+unsigned char gpio_groups[] = {};
 
 static void set_vddee_voltage(unsigned int target_voltage)
 {
@@ -53,11 +56,14 @@ static void set_vddee_voltage(unsigned int target_voltage)
 
 static void power_off_at_24M(unsigned int suspend_from)
 {
+	gpio_state_backup(gpio_groups, ARRAY_SIZE(gpio_groups));
 	return;
 }
 
 static void power_on_at_24M(unsigned int suspend_from)
 {
+	_udelay(10000);
+	gpio_state_restore(gpio_groups, ARRAY_SIZE(gpio_groups));
 	return;
 	set_vddee_voltage(CONFIG_VDDEE_INIT_VOLTAGE);
 }

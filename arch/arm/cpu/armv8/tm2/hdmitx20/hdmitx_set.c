@@ -16,6 +16,7 @@
 #include "hdmitx_tvenc.h"
 #include "mach_reg.h"
 #include "hw_enc_clk_config.h"
+#include <linux/arm-smccc.h>
 
 const static char *vend_name = "Amlogic"; /* Max 8 bytes */
 const static char *prod_desc = "MBox Meson Ref"; /* Max 16 bytes */
@@ -827,15 +828,11 @@ int hdmi_outputmode_check(char *mode, unsigned int frac)
 	return ret;
 }
 
-#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
 static void hdcp14_init(void)
 {
-	register long x0 asm("x0") = 0x82000012;
-	asm volatile(
-		__asmeq("%0", "x0")
-		"smc #0\n"
-		: : "r"(x0)
-	);
+	struct arm_smccc_res res;
+
+	arm_smccc_smc(0x82000012, 0, 0, 0, 0, 0, 0, 0, &res);
 }
 
 /*
@@ -1135,7 +1132,7 @@ static void config_hdmi20_tx(struct hdmitx_dev *hdev, enum hdmi_vic vic,
 	data32  = 0;
 	data32 |= (((output_color_format>>2)&0x1) << 7);
 	data32 |= (1 << 6);
-	data32 |= (0 << 4);
+	data32 |= (2 << 4);
 	data32 |= (0 << 2);
 	data32 |= (0x2 << 0);    /* FIXED YCBCR 444 */
 	hdmitx_wr_reg(HDMITX_DWC_FC_AVICONF0, data32);

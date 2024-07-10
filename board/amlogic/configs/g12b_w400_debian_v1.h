@@ -36,6 +36,22 @@
 #define CONFIG_CMD_SARADC 1
 #define CONFIG_SARADC_CH  2
 
+//#define CONFIG_AML_PRODUCT_MODE 1 //
+#ifdef CONFIG_AML_PRODUCT_MODE
+#define CONFIG_SILENT_CONSOLE
+#define CONFIG_NO_FASTBOOT_FLASHING
+#define CONFIG_USB_TOOL_ENTRY   "echo product mode"
+#define CONFIG_KNL_LOG_LEVEL    "loglevel=1"
+#else
+#define CONFIG_USB_TOOL_ENTRY   "update 1500"
+#define CONFIG_KNL_LOG_LEVEL    ""
+#define CONFIG_CMD_BOOTI        1
+#define CONFIG_CMD_MEMORY       1
+#define CONFIG_CMD_JTAG	        1
+#define CONFIG_CMD_AUTOSCRIPT   1
+#define CONFIG_USB_STORAGE      1
+#endif
+
 /* Bootloader Control Block function
  * That is used for recovery and the bootloader to talk to each other
  */
@@ -116,6 +132,9 @@
 #define CONFIG_BOOTCOMMAND "run bootcmd"
 #endif
 
+/*smc*/
+#define CONFIG_ARM_SMCCC       1
+
 #define CONFIG_EXTRA_ENV_SETTINGS \
 		"firstboot=1\0"\
 		"upgrade_step=0\0"\
@@ -133,7 +152,7 @@
 		"kernel_comp_size=0x2000000\0"\
 		"pxeuuid=00000000-0000-0000-0000-000000000000\0"\
 		"bootfile=\0"\
-		"fdtfile=g12b_a311d_w400_debian.dtb\0" \
+		"fdtfile=g12b_a311d_w400_linux.dtb\0" \
 		"silent=1\0"\
 		"lcd_ctrl=0x00000000\0" \
 		"outputmode=1080p60hz\0" \
@@ -161,7 +180,7 @@
 		"dv_fw_dir_odm_ext=/odm_ext/firmware/dovi_fw.bin\0" \
 		"dv_fw_dir_vendor=/vendor/firmware/dovi_fw.bin\0" \
 		"dv_fw_dir=/reserved/firmware/dovi_fw.bin\0" \
-		"usb_burning=update 1000\0" \
+		"usb_burning=" CONFIG_USB_TOOL_ENTRY "\0" \
 		"otg_device=1\0"\
 		"fdt_high=0x20000000\0"\
 		"try_auto_burn=update 700 750;\0"\
@@ -181,12 +200,30 @@
 		"boot_flag=0\0"\
 		"Irq_check_en=0\0"\
 		"reboot_mode_android=""normal""\0"\
+		"tftp_kernel_path=boot/Image \0" \
+		"tftp_dtb_path=boot/dtb/ \0" \
+		"tftp_initrd_path=boot/initrd.img \0" \
+		"nfsroot_path= \0" \
 		"initargs="\
 			"rootflags=data=writeback rw rootfstype=ext4 loglevel=4 " \
 			"console=tty0 console=ttyS0,115200 no_console_suspend " \
 			"earlycon=aml-uart,0xff803000 ramoops.pstore_en=1 " \
 			"ramoops.record_size=0x8000 ramoops.console_size=0x4000 "\
 			"scsi_mod.scan=async xhci_hcd.quirks=0x800000 gamma=0 "\
+			"\0"\
+		"nfs_boot="\
+			"dhcp;"\
+			"setenv nfs_para root=/dev/nfs rw "\
+				"nfsroot=${serverip}:${nfsroot_path} ip=:::::eth0:on;"\
+			"printenv nfs_para;"\
+			"setenv bootargs ${bootargs} ${nfs_para};"\
+			"tftp ${dtb_mem_addr} ${tftp_dtb_path}${fdtfile};"\
+			"tftp ${loadaddr_kernel} ${tftp_kernel_path};"\
+			"tftp ${ramdisk_addr_r} ${tftp_initrd_path};"\
+			"setenv ramdisk_size ${filesize};"\
+			"echo ramdisk_size=${ramdisk_size};"\
+			"booti ${loadaddr_kernel} ${ramdisk_addr_r}:${ramdisk_size} "\
+				" ${dtb_mem_addr};"\
 			"\0"\
 		"upgrade_check="\
 			"echo upgrade_step=${upgrade_step}; "\
@@ -281,24 +318,40 @@
 			"run recovery_from_flash;"\
 			"\0"\
 		"recovery_from_sdcard="\
-			"if fatload mmc 0 ${loadaddr} aml_autoscript; then autoscr ${loadaddr}; fi;"\
+			"if fatload mmc 0 ${loadaddr} aml_autoscript; then "\
+				"if avb memory recovery ${loadaddr}; then " \
+				"	avb recovery 1;" \
+					"autoscr ${loadaddr}; fi;"\
+			"fi;"\
 			"if fatload mmc 0 ${loadaddr} recovery.img; then "\
+				"if avb memory recovery ${loadaddr}; then " \
+					"avb recovery 1;" \
 					"if fatload mmc 0 ${dtb_mem_addr} dtb.img; then echo sd dtb.img loaded; fi;"\
 					"wipeisb; "\
 					"bootm ${loadaddr};fi;"\
+			"fi;"\
 			"\0"\
 		"recovery_from_udisk="\
-			"if fatload usb 0 ${loadaddr} aml_autoscript; then autoscr ${loadaddr}; fi;"\
+			"if fatload usb 0 ${loadaddr} aml_autoscript; then " \
+			"if avb memory recovery ${loadaddr}; then " \
+				"avb recovery 1;" \
+				"autoscr ${loadaddr}; fi;" \
+			"fi;"\
 			"if fatload usb 0 ${loadaddr} recovery.img; then "\
-				"if fatload usb 0 ${dtb_mem_addr} dtb.img; then echo udisk dtb.img loaded; fi;"\
+				"if avb memory recovery ${loadaddr}; then " \
+				"avb recovery 1;" \
+				"if fatload usb 0 ${dtb_mem_addr} dtb.img; then "\
+				"echo udisk dtb.img loaded; fi;"\
 				"wipeisb; "\
 				"bootm ${loadaddr};fi;"\
+			"fi;"\
 			"\0"\
 		"recovery_from_flash="\
 			"get_valid_slot;"\
 			"echo active_slot: ${active_slot};"\
 			"if test ${active_slot} = normal; then "\
 				"setenv bootargs ${bootargs} aml_dt=${aml_dt} recovery_part={recovery_part} recovery_offset={recovery_offset};"\
+				"avb recovery 1;" \
 				"if imgread kernel ${recovery_part} ${loadaddr} ${recovery_offset}; then wipeisb; bootm ${loadaddr}; fi;"\
 			"else "\
 				"setenv bootargs ${bootargs} aml_dt=${aml_dt} recovery_part=${boot_part} recovery_offset=${recovery_offset};"\
@@ -331,7 +384,7 @@
 			"else "\
 				"setenv reboot_mode_android ""normal"";"\
 				"run storeargs;"\
-				"hdmitx hpd;hdmitx get_preferred_mode;hdmitx get_parse_edid;"\
+				"hdmitx hpd;hdmitx get_parse_edid;"\
 				"dovi process;osd dual_logo;"\
 				"dovi set;dovi pkg;vpp hdrpkt;"\
 			"fi;fi;"\
@@ -615,7 +668,6 @@
 	#define CONFIG_GXL_USB_PHY3_BASE		0xffe09080
 	#define CONFIG_USB_PHY_20				0xff636000
 	#define CONFIG_USB_PHY_21				0xff63A000
-	#define CONFIG_USB_STORAGE	  1
 	#define CONFIG_USB_XHCI		1
 	#define CONFIG_USB_XHCI_AMLOGIC_V2 1
 	#define CONFIG_USB_GPIO_PWR			GPIOEE(GPIOH_6)
@@ -690,17 +742,13 @@
 
 /* commands */
 #define CONFIG_CMD_CACHE 1
-#define CONFIG_CMD_BOOTI 1
 #define CONFIG_CMD_EFUSE 1
 #define CONFIG_CMD_I2C 1
-#define CONFIG_CMD_MEMORY 1
 #define CONFIG_CMD_FAT 1
 #define CONFIG_CMD_GPIO 1
 #define CONFIG_CMD_RUN
 #define CONFIG_CMD_REBOOT 1
 #define CONFIG_CMD_ECHO 1
-#define CONFIG_CMD_JTAG	1
-#define CONFIG_CMD_AUTOSCRIPT 1
 #define CONFIG_CMD_MISC 1
 #define CONFIG_CMD_PLLTEST 1
 #define CONFIG_CMD_EXT4 1

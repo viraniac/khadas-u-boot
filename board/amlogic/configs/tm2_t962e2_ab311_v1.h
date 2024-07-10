@@ -40,6 +40,22 @@
 #define CONFIG_CMD_SARADC 1
 #define CONFIG_SARADC_CH  2
 
+//#define CONFIG_AML_PRODUCT_MODE 1 //
+#ifdef CONFIG_AML_PRODUCT_MODE
+#define CONFIG_SILENT_CONSOLE
+#define CONFIG_NO_FASTBOOT_FLASHING
+#define CONFIG_USB_TOOL_ENTRY   "echo product mode"
+#define CONFIG_KNL_LOG_LEVEL    "loglevel=1"
+#else
+#define CONFIG_USB_TOOL_ENTRY   "update 1500"
+#define CONFIG_KNL_LOG_LEVEL    ""
+#define CONFIG_CMD_BOOTI        1
+#define CONFIG_CMD_MEMORY       1
+#define CONFIG_CMD_JTAG	        1
+#define CONFIG_CMD_AUTOSCRIPT   1
+#define CONFIG_USB_STORAGE      1
+#endif
+
 #define CONFIG_FAT_WRITE 1
 #define CONFIG_AML_FACTORY_PROVISION 1
 
@@ -76,6 +92,9 @@
 #define CONFIG_ADC_POWER_KEY_CHAN           2  /* channel range: 0-7 */
 #define CONFIG_ADC_POWER_KEY_VAL            0  /* sample value range: 0-1023 */
 #define CONFIG_ADC_POWER_KEY_RANGE          40 /* tolerance */
+
+/*smc*/
+#define CONFIG_ARM_SMCCC       1
 
 #define STR1(R) #R
 #define STR2(R) STR1(R)
@@ -120,7 +139,7 @@
         "dv_fw_dir_odm_ext=/odm_ext/firmware/dovi_fw.bin\0" \
         "dv_fw_dir_vendor=/vendor/firmware/dovi_fw.bin\0" \
         "dv_fw_dir=/reserved/firmware/dovi_fw.bin\0" \
-        "usb_burning=update 1000\0" \
+        "usb_burning=" CONFIG_USB_TOOL_ENTRY "\0" \
         "otg_device=1\0"\
         "fdt_high=0x20000000\0"\
         "try_auto_burn=update 700 750;\0"\
@@ -155,7 +174,7 @@
         "Irq_check_en=0\0"\
         "fs_type=""rootfstype=ramfs""\0"\
         "initargs="\
-            "init=/init console=ttyS0,115200 no_console_suspend earlycon=aml-uart,0xff803000 printk.devkmsg=on ramoops.pstore_en=1 ramoops.record_size=0x8000 ramoops.console_size=0x4000 loop.max_part=4 "\
+            "init=/init " CONFIG_KNL_LOG_LEVEL " console=ttyS0,115200 no_console_suspend earlycon=aml-uart,0xff803000 printk.devkmsg=on ramoops.pstore_en=1 ramoops.record_size=0x8000 ramoops.console_size=0x4000 loop.max_part=4 "\
             "\0"\
         "upgrade_check="\
             "echo upgrade_step=${upgrade_step}; "\
@@ -167,6 +186,7 @@
             "get_bootloaderversion;" \
             "setenv bootargs ${initargs} hdr_policy=${hdr_policy} hdr_priority=${hdr_priority} otg_device=${otg_device} logo=${display_layer},loaded,${fb_addr} powermode=${powermode} fb_width=${fb_width} fb_height=${fb_height} display_bpp=${display_bpp} outputmode=${outputmode} vout=${outputmode},enable panel_type=${panel_type} lcd_ctrl=${lcd_ctrl} hdmimode=${hdmimode} hdmichecksum=${hdmichecksum} dolby_vision_on=${dolby_vision_on} cvbsmode=${cvbsmode} osd_reverse=${osd_reverse} video_reverse=${video_reverse} androidboot.selinux=${EnableSelinux} androidboot.firstboot=${firstboot} jtag=${jtag}; "\
 	"setenv bootargs ${bootargs} androidboot.hardware=amlogic androidboot.bootloader=${bootloader_version} androidboot.build.expect.baseband=N/A;"\
+	"setenv bootargs ${bootargs} androidboot.bootreason=${reboot_mode};"\
             "run cmdline_keys;"\
             "\0"\
         "cec_init="\
@@ -324,23 +344,38 @@
             "run recovery_from_flash;"\
             "\0"\
         "recovery_from_sdcard="\
-            "if fatload mmc 0 ${loadaddr} aml_autoscript; then autoscr ${loadaddr}; fi;"\
+	"if fatload mmc 0 ${loadaddr} aml_autoscript; then "\
+		"if avb memory recovery ${loadaddr}; then " \
+		"avb recovery 1;" \
+		"autoscr ${loadaddr}; fi;"\
+	"fi;"\
             "if fatload mmc 0 ${loadaddr} recovery.img; then "\
+	    "if avb memory recovery ${loadaddr}; then " \
+	    "avb recovery 1;" \
                     "if fatload mmc 0 ${dtb_mem_addr} dtb.img; then echo sd dtb.img loaded; fi;"\
                     "wipeisb; "\
                     "bootm ${loadaddr};fi;"\
+	    "fi;"\
             "\0"\
         "recovery_from_udisk="\
-            "if fatload usb 0 ${loadaddr} aml_autoscript; then autoscr ${loadaddr}; fi;"\
+	"if fatload usb 0 ${loadaddr} aml_autoscript; then " \
+		"if avb memory recovery ${loadaddr}; then " \
+		"avb recovery 1;" \
+		"autoscr ${loadaddr}; fi;" \
+	"fi;"\
             "if fatload usb 0 ${loadaddr} recovery.img; then "\
+	    "if avb memory recovery ${loadaddr}; then " \
+	    "avb recovery 1;" \
                 "if fatload usb 0 ${dtb_mem_addr} dtb.img; then echo udisk dtb.img loaded; fi;"\
                 "wipeisb; "\
                 "bootm ${loadaddr};fi;"\
+		"fi;"\
             "\0"\
         "recovery_from_flash="\
             "echo active_slot: ${active_slot};"\
             "if test ${active_slot} = normal; then "\
                 "setenv bootargs ${bootargs} ${fs_type} aml_dt=${aml_dt} recovery_part=${recovery_part} recovery_offset=${recovery_offset};"\
+		"avb recovery 1;" \
                 "if itest ${upgrade_step} == 3; then "\
                     "if ext4load mmc 1:2 ${dtb_mem_addr} /recovery/dtb.img; then echo cache dtb.img loaded; fi;"\
                     "if ext4load mmc 1:2 ${loadaddr} /recovery/recovery.img; then echo cache recovery.img loaded; wipeisb; bootm ${loadaddr}; fi;"\
@@ -363,11 +398,11 @@
             "\0"\
         "init_display="\
             "if test ${vendor_boot_mode} = true; then "\
-                "hdmitx hpd;hdmitx get_preferred_mode;hdmitx get_parse_edid;dovi process;osd open;osd clear;"\
+                "hdmitx hpd;hdmitx get_parse_edid;dovi process;osd open;osd clear;"\
                 "imgread pic logo bootup $loadaddr;bmp display $bootup_offset;"\
                 "bmp scale;vout output ${outputmode};dovi set;dovi pkg;vpp hdrpkt;"\
             "else "\
-                "hdmitx hpd;hdmitx get_preferred_mode;hdmitx get_parse_edid;dovi process;osd open;osd clear;"\
+                "hdmitx hpd;hdmitx get_parse_edid;dovi process;osd open;osd clear;"\
                 "if rdext4pic $board_logo_part $loadaddr; then echo $board_logo_part logo; "\
                 "else rdext4pic odm $loadaddr;fi;bmp display $logoLoadAddr;"\
                 "bmp scale;vout output ${outputmode};dovi set;dovi pkg;vpp hdrpkt;"\
@@ -662,7 +697,6 @@
 	#define CONFIG_USB_PHY_20				0xff636000
 	#define CONFIG_USB_PHY_21				0xff63A000
 	#define CONFIG_USB_PHY_22				0xff658000
-	#define CONFIG_USB_STORAGE      1
 	#define CONFIG_USB_XHCI		1
 	#define CONFIG_USB_XHCI_AMLOGIC_V2 1
 	#define CONFIG_USB_GPIO_PWR  			GPIOEE(GPIOH_6)
@@ -730,17 +764,13 @@
 
 /* commands */
 #define CONFIG_CMD_CACHE 1
-#define CONFIG_CMD_BOOTI 1
 #define CONFIG_CMD_EFUSE 1
 #define CONFIG_CMD_I2C 1
-#define CONFIG_CMD_MEMORY 1
 #define CONFIG_CMD_FAT 1
 #define CONFIG_CMD_GPIO 1
 #define CONFIG_CMD_RUN
 #define CONFIG_CMD_REBOOT 1
 #define CONFIG_CMD_ECHO 1
-#define CONFIG_CMD_JTAG	1
-#define CONFIG_CMD_AUTOSCRIPT 1
 #define CONFIG_CMD_MISC 1
 #define CONFIG_CMD_PLLTEST 1
 #define CONFIG_CMD_INI 1

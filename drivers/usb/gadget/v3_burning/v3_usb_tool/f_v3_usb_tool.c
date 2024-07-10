@@ -1001,7 +1001,7 @@ static void cb_oem_cmd(struct usb_ep *ep, struct usb_request *req)
 	int ret = 0;
 	char tmp[RESPONSE_LEN + 1];
 	char* cmd = req->buf;
-	char* ack = response_str + 4;
+	char *ack = response_str + 6;
 
 	ack[0] = '\0';//set err for which buf not setted
 	char* cmdBuf = tmp;
@@ -1064,7 +1064,7 @@ static void cb_oem_cmd(struct usb_ep *ep, struct usb_request *req)
 		}
 	}
 
-	ret ? fastboot_fail(NULL) :fastboot_okay(NULL);
+	ret ? fastboot_fail(ack) : fastboot_okay(ack);
 	fastboot_tx_write_str(response_str);
 	FB_MSG("response[%d][%s]\n", ret, response_str);
 	return ;

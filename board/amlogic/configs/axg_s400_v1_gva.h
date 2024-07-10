@@ -20,7 +20,7 @@
  * platform power init config
  */
 #define CONFIG_PLATFORM_POWER_INIT
-#define CONFIG_VCCK_INIT_VOLTAGE	1100
+#define CONFIG_VCCK_INIT_VOLTAGE	990
 #define CONFIG_VDDEE_INIT_VOLTAGE	950		// voltage for power up
 #define CONFIG_VDDEE_SLEEP_VOLTAGE	 810		// voltage for suspend
 
@@ -32,6 +32,22 @@
 
 /* config saradc*/
 #define CONFIG_CMD_SARADC 1
+
+#define CONFIG_AML_PRODUCT_MODE 1 //
+#ifdef CONFIG_AML_PRODUCT_MODE
+#define CONFIG_SILENT_CONSOLE
+#define CONFIG_NO_FASTBOOT_FLASHING
+#define CONFIG_USB_TOOL_ENTRY   "echo product mode"
+#define CONFIG_KNL_LOG_LEVEL    "loglevel=1"
+#else
+#define CONFIG_USB_TOOL_ENTRY   "update 1500"
+#define CONFIG_KNL_LOG_LEVEL    ""
+#define CONFIG_CMD_BOOTI        1
+#define CONFIG_CMD_MEMORY       1
+#define CONFIG_CMD_JTAG	        1
+#define CONFIG_CMD_AUTOSCRIPT   1
+#define CONFIG_USB_STORAGE      1
+#endif
 
 /* command watchdog */
 #define CONFIG_CMD_WATCHDOG 1
@@ -72,6 +88,9 @@
 #define CONFIG_ADC_POWER_KEY_CHAN   0  /*channel range: 0-7*/
 #define CONFIG_ADC_POWER_KEY_VAL    0  /*sample value range: 0-1023*/
 
+/*smc*/
+#define CONFIG_ARM_SMCCC       1
+
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \
@@ -98,7 +117,7 @@
         "fb_width=768\0" \
         "fb_height=1024\0" \
 	"lock=10101000\0"\
-        "usb_burning=update 1000\0" \
+        "usb_burning=" CONFIG_USB_TOOL_ENTRY "\0" \
         "fdt_high=0x20000000\0"\
         "try_auto_burn=update 700 750;\0"\
         "sdcburncfg=aml_sdc_burn.ini\0"\
@@ -116,7 +135,7 @@
         "reboot_mode_android=""normal""\0"\
         "fs_type=""rootfstype=ramfs""\0"\
         "initargs="\
-            "rootfstype=ramfs init=/init ramoops.pstore_en=1 ramoops.record_size=0x8000 ramoops.console_size=0x4000 "\
+            "rootfstype=ramfs init=/init " CONFIG_KNL_LOG_LEVEL " ramoops.pstore_en=1 ramoops.record_size=0x8000 ramoops.console_size=0x4000 "\
             "\0"\
         "upgrade_check="\
             "echo recovery_status=${recovery_status};"\
@@ -227,23 +246,38 @@
             "fi;fi" \
             "\0"\
         "recovery_from_sdcard="\
-            "if fatload mmc 0 ${loadaddr} aml_autoscript; then autoscr ${loadaddr}; fi;"\
-            "if fatload mmc 0 ${loadaddr} recovery.img; then "\
+	"if fatload mmc 0 ${loadaddr} aml_autoscript; then "\
+		"if avb memory recovery ${loadaddr}; then " \
+		"avb recovery 1;" \
+		"autoscr ${loadaddr}; fi;"\
+	"fi;"\
+	"if fatload mmc 0 ${loadaddr} recovery.img; then "\
+	"if avb memory recovery ${loadaddr}; then " \
+	"avb recovery 1;" \
                     "if fatload mmc 0 ${dtb_mem_addr} dtb.img; then echo sd dtb.img loaded; fi;"\
                     "wipeisb; "\
                     "setenv bootargs ${bootargs} ${fs_type};"\
                     "bootm ${loadaddr};fi;"\
+		    "fi;"\
             "\0"\
         "recovery_from_udisk="\
-            "if fatload usb 0 ${loadaddr} aml_autoscript; then autoscr ${loadaddr}; fi;"\
+	"if fatload usb 0 ${loadaddr} aml_autoscript; then " \
+	"	if avb memory recovery ${loadaddr}; then " \
+		"avb recovery 1;" \
+	"	autoscr ${loadaddr}; fi;" \
+	"fi;"\
             "if fatload usb 0 ${loadaddr} recovery.img; then "\
+	    "if avb memory recovery ${loadaddr}; then " \
+	    "avb recovery 1;" \
                 "if fatload usb 0 ${dtb_mem_addr} dtb.img; then echo udisk dtb.img loaded; fi;"\
                 "wipeisb; "\
                 "setenv bootargs ${bootargs} ${fs_type};"\
                 "bootm ${loadaddr};fi;"\
+		"fi;"\
             "\0"\
         "recovery_from_flash="\
             "setenv bootargs ${bootargs} ${fs_type} aml_dt=${aml_dt} recovery_part={recovery_part} recovery_offset={recovery_offset};"\
+	    "avb recovery 1;" \
             "if imgread kernel ${recovery_part} ${loadaddr} ${recovery_offset}; then wipeisb; bootm ${loadaddr}; fi;"\
             "\0"\
         "init_display="\
@@ -529,7 +563,6 @@
 	#define CONFIG_GXL_XHCI_BASE            0xff500000
 	#define CONFIG_GXL_USB_PHY2_BASE        0xffe09000
 	#define CONFIG_GXL_USB_PHY3_BASE        0xffe09080
-	#define CONFIG_USB_STORAGE      1
 	#define CONFIG_USB_XHCI		1
 	#define CONFIG_USB_XHCI_AMLOGIC_GXL 1
 #endif //#if defined(CONFIG_CMD_USB)
@@ -591,17 +624,13 @@
 
 /* commands */
 #define CONFIG_CMD_CACHE 1
-#define CONFIG_CMD_BOOTI 1
 #define CONFIG_CMD_EFUSE 1
 #define CONFIG_CMD_I2C 1
-#define CONFIG_CMD_MEMORY 1
 #define CONFIG_CMD_FAT 1
 #define CONFIG_CMD_GPIO 1
 #define CONFIG_CMD_RUN
 #define CONFIG_CMD_REBOOT 1
 #define CONFIG_CMD_ECHO 1
-#define CONFIG_CMD_JTAG	1
-#define CONFIG_CMD_AUTOSCRIPT 1
 #define CONFIG_CMD_MISC 1
 
 /*file system*/

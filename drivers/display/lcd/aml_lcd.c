@@ -41,6 +41,8 @@ static struct aml_lcd_drv_s aml_lcd_driver;
 static struct lcd_boot_ctrl_s boot_ctrl;
 static struct lcd_debug_ctrl_s debug_ctrl;
 
+static void lcd_update_boot_ctrl_bootargs(void);
+
 static void lcd_chip_detect(void)
 {
 #if 1
@@ -116,7 +118,7 @@ static void lcd_chip_detect(void)
 
 static int lcd_check_valid(void)
 {
-	if (aml_lcd_driver.config_check == NULL) {
+	if (aml_lcd_driver.probe_done == 0) {
 		LCDERR("invalid lcd config\n");
 		return -1;
 	}
@@ -267,6 +269,18 @@ static void lcd_gamma_init(void)
 static void lcd_encl_on(void)
 {
 	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
+	int ret;
+
+	if (lcd_drv->config_check_en == 0) {
+		if (lcd_debug_print_flag)
+			LCDPR("config_check disabled\n");
+	} else {
+		ret = lcd_config_timing_check(&lcd_drv->lcd_config->lcd_timing.act_timing);
+		if (ret & 0x55) {
+			LCDERR("%s: config timing check fatal error!\n", __func__);
+			return;
+		}
+	}
 
 	lcd_drv->driver_init_pre();
 	if (lcd_debug_test)
@@ -312,22 +326,30 @@ static void lcd_module_enable(char *mode, unsigned int frac)
 	struct lcd_config_s *pconf = lcd_drv->lcd_config;
 	int ret;
 
-	ret = lcd_drv->config_check(mode, frac);
+	if (!mode)
+		return;
+
+	ret = lcd_drv->config_valid(mode);
 	if (ret) {
 		LCDERR("init exit\n");
 		return;
 	}
 
-	sync_duration = pconf->lcd_timing.sync_duration_num;
+	sync_duration = pconf->lcd_timing.act_timing.sync_duration_num;
 	sync_duration = (sync_duration * 100 /
-			 pconf->lcd_timing.sync_duration_den);
+			 pconf->lcd_timing.act_timing.sync_duration_den);
 	LCDPR("enable: %s, %s, %ux%u@%u.%2uHz\n", pconf->lcd_basic.model_name,
 	      lcd_type_type_to_str(pconf->lcd_basic.lcd_type),
-	      pconf->lcd_basic.h_active, pconf->lcd_basic.v_active,
+	      pconf->lcd_timing.act_timing.h_active,
+	      pconf->lcd_timing.act_timing.v_active,
 	      (sync_duration / 100), (sync_duration % 100));
 
 	if ((lcd_drv->lcd_status & LCD_STATUS_ENCL_ON) == 0)
 		lcd_encl_on();
+	if ((lcd_drv->lcd_status & LCD_STATUS_ENCL_ON) == 0) {
+		LCDERR("%s: encl_on failed!\n", __func__);
+		return;
+	}
 	if ((lcd_drv->lcd_status & LCD_STATUS_IF_ON) == 0) {
 		if (boot_ctrl.init_level == LCD_INIT_LEVEL_NORMAL) {
 			lcd_interface_on();
@@ -337,8 +359,8 @@ static void lcd_module_enable(char *mode, unsigned int frac)
 			      boot_ctrl.init_level);
 		}
 	}
-	if (!lcd_debug_test)
-		aml_lcd_mute_setting(0);
+
+	lcd_update_boot_ctrl_bootargs();
 }
 
 static void lcd_module_disable(void)
@@ -347,7 +369,6 @@ static void lcd_module_disable(void)
 
 	LCDPR("disable: %s\n", lcd_drv->lcd_config->lcd_basic.model_name);
 
-	aml_lcd_mute_setting(1);
 	if (lcd_drv->lcd_status & LCD_STATUS_IF_ON) {
 		aml_bl_power_ctrl(0, 1);
 		lcd_power_ctrl(0);
@@ -363,7 +384,10 @@ static void lcd_module_prepare(char *mode, unsigned int frac)
 	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
 	int ret;
 
-	ret = lcd_drv->config_check(mode, frac);
+	if (!mode)
+		return;
+
+	ret = lcd_drv->config_valid(mode);
 	if (ret) {
 		LCDERR("prepare exit\n");
 		return;
@@ -371,6 +395,8 @@ static void lcd_module_prepare(char *mode, unsigned int frac)
 
 	if ((lcd_drv->lcd_status & LCD_STATUS_ENCL_ON) == 0)
 		lcd_encl_on();
+
+	lcd_update_boot_ctrl_bootargs();
 }
 
 static void lcd_vbyone_filter_flag_print(struct lcd_config_s *pconf)
@@ -611,6 +637,41 @@ static int lcd_init_load_from_dts(char *dt_addr)
 	for (j = i; j < LCD_EXPANDER_GPIO_NUM_MAX; j++)
 		strcpy(pconf->lcd_power->expander_gpio[j], "invalid");
 
+	propdata = (char *)fdt_getprop(dt_addr, parent_offset, "config_check_glb", NULL);
+	if (!propdata) {
+		aml_lcd_driver.config_check_glb = 0;
+	} else {
+		aml_lcd_driver.config_check_glb = be32_to_cpup((u32 *)propdata);
+		if (lcd_debug_print_flag) {
+			LCDPR("find config_check_glb: %d\n",
+				aml_lcd_driver.config_check_glb);
+		}
+	}
+
+	propdata = (char *)fdt_getprop(dt_addr, parent_offset, "display_timing_req_min", NULL);
+	if (!propdata) {
+		aml_lcd_driver.disp_req.alert_level = 0;
+		aml_lcd_driver.disp_req.hswbp_vid = 0;
+		aml_lcd_driver.disp_req.hfp_vid = 0;
+		aml_lcd_driver.disp_req.vswbp_vid = 0;
+		aml_lcd_driver.disp_req.vfp_vid = 0;
+	} else {
+		aml_lcd_driver.disp_req.alert_level = be32_to_cpup((u32 *)propdata);
+		aml_lcd_driver.disp_req.hswbp_vid   = be32_to_cpup((((u32 *)propdata) + 1));
+		aml_lcd_driver.disp_req.hfp_vid     = be32_to_cpup((((u32 *)propdata) + 2));
+		aml_lcd_driver.disp_req.vswbp_vid   = be32_to_cpup((((u32 *)propdata) + 3));
+		aml_lcd_driver.disp_req.vfp_vid     = be32_to_cpup((((u32 *)propdata) + 4));
+		if (lcd_debug_print_flag) {
+			LCDPR("find display_timing_req_min: alert_level:%d\n"
+				"hswbp:%d, hfp:%d, vswbp:%d, vfp:%d\n",
+				aml_lcd_driver.disp_req.alert_level,
+				aml_lcd_driver.disp_req.hswbp_vid,
+				aml_lcd_driver.disp_req.hfp_vid,
+				aml_lcd_driver.disp_req.vswbp_vid,
+				aml_lcd_driver.disp_req.vfp_vid);
+		}
+	}
+
 	return 0;
 }
 #endif
@@ -731,7 +792,7 @@ static int lcd_config_load_id_check(char *dt_addr)
 
 static int lcd_mode_probe(char *dt_addr, int load_id)
 {
-	int ret = 0;
+	int dbg_chk, ret = 0;
 
 	switch (debug_ctrl.debug_lcd_mode) {
 	case 1:
@@ -763,9 +824,8 @@ static int lcd_mode_probe(char *dt_addr, int load_id)
 		LCDERR("invalid lcd mode: %d\n", aml_lcd_driver.lcd_config->lcd_mode);
 		break;
 	}
-
 	if (ret) {
-		aml_lcd_driver.config_check = NULL;
+		aml_lcd_driver.probe_done = 0;
 		LCDERR("invalid lcd config\n");
 		return -1;
 	}
@@ -775,6 +835,19 @@ static int lcd_mode_probe(char *dt_addr, int load_id)
 #ifdef CONFIG_AML_LCD_TCON
 	lcd_tcon_probe(dt_addr, &aml_lcd_driver, load_id);
 #endif
+
+	dbg_chk = getenv_ulong("lcd_debug_check", 10, 0xff);
+	if (dbg_chk == 0xff) {
+		if (aml_lcd_driver.lcd_config->lcd_basic.config_check & 0x2) {
+			aml_lcd_driver.config_check_en =
+				aml_lcd_driver.lcd_config->lcd_basic.config_check & 0x1;
+		} else {
+			aml_lcd_driver.config_check_en = aml_lcd_driver.config_check_glb;
+		}
+	} else {
+		LCDPR("lcd_debug_check: %d\n", dbg_chk);
+		aml_lcd_driver.config_check_en = dbg_chk;
+	}
 
 #ifdef CONFIG_AML_LCD_EXTERN
 	lcd_extern_load_config(dt_addr, aml_lcd_driver.lcd_config);
@@ -839,6 +912,7 @@ static void lcd_update_boot_ctrl_bootargs(void)
 
 	boot_ctrl.lcd_type = pconf->lcd_basic.lcd_type;
 	boot_ctrl.lcd_bits = pconf->lcd_basic.lcd_bits;
+	boot_ctrl.base_frame_rate = pconf->lcd_timing.base_timing.frame_rate;
 	switch (pconf->lcd_basic.lcd_type) {
 	case LCD_TTL:
 		boot_ctrl.advanced_flag = pconf->lcd_control.ttl_config->sync_valid;
@@ -870,6 +944,12 @@ static void lcd_update_boot_ctrl_bootargs(void)
 	value |= (boot_ctrl.advanced_flag & 0xff) << 8;
 	value |= (boot_ctrl.custom_pinmux & 0x1) << 16;
 	value |= (boot_ctrl.init_level & 0x3) << 18;
+	value |= (boot_ctrl.base_frame_rate & 0xff) << 24;
+
+	if (lcd_debug_print_flag) {
+		LCDPR("%s: base_fr=%d, bootctrl val=0x%x\n",
+			__func__, pconf->lcd_timing.base_timing.frame_rate, value);
+	}
 	sprintf(ctrl_str, "0x%08x", value);
 	setenv("lcd_ctrl", ctrl_str);
 
@@ -893,12 +973,12 @@ static void lcd_update_boot_ctrl_bootargs(void)
 	 *bit[31:30]: lcd mode(0=normal, 1=tv; 2=tablet, 3=TBD)
 	 *bit[29:28]: lcd debug para source(0=normal, 1=dts, 2=unifykey,
 	 *                                  3=bsp for uboot)
-	 *bit[27:16]: reserved
-	 *bit[15:8]: lcd test pattern
-	 *bit[7:0]:  lcd debug print flag
+	 *bit[27:20]: reserved
+	 *bit[19:16]: lcd test pattern
+	 *bit[15:0]:  lcd debug print flag
 	 */
-	value |= (debug_ctrl.debug_print_flag & 0xff);
-	value |= (debug_ctrl.debug_test_pattern & 0xff) << 8;
+	value |= (debug_ctrl.debug_print_flag & 0xffff);
+	value |= (debug_ctrl.debug_test_pattern & 0xff) << 16;
 	value |= (debug_ctrl.debug_para_source & 0x3) << 28;
 	value |= (debug_ctrl.debug_lcd_mode & 0x3) << 30;
 	sprintf(ctrl_str, "0x%08x", value);
@@ -984,7 +1064,7 @@ void lcd_wait_vsync(void)
 static int lcd_outputmode_check(char *mode, unsigned int frac)
 {
 	if (aml_lcd_driver.outputmode_check)
-		return aml_lcd_driver.outputmode_check(mode, frac);
+		return aml_lcd_driver.outputmode_check(mode);
 
 	LCDERR("invalid lcd config\n");
 	return -1;
@@ -1023,30 +1103,19 @@ static void lcd_disable(void)
 static void aml_lcd_set_ss(unsigned int level, unsigned int freq, unsigned int mode)
 {
 	struct aml_lcd_drv_s *lcd_drv = aml_lcd_get_driver();
-	unsigned int temp;
 	int ret;
 
 	if (lcd_check_valid())
 		return;
 	if (aml_lcd_driver.lcd_status) {
-		temp = lcd_drv->lcd_config->lcd_timing.ss_level;
 		ret = lcd_set_ss(level, freq, mode);
 		if (ret == 0) {
-			if (level < 0xff) {
-				temp &= ~(0xff);
-				temp |= level;
-				lcd_drv->lcd_config->lcd_timing.ss_level = temp;
-			}
-			if (freq < 0xff) {
-				temp &= ~((0xf << LCD_CLK_SS_BIT_FREQ) << 8);
-				temp |= ((freq << LCD_CLK_SS_BIT_FREQ) << 8);
-				lcd_drv->lcd_config->lcd_timing.ss_level = temp;
-			}
-			if (mode < 0xff) {
-				temp &= ~((0xf << LCD_CLK_SS_BIT_MODE) << 8);
-				temp |= ((mode << LCD_CLK_SS_BIT_MODE) << 8);
-				lcd_drv->lcd_config->lcd_timing.ss_level = temp;
-			}
+			if (level < 0xff)
+				lcd_drv->lcd_config->lcd_timing.ss_level = level;
+			if (freq < 0xff)
+				lcd_drv->lcd_config->lcd_timing.ss_freq = freq;
+			if (mode < 0xff)
+				lcd_drv->lcd_config->lcd_timing.ss_mode = mode;
 		}
 	} else {
 		LCDPR("already disabled\n");
@@ -1071,6 +1140,37 @@ static void aml_lcd_test(int num)
 		aml_lcd_debug_test(num);
 	else
 		LCDPR("already disabled\n");
+}
+
+static void aml_lcd_config_check(void)
+{
+	int ret;
+
+	if (lcd_check_valid())
+		return;
+
+	ret = lcd_config_timing_check(&aml_lcd_driver.lcd_config->lcd_timing.act_timing);
+	if (ret == 0)
+		printf("lcd_config_check: PASS\n");
+	printf("disp_tmg_min_req:\n"
+		"  alert_lvl  %d\n"
+		"  hswbp  %d\n"
+		"  hfp    %d\n"
+		"  vswbp  %d\n"
+		"  vfp    %d\n\n",
+		aml_lcd_driver.disp_req.alert_level,
+		aml_lcd_driver.disp_req.hswbp_vid, aml_lcd_driver.disp_req.hfp_vid,
+		aml_lcd_driver.disp_req.vswbp_vid, aml_lcd_driver.disp_req.vfp_vid);
+#ifdef CONFIG_AML_LCD_TCON
+	if (aml_lcd_driver.lcd_config->lcd_basic.lcd_type == LCD_MLVDS ||
+	    aml_lcd_driver.lcd_config->lcd_basic.lcd_type == LCD_P2P) {
+		lcd_tcon_dbg_check(&aml_lcd_driver.lcd_config->lcd_timing.act_timing);
+	}
+#endif
+	printf("config_check_glb: %d, config_check: 0x%x, config_check_en: %d\n\n",
+		aml_lcd_driver.config_check_glb,
+		aml_lcd_driver.lcd_config->lcd_basic.config_check,
+		aml_lcd_driver.config_check_en);
 }
 
 static void aml_lcd_clk(void)
@@ -1135,16 +1235,6 @@ static void aml_backlight_power_off(void)
 	aml_bl_power_ctrl(0, 1);
 }
 
-static void aml_lcd_key_test(void)
-{
-	if (aml_lcd_driver.unifykey_test_flag) {
-		aml_lcd_unifykey_test();
-		lcd_config_probe();
-	} else {
-		printf("lcd unifykey test disabled\n");
-	}
-}
-
 static void aml_lcd_key_dump(unsigned int flag)
 {
 	unsigned int key_flag = LCD_UKEY_DEBUG_NORMAL;
@@ -1180,10 +1270,11 @@ static void aml_lcd_debug_print_set(unsigned int flag)
 }
 
 static struct aml_lcd_drv_s aml_lcd_driver = {
+	.probe_done = 0,
 	.lcd_status = 0,
 	.lcd_config = &lcd_config_dft,
 	.bl_config = &bl_config_dft,
-	.config_check = NULL,
+	.config_valid = NULL,
 	.lcd_probe = lcd_probe,
 	.lcd_outputmode_check = lcd_outputmode_check,
 	.lcd_prepare = lcd_prepare,
@@ -1192,6 +1283,7 @@ static struct aml_lcd_drv_s aml_lcd_driver = {
 	.lcd_set_ss = aml_lcd_set_ss,
 	.lcd_get_ss = aml_lcd_get_ss,
 	.lcd_test = aml_lcd_test,
+	.lcd_config_check = aml_lcd_config_check,
 	.lcd_prbs = aml_lcd_prbs_test,
 	.lcd_clk = aml_lcd_clk,
 	.lcd_info = aml_lcd_info,
@@ -1217,7 +1309,6 @@ static struct aml_lcd_drv_s aml_lcd_driver = {
 	.get_bl_level = aml_get_backlight_level,
 	.bl_config_print = aml_bl_config_print,
 	.unifykey_test_flag = 0, /* default disable unifykey test */
-	.unifykey_test = aml_lcd_key_test,
 	.unifykey_dump = aml_lcd_key_dump,
 	.debug_print_set = aml_lcd_debug_print_set,
 

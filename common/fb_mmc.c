@@ -284,8 +284,17 @@ void fb_mmc_erase_write(const char *cmd, void *download_buffer)
 		return;
 	}
 #ifdef CONFIG_EFI_PARTITION
-	if (dev_desc->part_type == PART_TYPE_EFI)
-		ret = part_get_info_efi_by_name_or_alias(dev_desc, cmd, &info);
+	if (dev_desc->part_type == PART_TYPE_EFI) {
+		if (!strncmp(cmd, "bootloader", strlen("bootloader"))) {
+			ret = erase_gpt_part_table(dev_desc);
+			if (ret) {
+				printf("%s, failed erase gpt", __func__);
+				return;
+			}
+		} else {
+			ret = part_get_info_efi_by_name_or_alias(dev_desc, cmd, &info);
+		}
+	}
 #endif
 #ifdef CONFIG_AML_PARTITION
 	if ((dev_desc->part_type == PART_TYPE_AML)

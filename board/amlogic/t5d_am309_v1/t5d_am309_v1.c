@@ -51,6 +51,7 @@
 #endif
 #include <asm/arch/timer.h>
 #include <partition_table.h>
+#include <asm/arch/stick_mem.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -571,8 +572,7 @@ U_BOOT_DEVICES(meson_i2cs) = {
 #if 0 /* i2c pinmux demo */
 void set_i2c_b_pinmux(void)
 {
-	/*ds =3 */
-	setbits_le32(PAD_DS_REG2B, 0xf << 8);
+	/*ds default =2 */
 	/*pull up disable*/
 	clrbits_le32(PAD_PULL_UP_EN_REG2, 0x3 << 20);
 	/*pin mux to i2cm1*/
@@ -638,6 +638,7 @@ int board_late_init(void)
 		run_command("defenv_reserv;setenv upgrade_step 2; saveenv;", 0);
 	}
 
+	get_stick_reboot_flag_mbx();
 	//update env before anyone using it
 	run_command("get_rebootmode; echo reboot_mode=${reboot_mode};", 0);
 	run_command("if itest ${upgrade_step} == 1; then "\

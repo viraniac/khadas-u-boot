@@ -1624,9 +1624,9 @@ static void mipi_dsi_video_config(struct lcd_config_s *pconf)
 	unsigned int den, num;
 	unsigned short v_period, v_active, vs_width, vs_bp;
 
-	h_period = pconf->lcd_basic.h_period;
-	hs_width = pconf->lcd_timing.hsync_width;
-	hs_bp = pconf->lcd_timing.hsync_bp;
+	h_period = pconf->lcd_timing.act_timing.h_period;
+	hs_width = pconf->lcd_timing.act_timing.hsync_width;
+	hs_bp = pconf->lcd_timing.act_timing.hsync_bp;
 	den = pconf->lcd_control.mipi_config->factor_denominator;
 	num = pconf->lcd_control.mipi_config->factor_numerator;
 
@@ -1634,10 +1634,10 @@ static void mipi_dsi_video_config(struct lcd_config_s *pconf)
 	dsi_vconf.hsa = (hs_width * den + num - 1) / num;
 	dsi_vconf.hbp = (hs_bp * den + num - 1) / num;
 
-	v_period = pconf->lcd_basic.v_period;
-	v_active = pconf->lcd_basic.v_active;
-	vs_width = pconf->lcd_timing.vsync_width;
-	vs_bp = pconf->lcd_timing.vsync_bp;
+	v_period = pconf->lcd_timing.act_timing.v_period;
+	v_active = pconf->lcd_timing.act_timing.v_active;
+	vs_width = pconf->lcd_timing.act_timing.vsync_width;
+	vs_bp = pconf->lcd_timing.act_timing.vsync_bp;
 	dsi_vconf.vsa = vs_width;
 	dsi_vconf.vbp = vs_bp;
 	dsi_vconf.vfp = v_period - v_active - vs_bp - vs_width;
@@ -1671,8 +1671,8 @@ static void mipi_dsi_non_burst_packet_config(struct lcd_config_s *pconf)
 
 	lane_num = (int)(dconf->lane_num);
 	clk_factor = dconf->clk_factor;
-	hactive = pconf->lcd_basic.h_active;
-	bit_rate_required = pconf->lcd_timing.lcd_clk;
+	hactive = pconf->lcd_timing.act_timing.h_active;
+	bit_rate_required = pconf->lcd_timing.act_timing.pixel_clk;
 	bit_rate_required = bit_rate_required * 3 * dsi_vconf.data_bits;
 	bit_rate_required = lcd_do_div(bit_rate_required, lane_num);
 	if (pconf->lcd_timing.bit_rate > bit_rate_required)
@@ -1789,7 +1789,7 @@ static void mipi_dsi_non_burst_packet_config(struct lcd_config_s *pconf)
 static void mipi_dsi_vid_mode_config(struct lcd_config_s *pconf)
 {
 	if (pconf->lcd_control.mipi_config->video_mode_type == BURST_MODE) {
-		dsi_vconf.pixel_per_chunk = pconf->lcd_basic.h_active;
+		dsi_vconf.pixel_per_chunk = pconf->lcd_timing.act_timing.h_active;
 		dsi_vconf.vid_num_chunks = 0;
 		dsi_vconf.vid_null_size = 0;
 	} else {
@@ -1902,7 +1902,7 @@ void lcd_mipi_dsi_config_set(struct lcd_config_s *pconf)
 	/* unit in kHz for calculation */
 	if (cConf->data)
 		pll_out_fmin = cConf->data->pll_out_fmin;
-	band_width = pconf->lcd_timing.lcd_clk;
+	band_width = pconf->lcd_timing.act_timing.pixel_clk;
 
 	/* data format */
 	if (pconf->lcd_basic.lcd_bits == 6) {
@@ -1932,9 +1932,9 @@ void lcd_mipi_dsi_config_set(struct lcd_config_s *pconf)
 		bit_rate_min = 0;
 		bit_rate_max = 0;
 		while ((bit_rate_min < pll_out_fmin) && (n < 100)) {
-			bit_rate_max = bit_rate + (pconf->lcd_timing.lcd_clk / 2) +
-					(n * pconf->lcd_timing.lcd_clk);
-			bit_rate_min = bit_rate_max - pconf->lcd_timing.lcd_clk;
+			bit_rate_max = bit_rate + (pconf->lcd_timing.act_timing.pixel_clk / 2) +
+					(n * pconf->lcd_timing.act_timing.pixel_clk);
+			bit_rate_min = bit_rate_max - pconf->lcd_timing.act_timing.pixel_clk;
 			n++;
 		}
 
@@ -1979,10 +1979,10 @@ void lcd_mipi_dsi_config_set(struct lcd_config_s *pconf)
 		break;
 	case 0: /* auto */
 	default:
-		if ((pconf->lcd_basic.h_active != 240) &&
-			(pconf->lcd_basic.h_active != 768) &&
-			(pconf->lcd_basic.h_active != 1920) &&
-			(pconf->lcd_basic.h_active != 2560)) {
+		if (pconf->lcd_timing.act_timing.h_active != 240 &&
+			pconf->lcd_timing.act_timing.h_active != 768 &&
+			pconf->lcd_timing.act_timing.h_active != 1920 &&
+			pconf->lcd_timing.act_timing.h_active != 2560) {
 			dsi_phy_config.state_change = 2;
 		} else {
 			dsi_phy_config.state_change = 1;
@@ -2004,7 +2004,7 @@ static void mipi_dsi_config_post(struct lcd_config_s *pconf)
 	if (dconf->factor_numerator == 0) {
 		lanebyteclk = lcd_do_div(bit_rate, 8);
 		LCDPR("pixel_clk = %dHz, bit_rate = %lldHz, lanebyteclk = %dHz\n",
-			pconf->lcd_timing.lcd_clk, bit_rate, lanebyteclk);
+			pconf->lcd_timing.act_timing.pixel_clk, bit_rate, lanebyteclk);
 #if 0
 		dconf->factor_numerator = pclk;
 		dconf->factor_denominator = lanebyteclk;

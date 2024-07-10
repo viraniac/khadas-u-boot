@@ -52,7 +52,7 @@ struct bootloader_message {
     char reserved[192];
 };
 
-
+#ifdef CONFIG_CMD_BCB
 static int clear_misc_partition(char *clearbuf, int size)
 {
     char *partition = "misc";
@@ -66,6 +66,7 @@ static int clear_misc_partition(char *clearbuf, int size)
 
     return 0;
 }
+#endif
 
 static int do_RunBcbCommand(
     cmd_tbl_t * cmdtp,
@@ -173,15 +174,18 @@ static int do_RunBcbCommand(
 			0);
 	}
 
-    if (!memcmp(command, CMD_RUN_RECOVERY, strlen(CMD_RUN_RECOVERY))) {
-        if (run_command("run recovery_from_flash", 0) < 0) {
-            printf("run_command for cmd:run recovery_from_flash failed.\n");
-            return -1;
-        }
-        printf("run command:run recovery_from_flash successful.\n");
-        return 0;
-    }
+	setenv("recovery_mode", "false");
+	if (!memcmp(command, CMD_RUN_RECOVERY, strlen(CMD_RUN_RECOVERY))) {
+		setenv("recovery_mode", "true");
+		if (run_command("run recovery_from_flash", 0) < 0) {
+			printf("run_command for cmd:run recovery_from_flash failed.\n");
+			return -1;
+		}
+		printf("run command:run recovery_from_flash successful.\n");
+		return 0;
+	}
 
+#ifdef CONFIG_CMD_BCB
     if (!memcmp(command_mark, command, strlen(command_mark))) {
         printf("%s\n", recovery);
         if (run_command((char *)recovery, 0) < 0) {
@@ -200,6 +204,7 @@ static int do_RunBcbCommand(
         printf("command mark(%s) not match %s,don't execute.\n",
             command_mark, command);
     }
+#endif
 
     return 0;
 

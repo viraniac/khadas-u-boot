@@ -575,7 +575,6 @@ int gpt_fill_pte(block_dev_desc_t *dev_desc,
 int gpt_fill_header(block_dev_desc_t *dev_desc, gpt_header *gpt_h,
 		char *str_guid, int parts_count)
 {
-	printf("~~~~~~~~~~~%s, %d, 0x%llx\n", __func__, __LINE__, alter_gpt_lba);
 	gpt_h->signature = cpu_to_le64(GPT_HEADER_SIGNATURE);
 	gpt_h->revision = cpu_to_le32(GPT_HEADER_REVISION_V1);
 	gpt_h->header_size = cpu_to_le32(sizeof(gpt_header));
@@ -1015,5 +1014,93 @@ int is_pte_valid(gpt_entry * pte)
 	} else {
 		return 1;
 	}
+}
+
+int erase_gpt_part_table(block_dev_desc_t *dev_desc)
+{
+	gpt_header *gpt_h;
+	gpt_entry *gpt_pte = NULL;
+	int size;
+	lbaint_t lba;
+	int cnt;
+
+	printf("come to %s\n", __func__);
+
+	gpt_h = calloc(1, PAD_TO_BLOCKSIZE(sizeof(gpt_header),
+						       dev_desc));
+	if (!gpt_h) {
+		printf("%s: calloc failed!\n", __func__);
+		return -1;
+	}
+	size = PAD_TO_BLOCKSIZE(sizeof(gpt_header), dev_desc);
+	memset(gpt_h, 0, size);
+
+	/* Setup the Protective MBR */
+	ALLOC_CACHE_ALIGN_BUFFER_PAD(legacy_mbr, p_mbr, 1, dev_desc->blksz);
+	if (!p_mbr) {
+		printf("%s: calloc failed!\n", __func__);
+		free(gpt_h);
+		return -1;
+	}
+
+	ALLOC_CACHE_ALIGN_BUFFER_PAD(gpt_header, gpt_head, 1, dev_desc->blksz);
+
+	if (is_gpt_valid(dev_desc, GPT_PRIMARY_PARTITION_TABLE_LBA,
+				gpt_head, &gpt_pte) != 1) {
+		if (is_gpt_valid(dev_desc, (dev_desc->lba - 1),
+					gpt_head, &gpt_pte) != 1) {
+			printf("%s: there is no valid gpt before, erase\n", __func__);
+		}
+		printf("%s: *** Using Backup GPT ***\n", __func__);
+	}
+
+	/* Clear all data in MBR except of backed up boot code */
+	memset((char *)p_mbr + MSDOS_MBR_BOOT_CODE_SIZE, 0, sizeof(*p_mbr) -
+			MSDOS_MBR_BOOT_CODE_SIZE);
+
+	/* Write MBR sector to the MMC device */
+	if (dev_desc->block_write(dev_desc->dev, 0, 1, p_mbr) != 1) {
+		printf("** Can't write to device %d **\n",
+			dev_desc->dev);
+		free(gpt_h);
+		return -1;
+	}
+
+	/* write Primary GPT */
+	lba = GPT_PRIMARY_PARTITION_TABLE_LBA;
+	cnt = 1;	/* GPT Header (1 block) */
+	printf("%s: erase '%s' (%d blks at 0x" LBAF ")\n",
+		       __func__, "Primary GPT Header", cnt, lba);
+	if (dev_desc->block_write(dev_desc->dev, lba, cnt, gpt_h) != cnt) {
+		printf("%s: failed erase '%s' (%d blks at 0x" LBAF ")\n",
+		       __func__, "Primary GPT Header", cnt, lba);
+		free(gpt_h);
+		return 1;
+	}
+
+	/* write alternate GPT */
+	lba = le64_to_cpu(gpt_head->alternate_lba);
+	cnt = 1;	/* GPT Header (1 block) */
+	printf("%s: erase '%s' (%d blks at 0x" LBAF ")\n",
+		       __func__, "alternate GPT Header", cnt, lba);
+	if (dev_desc->block_write(dev_desc->dev, lba, cnt, gpt_h) != cnt) {
+		printf("%s: failed erase '%s' (%d blks at 0x" LBAF ")\n",
+		       __func__, "alternate GPT Header", cnt, lba);
+		free(gpt_h);
+		return 1;
+	}
+
+	lba = cpu_to_le64(dev_desc->lba - 1);
+	cnt = 1;	/* GPT Header (1 block) */
+	printf("%s: erase '%s' (%d blks at 0x" LBAF ")\n",
+		       __func__, "Backup GPT Header", cnt, lba);
+	if (dev_desc->block_write(dev_desc->dev, lba, cnt, gpt_h) != cnt) {
+		printf("%s: failed erase '%s' (%d blks at 0x" LBAF ")\n",
+		       __func__, "Backup GPT Header", cnt, lba);
+		free(gpt_h);
+		return 1;
+	}
+	free(gpt_h);
+	return 0;
 }
 #endif

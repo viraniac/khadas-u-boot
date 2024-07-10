@@ -12,8 +12,11 @@
 #include <cec_tx_reg.h>
 #include <hdmi_cec_arc.h>
 #endif
+#include <gpio.c>
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
+unsigned char gpio_groups[] = {};
 
 static unsigned int wwe_wakeup_status;
 
@@ -54,6 +57,8 @@ static void power_off_at_24M(unsigned int suspend_from)
 	writel(readl(AO_GPIO_O_EN_N) & (~(1 << 3)), AO_GPIO_O_EN_N);
 	writel(readl(AO_RTI_PINMUX_REG0) & (~(0xf << 12)), AO_RTI_PINMUX_REG0);
 
+	gpio_state_backup(gpio_groups, ARRAY_SIZE(gpio_groups));
+
 	/*set gpiaoAO_2 low to power off VDDIO_3.3V*/
 	writel(readl(AO_GPIO_O) & (~(1 << 2)), AO_GPIO_O);
 	writel(readl(AO_GPIO_O_EN_N) & (~(1 << 2)), AO_GPIO_O_EN_N);
@@ -90,7 +95,9 @@ static void power_on_at_24M(unsigned int suspend_from)
 	writel(readl(AO_GPIO_O) | (1 << 2), AO_GPIO_O);
 	writel(readl(AO_GPIO_O_EN_N) & (~(1 << 2)), AO_GPIO_O_EN_N);
 	writel(readl(AO_RTI_PINMUX_REG0) & (~(0xf << 8)), AO_RTI_PINMUX_REG0);
-	_udelay(100);
+
+	_udelay(10000);
+	gpio_state_restore(gpio_groups, ARRAY_SIZE(gpio_groups));
 	/*set gpioAO_3 low to power on VDD5V and hdmi_3.3v*/
 	writel(readl(AO_GPIO_O) | (1 << 3), AO_GPIO_O);
 	writel(readl(AO_GPIO_O_EN_N) & (~(1 << 3)), AO_GPIO_O_EN_N);

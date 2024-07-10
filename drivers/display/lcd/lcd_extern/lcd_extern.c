@@ -1266,18 +1266,20 @@ static int aml_lcd_extern_get_config_unifykey(int index,
 	unsigned char *para, *p;
 	int key_len, len;
 	const char *str;
-	struct aml_lcd_unifykey_header_s ext_header;
+	struct aml_lcd_unifykey_header_s *ext_header;
 	int ret;
 
 	extconf->table_init_loaded = 0;
-	para = (unsigned char *)malloc(sizeof(unsigned char) * LCD_UKEY_LCD_EXT_SIZE);
+	ret = aml_lcd_unifykey_get_size("lcd_extern", &key_len);
+	if (ret)
+		return -1;
+	para = (unsigned char *)malloc(sizeof(unsigned char) * key_len);
 	if (!para) {
 		EXTERR("%s: Not enough memory\n", __func__);
 		return -1;
 	}
-	key_len = LCD_UKEY_LCD_EXT_SIZE;
 	memset(para, 0, (sizeof(unsigned char) * key_len));
-	ret = aml_lcd_unifykey_get("lcd_extern", para, &key_len);
+	ret = aml_lcd_unifykey_get("lcd_extern", para, key_len);
 	if (ret) {
 		free(para);
 		return -1;
@@ -1293,14 +1295,14 @@ static int aml_lcd_extern_get_config_unifykey(int index,
 	}
 
 	/* header: 10byte */
-	aml_lcd_unifykey_header_check(para, &ext_header);
+	ext_header = (struct aml_lcd_unifykey_header_s *)para;
 	if (lcd_debug_print_flag) {
 		EXTPR("unifykey header:\n");
-		EXTPR("crc32             = 0x%08x\n", ext_header.crc32);
-		EXTPR("data_len          = %d\n", ext_header.data_len);
-		EXTPR("version           = 0x%04x\n", ext_header.version);
-		EXTPR("block_next_flag   = %d\n", ext_header.block_next_flag);
-		EXTPR("block_cur_size   = %d\n", ext_header.block_cur_size);
+		EXTPR("crc32             = 0x%08x\n", ext_header->crc32);
+		EXTPR("data_len          = %d\n", ext_header->data_len);
+		EXTPR("version           = 0x%04x\n", ext_header->version);
+		EXTPR("block_next_flag   = %d\n", ext_header->block_next_flag);
+		EXTPR("block_cur_size   = %d\n", ext_header->block_cur_size);
 	}
 
 	/* basic: 33byte */

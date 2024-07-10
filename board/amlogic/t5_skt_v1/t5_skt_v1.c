@@ -51,6 +51,7 @@
 #endif
 #include <asm/arch/timer.h>
 #include <partition_table.h>
+#include <asm/arch/stick_mem.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -636,6 +637,7 @@ int board_late_init(void)
 
 	char outputModePre[30] = {0};
 	char outputModeCur[30] = {0};
+	get_stick_reboot_flag_mbx();
 	strncpy(outputModePre, getenv("outputmode"), 29);
 	if (getenv("default_env")) {
 		printf("factory reset, need default all uboot env\n");

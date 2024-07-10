@@ -62,7 +62,13 @@
 /* 20230816: optimize clk accuracy*/
 /* 20230821: update lcd ss support*/
 /* 20230912: bypass phy data buffer */
-#define LCD_DRV_VERSION    "20230912"
+/* 20231205: add lcd config check*/
+/* 20231218: update timing management*/
+/* 20240129: update display mode management*/
+/* 20240218: optimize lcd config check sequence*/
+/* 20240222: update custom control support*/
+/* 20240307: update swpdf support*/
+#define LCD_DRV_VERSION    "20240307"
 
 #define LCD_STATUS_IF_ON      (1 << 0)
 #define LCD_STATUS_ENCL_ON    (1 << 1)
@@ -86,13 +92,29 @@ extern char *lcd_type_type_to_str(int type);
 extern int lcd_mode_str_to_mode(const char *str);
 extern char *lcd_mode_mode_to_str(int mode);
 
+int lcd_config_timing_check(struct lcd_detail_timing_s *ptiming);
 extern int lcd_power_load_from_dts(struct lcd_config_s *pconf,
 		char *dt_addr, int child_offset);
 extern int lcd_power_load_from_unifykey(struct lcd_config_s *pconf,
 		unsigned char *buf, int key_len, int len);
 extern int lcd_pinmux_load_config(char *dt_addr, struct lcd_config_s *pconf);
-extern void lcd_timing_init_config(struct lcd_config_s *pconf);
-extern int lcd_vmode_change(struct lcd_config_s *pconf);
+void lcd_clk_frame_rate_init(struct lcd_detail_timing_s *ptiming);
+void lcd_default_to_basic_timing_init_config(struct lcd_config_s *pconf);
+void lcd_enc_timing_init_config(struct lcd_config_s *pconf);
+int lcd_frame_rate_change(struct lcd_config_s *pconf);
+
+/* lcd cus_ctrl */
+void lcd_cus_ctrl_dump_raw_data(struct lcd_config_s *pconf);
+void lcd_cus_ctrl_dump_info(struct lcd_config_s *pconf);
+int lcd_cus_ctrl_load_from_dts(struct lcd_config_s *pconf, char *dt_addr);
+int lcd_cus_ctrl_load_from_unifykey(struct lcd_config_s *pconf, unsigned char *buf,
+		unsigned int max_size);
+void lcd_cus_ctrl_config_remove(struct lcd_config_s *pconf);
+int lcd_cus_ctrl_config_update(struct lcd_config_s *pconf, void *param, unsigned int mask_sel);
+void lcd_cus_ctrl_state_clear(struct lcd_config_s *pconf, unsigned int mask_sel);
+int lcd_cus_ctrl_timing_is_valid(struct lcd_config_s *pconf);
+int lcd_cus_ctrl_timing_is_activated(struct lcd_config_s *pconf);
+struct lcd_detail_timing_s **lcd_cus_ctrl_timing_match_get(struct lcd_config_s *pconf);
 
 /* lcd phy */
 unsigned int lcd_phy_vswing_level_to_value(struct aml_lcd_drv_s *pdrv, unsigned int level);
@@ -106,10 +128,14 @@ extern int lcd_phy_probe(void);
 extern void lcd_phy_tcon_chpi_bbc_init_tl1(struct lcd_config_s *pconf);
 
 /* lcd tcon */
+#ifdef CONFIG_AML_LCD_TCON
 extern void lcd_tcon_info_print(void);
+int lcd_tcon_top_init(struct lcd_config_s *pconf);
 extern int lcd_tcon_enable(struct lcd_config_s *pconf);
 extern void lcd_tcon_disable(struct lcd_config_s *pconf);
 extern int lcd_tcon_probe(char *dt_addr, struct aml_lcd_drv_s *lcd_drv, int load_id);
+void lcd_tcon_dbg_check(struct lcd_detail_timing_s *ptiming);
+#endif
 
 /* lcd pinctrl */
 int lcd_pinmux_probe(unsigned int cpu_type);
@@ -121,6 +147,7 @@ extern int aml_lcd_gpio_set(int gpio, int value);
 extern unsigned int aml_lcd_gpio_input_get(int gpio);
 
 /* lcd debug */
+int lcd_debug_info_len(int num);
 extern void aml_lcd_debug_test(unsigned int num);
 extern void aml_lcd_mute_setting(unsigned char flag);
 extern void aml_lcd_info_print(void);

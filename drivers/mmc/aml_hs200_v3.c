@@ -334,8 +334,8 @@ void select_clock_src(void) {
 	*((u32 *)buf) = (u32)writeval;
 	unmap_sysmem(buf);
 
-	writel(0x17ff, PAD_PULL_UP_REG0);
-	writel(0xffffffff, PAD_DS_REG0A);
+	clksetbits(PAD_PULL_UP_REG0, 0xfff, 0x7ff);
+	clksetbits_le32(PAD_DS_REG0A, 0xffffff, 0xffffff);
 }
 
 int mmc_set_hs200_mode(struct mmc *mmc)

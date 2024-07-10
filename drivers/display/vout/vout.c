@@ -609,9 +609,9 @@ static void vout_vmode_init(void)
 	case VMODE_LCD:
 		lcd_drv = aml_lcd_get_driver();
 		if (lcd_drv) {
-			width = lcd_drv->lcd_config->lcd_basic.h_active;
-			height = lcd_drv->lcd_config->lcd_basic.v_active;
-			field_height = lcd_drv->lcd_config->lcd_basic.v_active;
+			width = lcd_drv->lcd_config->lcd_timing.act_timing.h_active;
+			height = lcd_drv->lcd_config->lcd_timing.act_timing.v_active;
+			field_height = lcd_drv->lcd_config->lcd_timing.act_timing.v_active;
 		} else {
 			width = vout_find_width_by_name(outputmode);
 			height = vout_find_height_by_name(outputmode);

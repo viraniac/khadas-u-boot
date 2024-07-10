@@ -946,7 +946,7 @@ void hdr_func(enum hdr_module_sel module_sel,
 	memset(&hdr_lut_param, 0, sizeof(struct hdr_proc_lut_param_s));
 
 	if (module_sel == OSD1_HDR &&
-		get_cpu_id().family_id >= MESON_CPU_MAJOR_ID_G12B) {
+		get_cpu_id().family_id >= MESON_CPU_MAJOR_ID_G12A) {
 		/*for g12a/g12b osd blend shift rtl bug*/
 		if ((get_cpu_id().family_id == MESON_CPU_MAJOR_ID_G12A) ||
 		    ((get_cpu_id().family_id == MESON_CPU_MAJOR_ID_G12B)))

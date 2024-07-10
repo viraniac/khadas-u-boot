@@ -329,6 +329,18 @@ struct aml_nand_flash_dev aml_nand_flash_ids[] = {
 		0,
 		(NAND_TIMING_MODE5 | NAND_ECC_BCH8_MODE )},
 
+	{"2Gib S34ML02G300TFI000 ",
+		{NAND_MFR_AMD, 0xda, 0x00, 0x95, 0x46},
+		2048,
+		256,
+		0x20000,
+		128,
+		1,
+		16,
+		15,
+		0,
+		(NAND_TIMING_MODE5 | NAND_ECC_BCH8_MODE)},
+
 	{"AMD/Spansion Slc NAND 2Gib S34ML02G1(MLO2G100BH1OO)",
 		{NAND_MFR_AMD, 0xda, 0x90, 0x95, 0x44, 0x01},
 		2048,
@@ -537,7 +549,7 @@ struct aml_nand_flash_dev aml_nand_flash_ids[] = {
 		20,
 		25,
 		0,
-		(NAND_TIMING_MODE5 | NAND_ECC_BCH8_MODE )},
+		(NAND_TIMING_MODE5 | NAND_ECC_BCH8_MODE)},
 	{"A revision NAND 4Gib TH58NVG2S3HTA00 ",
 		{NAND_MFR_TOSHIBA, 0xdc, 0x91, 0x15, 0x76},
 		2048,
@@ -1203,6 +1215,17 @@ struct aml_nand_flash_dev aml_nand_flash_ids[] = {
 		0,
 		(NAND_TIMING_MODE5 | NAND_ECC_BCH16_MODE )},
 #endif
+	{"A Version NAND 1GiB FSNS8A001G",
+		{NAND_MFR_FORESEE, 0xF1, 0x00, 0x95, 0x40},
+		2048,
+		128,
+		0x20000,
+		64,
+		1,
+		20,
+		15,
+		0,
+		NAND_ECC_BCH8_MODE},
 	{NULL,}
 };
 
@@ -1396,7 +1419,8 @@ static struct aml_nand_flash_dev *aml_nand_get_flash_type(struct mtd_info *mtd,
 	struct aml_nand_platform *plat = aml_chip->platform;
 	struct aml_nand_flash_dev *type = NULL;
 	int i, maf_idx;
-	u8 dev_id[MAX_ID_LEN];
+	u8 id_len;
+	u8 dev_id[MAX_ID_LEN] = {0};
 
 #ifdef NEW_NAND_SUPPORT
 	struct new_tech_nand_t *nand_info;
@@ -1454,11 +1478,11 @@ static struct aml_nand_flash_dev *aml_nand_get_flash_type(struct mtd_info *mtd,
 	chip->cmdfunc(mtd, NAND_CMD_READID, 0x00, -1);
 
 	/* Read manufacturer and device IDs */
-	for (i=0; i<MAX_ID_LEN; i++) {
+	for (i = 0; i < MAX_ID_LEN; i++)
 		dev_id[i] = chip->read_byte(mtd);
-	}
+
 	*maf_id = dev_id[0];
-	printk("NAND device id: %x %x %x %x %x %x \n",
+	printf("NAND device id: %x %x %x %x %x %x\n",
 	dev_id[0], dev_id[1], dev_id[2], dev_id[3], dev_id[4], dev_id[5]);
 
 #if 0
@@ -1466,8 +1490,10 @@ static struct aml_nand_flash_dev *aml_nand_get_flash_type(struct mtd_info *mtd,
 #endif
 	/* Lookup the flash id */
 	for (i = 0; aml_nand_flash_ids[i].name != NULL; i++) {
-		if (!strncmp((char*) aml_nand_flash_ids[i].id,
-		(char*)dev_id, strlen((const char*)aml_nand_flash_ids[i].id))) {
+		for (id_len = MAX_ID_LEN - 1; id_len &&
+			aml_nand_flash_ids[i].id[id_len] == 0; id_len--)
+			;
+		if (!memcmp(dev_id, aml_nand_flash_ids[i].id, id_len + 1)) {
 			type = &aml_nand_flash_ids[i];
 			break;
 		}

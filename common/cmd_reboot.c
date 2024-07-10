@@ -14,6 +14,10 @@
 #include <asm/arch/bl31_apis.h>
 #include <asm/arch/watchdog.h>
 #include <partition_table.h>
+#include <asm/arch/cpu_config.h>
+#ifdef CONFIG_SUPPORT_STICK_MEM
+#include <asm/arch/stick_mem.h>
+#endif
 
 
 /*
@@ -30,7 +34,22 @@ unsigned int do_get_reboot_reason(void)
 int do_get_rebootmode (cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
 	uint32_t reboot_mode_val;
+#ifdef CONFIG_SUPPORT_STICK_MEM
+	u32 stick_reboot_flag;
+#endif
+
 	reboot_mode_val = ((readl(AO_SEC_SD_CFG15) >> 12) & 0xf);
+#ifdef CONFIG_SUPPORT_STICK_MEM
+	//this step prevent the reboot mode val stored in sticky register lost
+	//during the exceptional reset, such as reset pin disturbance
+	stick_reboot_flag = get_stick_reboot_flag();
+	if (reboot_mode_val == AMLOGIC_COLD_BOOT &&
+			stick_reboot_flag == AMLOGIC_WATCHDOG_REBOOT) {
+		printf("Warning: system is reset abnormally!\n");
+		printf("Set reboot_mode to watchdog reboot\n");
+		reboot_mode_val = AMLOGIC_WATCHDOG_REBOOT;
+	}
+#endif
 
 	debug("reboot_mode(0x%x)=0x%x\n", AO_SEC_SD_CFG15, reboot_mode_val);
 

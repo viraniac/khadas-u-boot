@@ -20,7 +20,7 @@
 static inline void mbwrite(uintptr_t to, void *from, long count)
 {
 	int i = 0;
-	int len = count / 4 + (count % 4);
+	int len = count / 4 + ((count % 4) ? 1 : 0);
 	u32 *p = from;
 
 	while (len > 0) {
@@ -33,7 +33,7 @@ static inline void mbwrite(uintptr_t to, void *from, long count)
 static inline void mbclean(uintptr_t to, long count)
 {
 	int i = 0;
-	int len = count / 4 + (count % 4);
+	int len = count / 4 + ((count % 4) ? 1 : 0);
 
 	while (len > 0) {
 		aml_writel32(0, to + (4 * i));
@@ -45,7 +45,7 @@ static inline void mbclean(uintptr_t to, long count)
 static inline void mbread(void *to, uintptr_t from, long count)
 {
 	int i = 0;
-	int len = count / 4 + (count % 4);
+	int len = count / 4 + ((count % 4) ? 1 : 0);
 	u32 *p = to;
 
 	while (len > 0) {
@@ -172,34 +172,36 @@ void mhu_message_end(uintptr_t mboxpl_addr)
 
 void mhu_init(void)
 {
-        //bakery_lock_init(&mhu_lock);
+    //bakery_lock_init(&mhu_lock);
 
-        /*
-         * Clear the CPU's INTR register to make sure we don't see a stale
-         * or garbage value and think it's a message we've already sent.
-         */
-        writel(REE2AO_CLR_ADDR, 0xffffffffu);
+	/*
+	 * Clear the CPU's INTR register to make sure we don't see a stale
+	 * or garbage value and think it's a message we've already sent.
+	 */
+	writel(REE2AO_CLR_ADDR, 0xffffffffu);
+	printf("[BL33] mhu init done payload-v1\n");
 }
 
-void scpi_send_data(uint32_t chan, uint32_t command, void *sendmessage,
-		    uint32_t sendsize, void *revmessage, uint32_t revsize)
+int scpi_send_data(u32 chan, u32 command, void *sendmessage,
+		    u32 sendsize, void *revmessage, u32 revsize)
 {
-        uintptr_t mboxset_addr = 0;
-        uintptr_t mboxstat_addr = 0;
-        uintptr_t mboxpl_addr = 0;
-        int ret;
+	uintptr_t mboxset_addr = 0;
+	uintptr_t mboxstat_addr = 0;
+	uintptr_t mboxpl_addr = 0;
+	int ret = 0;
 
-        ret = mhu_get_addr(chan, &mboxset_addr, &mboxstat_addr, &mboxpl_addr);
-        if (ret) {
-                printf("[BL33] mhu pl get addr fail\n");
-                return;
-        }
-        mhu_message_start(mboxstat_addr);
+	ret = mhu_get_addr(chan, &mboxset_addr, &mboxstat_addr, &mboxpl_addr);
+	if (ret) {
+		printf("[BL33] mhu pl get addr fail\n");
+		return ret;
+	}
+	mhu_message_start(mboxstat_addr);
 	if (sendmessage != NULL && sendsize != 0)
 		mhu_build_payload(mboxpl_addr, sendmessage, sendsize);
-        mhu_message_send(mboxset_addr, command, sendsize);
-        mhu_message_wait(mboxstat_addr);
+	mhu_message_send(mboxset_addr, command, sendsize);
+	mhu_message_wait(mboxstat_addr);
 	if (revmessage != NULL && revsize != 0)
 		mhu_get_payload(mboxpl_addr, revmessage, revsize);
-        mhu_message_end(mboxpl_addr);
+	mhu_message_end(mboxpl_addr);
+	return ret;
 }

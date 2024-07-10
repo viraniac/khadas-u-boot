@@ -124,6 +124,12 @@ static int initr_caches(void)
 	enable_caches();
 	return 0;
 }
+
+static int initr_mmu_update_text_attr(void)
+{
+	mmu_update_text_attr();
+	return 0;
+}
 #endif
 
 __weak int fixup_cpu(void)
@@ -736,6 +742,9 @@ init_fnc_t init_sequence_r[] = {
 	initr_caches,
 #endif
 	initr_reloc_global_data,
+#ifdef CONFIG_ARM
+	initr_mmu_update_text_attr,
+#endif
 #if defined(CONFIG_SYS_INIT_RAM_LOCK) && defined(CONFIG_E500)
 	initr_unlock_ram_in_cache,
 #endif

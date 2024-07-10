@@ -218,6 +218,7 @@ int fat_readdir(struct fs_dir_stream *dirs, struct fs_dirent **dentp);
 void fat_closedir(struct fs_dir_stream *dirs);
 int fat_unlink(const char *filename);
 void fat_close(void);
+int fat_mkdir(const char *new_dirname);
 /* port from uboot2019/include/memalign.h */
 /* alloc */
 /**

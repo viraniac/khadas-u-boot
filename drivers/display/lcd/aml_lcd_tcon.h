@@ -19,6 +19,13 @@
 
 #define REG_LCD_TCON_MAX    0xffff
 
+struct lcd_tcon_axi_mem_cfg_s {
+	unsigned int mem_type;
+	unsigned int mem_size;
+	unsigned int axi_reg;  //ddrif reg
+	unsigned int mem_valid;
+};
+
 struct lcd_tcon_config_s {
 	unsigned char tcon_valid;
 
@@ -49,13 +56,19 @@ struct lcd_tcon_config_s {
 	unsigned int demura_lut_size;
 	unsigned int acc_lut_size;
 
+	unsigned int axi_tbl_len;
+	struct lcd_tcon_axi_mem_cfg_s *axi_mem_cfg_tbl;
+
 	unsigned int *axi_reg;
 	void (*tcon_axi_mem_config)(void);
 	void (*tcon_axi_mem_secure)(void);
-	void (*tcon_axi_mem_update)(unsigned int *table);
+	void (*tcon_init_table_pre_proc)(unsigned char *table);
+	int (*tcon_top_init)(struct lcd_config_s *pconf);
 	int (*tcon_enable)(struct lcd_config_s *pconf);
 	int (*tcon_disable)(struct lcd_config_s *pconf);
 	int (*tcon_forbidden_check)(void);
+	int (*tcon_check)(struct lcd_detail_timing_s *ptiming,
+			unsigned char *core_reg_table, char *ferr_str, char *warn_str);
 };
 
 struct tcon_rmem_config_s {
@@ -113,6 +126,7 @@ struct tcon_mem_map_table_s {
 #define TCON_BIN_VER_LEN    9
 struct lcd_tcon_local_cfg_s {
 	char bin_ver[TCON_BIN_VER_LEN];
+	unsigned char *cur_core_reg_table;
 };
 
 /* **********************************
@@ -205,8 +219,8 @@ struct lcd_tcon_config_s *get_lcd_tcon_config(void);
 struct tcon_rmem_s *get_lcd_tcon_rmem(void);
 struct tcon_mem_map_table_s *get_lcd_tcon_mm_table(void);
 struct lcd_tcon_local_cfg_s *get_lcd_tcon_local_cfg(void);
-int lcd_tcon_mem_tee_protect(int mem_flag, int protect_en);
 
+void lcd_tcon_init_table_pre_proc(unsigned char *table);
 int lcd_tcon_enable_txhd(struct lcd_config_s *pconf);
 int lcd_tcon_enable_tl1(struct lcd_config_s *pconf);
 int lcd_tcon_disable_tl1(struct lcd_config_s *pconf);
@@ -214,6 +228,18 @@ int lcd_tcon_enable_t5(struct lcd_config_s *pconf);
 int lcd_tcon_disable_t5(struct lcd_config_s *pconf);
 int lcd_tcon_forbidden_check_t5(void);
 int lcd_tcon_forbidden_check_t5d(void);
+int lcd_tcon_top_set_tl1(struct lcd_config_s *pconf);
+int lcd_tcon_top_set_t5(struct lcd_config_s *pconf);
+
+int lcd_tcon_init_setting_check(struct lcd_detail_timing_s *ptiming,
+		unsigned char *core_reg_table);
+int lcd_tcon_setting_check_t5(struct lcd_detail_timing_s *ptiming,
+		unsigned char *core_reg_table, char *ferr_str, char *warn_str);
+int lcd_tcon_setting_check_t5d(struct lcd_detail_timing_s *ptiming,
+		unsigned char *core_reg_table, char *ferr_str, char *warn_str);
+
+int lcd_tcon_mem_od_is_valid(void);
+int lcd_tcon_mem_demura_is_valid(void);
 
 #endif
 

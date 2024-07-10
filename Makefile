@@ -386,6 +386,12 @@ export CFLAGS_UASAN
 
 endif
 
+ifeq ("$(CONFIG_NOVERBOSE_BUILD)", "1")
+KBUILD_CFLAGS += -DCONFIG_NOVERBOSE_BUILD
+CFLAGS += -DCONFIG_NOVERBOSE_BUILD
+export CFLAGS
+endif
+
 # Read UBOOTRELEASE from include/config/uboot.release (if it exists)
 UBOOTRELEASE = $(shell cat include/config/uboot.release 2> /dev/null)
 UBOOTVERSION = $(VERSION)$(if $(PATCHLEVEL),.$(PATCHLEVEL)$(if $(SUBLEVEL),.$(SUBLEVEL)))$(EXTRAVERSION)
@@ -1243,7 +1249,8 @@ define filechk_version.h
 	(echo \#define PLAIN_VERSION \"$(UBOOTRELEASE)\"; \
 	echo \#define U_BOOT_VERSION \"U-Boot \" PLAIN_VERSION; \
 	echo \#define CC_VERSION_STRING \"$$($(CC) --version | head -n 1)\"; \
-	echo \#define LD_VERSION_STRING \"$$($(LD) --version | head -n 1)\"; )
+	echo \#define LD_VERSION_STRING \"$$($(LD) --version | head -n 1)\"; \
+	echo \#define COMPILE_USER \"${USER}\";)
 endef
 
 define filechk_timestamp.h

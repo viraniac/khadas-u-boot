@@ -17,23 +17,23 @@
 #include <asm/cpu_id.h>
 #include <asm/arch/secure_apb.h>
 #include <asm/arch-tm2/usb-v2.h>
+#include <linux/arm-smccc.h>
 
 static long sharemem_input_base;
 static long sharemem_output_base;
 
 long get_sharemem_info(unsigned long function_id)
 {
-	asm volatile(
-		__asmeq("%0", "x0")
-		"smc    #0\n"
-		: "+r" (function_id));
+	struct arm_smccc_res res;
 
-	return function_id;
+	arm_smccc_smc(function_id, 0, 0, 0, 0, 0, 0, 0, &res);
+	return res.a0;
 }
 
 int32_t set_boot_params(const keymaster_boot_params *boot_params)
 {
 	const unsigned cmd = SET_BOOT_PARAMS;
+	struct arm_smccc_res res;
 
 	if (!boot_params)
 		return -1;
@@ -44,21 +44,8 @@ int32_t set_boot_params(const keymaster_boot_params *boot_params)
 
 	memcpy((void *)sharemem_input_base,
 			(const void *)boot_params, sizeof(keymaster_boot_params));
-
-	asm __volatile__("" : : : "memory");
-	register uint64_t x0 asm("x0") = cmd;
-	register uint64_t x1 asm("x1") = sizeof(keymaster_boot_params);
-	do {
-		asm volatile(
-		    __asmeq("%0", "x0")
-		    __asmeq("%1", "x0")
-		    __asmeq("%2", "x1")
-		    "smc    #0\n"
-		    : "=r"(x0)
-		    : "r"(x0), "r"(x1));
-	} while (0);
-
-	return (!x0)? -1: 0;
+	arm_smccc_smc(cmd, sizeof(keymaster_boot_params), 0, 0, 0, 0, 0, 0, &res);
+	return (!res.a0) ? -1 : 0;
 }
 
 #ifdef CONFIG_EFUSE
@@ -70,6 +57,7 @@ uint32_t meson_efuse_obj_read(
 {
 	uint32_t rc = EFUSE_OBJ_ERR_UNKNOWN;
 	uint32_t len = 0;
+	struct arm_smccc_res res;
 
 	if (!sharemem_input_base)
 		sharemem_input_base =
@@ -79,24 +67,10 @@ uint32_t meson_efuse_obj_read(
 		sharemem_output_base =
 			get_sharemem_info(GET_SHARE_MEM_OUTPUT_BASE);
 
-	register uint64_t x0 asm("x0") = EFUSE_OBJ_READ;
-	register uint64_t x1 asm("x1") = obj_id;
-	register uint64_t x2 asm("x2") = *size;
+	arm_smccc_smc(EFUSE_OBJ_READ, obj_id, *size, 0, 0, 0, 0, 0, &res);
 
-	do {
-		asm volatile(
-			__asmeq("%0", "x0")
-			__asmeq("%1", "x1")
-			__asmeq("%2", "x0")
-			__asmeq("%3", "x1")
-			__asmeq("%4", "x2")
-			"smc	#0\n"
-			: "+r" (x0), "+r" (x1)
-			: "r" (x0), "r" (x1), "r" (x2));
-	} while (0);
-
-	rc = x0;
-	len = x1;
+	rc = res.a0;
+	len = res.a1;
 
 	if (rc == EFUSE_OBJ_SUCCESS) {
 		if (*size >= len) {
@@ -116,6 +90,7 @@ uint32_t meson_efuse_obj_write(
 	uint32_t size)
 {
 	uint32_t rc = EFUSE_OBJ_ERR_UNKNOWN;
+	struct arm_smccc_res res;
 
 	if (!sharemem_input_base)
 		sharemem_input_base =
@@ -125,22 +100,9 @@ uint32_t meson_efuse_obj_write(
 		sharemem_output_base =
 			get_sharemem_info(GET_SHARE_MEM_OUTPUT_BASE);
 
-	register uint64_t x0 asm("x0") = EFUSE_OBJ_WRITE;
-	register uint64_t x1 asm("x1") = obj_id;
-	register uint64_t x2 asm("x2") = size;
+	arm_smccc_smc(EFUSE_OBJ_WRITE, obj_id, size, 0, 0, 0, 0, 0, &res);
 
-	do {
-		asm volatile(
-			__asmeq("%0", "x0")
-			__asmeq("%1", "x0")
-			__asmeq("%2", "x1")
-			__asmeq("%3", "x2")
-			"smc	#0\n"
-			: "+r" (x0)
-			: "r" (x0), "r" (x1), "r" (x2));
-	} while (0);
-
-	rc = x0;
+	rc = res.a0;
 	return rc;
 }
 #endif /* CONFIG_EFUSE_OBJ_API */
@@ -150,6 +112,7 @@ int32_t meson_trustzone_efuse(struct efuse_hal_api_arg *arg)
 	int ret;
 	unsigned cmd, offset, size;
 	unsigned long *retcnt = (unsigned long *)(arg->retcnt_phy);
+	struct arm_smccc_res res;
 
 	if (!sharemem_input_base)
 		sharemem_input_base =
@@ -170,23 +133,11 @@ int32_t meson_trustzone_efuse(struct efuse_hal_api_arg *arg)
 	if (arg->cmd == EFUSE_HAL_API_WRITE)
 		memcpy((void *)sharemem_input_base,
 		       (const void *)arg->buffer_phy, size);
-	asm __volatile__("" : : : "memory");
 
-	register uint64_t x0 asm("x0") = cmd;
-	register uint64_t x1 asm("x1") = offset;
-	register uint64_t x2 asm("x2") = size;
-	do {
-		asm volatile(
-		    __asmeq("%0", "x0")
-		    __asmeq("%1", "x0")
-		    __asmeq("%2", "x1")
-		    __asmeq("%3", "x2")
-		    "smc    #0\n"
-		    : "=r"(x0)
-		    : "r"(x0), "r"(x1), "r"(x2));
-	} while (0);
-	ret = x0;
-	*retcnt = x0;
+	arm_smccc_smc(cmd, offset, size, 0, 0, 0, 0, 0, &res);
+
+	ret = res.a0;
+	*retcnt = res.a0;
 
 	if ((arg->cmd == EFUSE_HAL_API_READ) && (ret != 0))
 		memcpy((void *)arg->buffer_phy,
@@ -202,23 +153,14 @@ int32_t meson_trustzone_efuse_get_max(struct efuse_hal_api_arg *arg)
 {
 	int32_t ret;
 	int cmd = -1;
+	struct arm_smccc_res res;
 
 	if (arg->cmd == EFUSE_HAL_API_USER_MAX)
 		cmd = EFUSE_USER_MAX;
 
-	asm __volatile__("" : : : "memory");
+	arm_smccc_smc(cmd, 0, 0, 0, 0, 0, 0, 0, &res);
 
-	register uint64_t x0 asm("x0") = cmd;
-
-	do {
-		asm volatile(
-		    __asmeq("%0", "x0")
-		    __asmeq("%1", "x0")
-		    "smc    #0\n"
-		    : "=r"(x0)
-		    : "r"(x0));
-	} while (0);
-	ret = x0;
+	ret = res.a0;
 
 	if (!ret)
 		return -1;
@@ -247,8 +189,8 @@ ssize_t meson_trustzone_efuse_writepattern(const char *buf, size_t count)
 
 uint64_t meson_trustzone_efuse_check(unsigned char *addr)
 {
-	uint64_t ret = 0;
 	struct sram_hal_api_arg arg = {};
+	struct arm_smccc_res res;
 
 	arg.cmd = SRAM_HAL_API_CHECK_EFUSE;
 	arg.req_len = 0x1000000;
@@ -256,33 +198,18 @@ uint64_t meson_trustzone_efuse_check(unsigned char *addr)
 	arg.req_phy_addr = (unsigned long)addr;
 	arg.res_phy_addr = (unsigned long)NULL;
 
-	asm __volatile__("" : : : "memory");
+	arm_smccc_smc(CALL_TRUSTZONE_HAL_API, TRUSTZONE_HAL_API_SRAM,
+			(unsigned long)(&arg), 0, 0, 0, 0, 0, &res);
 
-	register uint64_t x0 asm("x0") = CALL_TRUSTZONE_HAL_API;
-	register uint64_t x1 asm("x1") = TRUSTZONE_HAL_API_SRAM;
-	register uint64_t x2 asm("x2") = (unsigned long)(&arg);
-	do {
-		asm volatile(
-		    __asmeq("%0", "x0")
-		    __asmeq("%1", "x0")
-		    __asmeq("%2", "x1")
-		    __asmeq("%3", "x2")
-		    "smc #0\n"
-		    : "=r"(x0)
-		    : "r"(x0), "r"(x1), "r"(x2));
-	} while (0);
-
-	ret = x0;
-
-	return ret;
+	return res.a0;
 }
 
 void debug_efuse_cmd(unsigned long cmd)
 {
-	asm volatile(
-		__asmeq("%0", "x0")
-		"smc    #0\n"
-		: : "r" (cmd));
+	struct arm_smccc_res res;
+
+	arm_smccc_smc(cmd, 0, 0, 0, 0, 0, 0, 0, &res);
+
 }
 
 void bl31_debug_efuse_write_pattern(const char *buf)
@@ -308,77 +235,49 @@ void bl31_debug_efuse_read_pattern(char *buf)
 void aml_set_jtag_state(unsigned state, unsigned select)
 {
 	uint64_t command;
+	struct arm_smccc_res res;
+
 	if (state == JTAG_STATE_ON)
 		command = JTAG_ON;
 	else
 		command = JTAG_OFF;
-	asm __volatile__("" : : : "memory");
 
-	asm volatile(
-		__asmeq("%0", "x0")
-		__asmeq("%1", "x1")
-		"smc    #0\n"
-		: : "r" (command), "r"(select));
+	arm_smccc_smc(command, select, 0, 0, 0, 0, 0, 0, &res);
 }
 
 unsigned aml_get_reboot_reason(void)
 {
 	unsigned reason;
 	uint64_t ret;
+	struct arm_smccc_res res;
 
-	register uint64_t x0 asm("x0") = GET_REBOOT_REASON;
-	asm volatile(
-		__asmeq("%0", "x0")
-		"smc #0\n"
-		:"+r"(x0));
-		ret = x0;
-		reason = (unsigned)(ret&0xffffffff);
-		return reason;
+	arm_smccc_smc(GET_REBOOT_REASON, 0, 0, 0, 0, 0, 0, 0, &res);
+	ret = res.a0;
+	reason = (unsigned int)(ret & 0xffffffff);
+	return reason;
 }
 
 void set_viu_probe_enable(void)
 {
-	register uint64_t x0 asm("x0") = VIU_PREOBE_EN;
+	struct arm_smccc_res res;
 
-	asm volatile(
-			__asmeq("%0", "x0")
-			"smc #0\n"
-			:"+r"(x0));
+	arm_smccc_smc(VIU_PREOBE_EN, 0, 0, 0, 0, 0, 0, 0, &res);
 }
 unsigned aml_reboot(uint64_t function_id, uint64_t arg0, uint64_t arg1, uint64_t arg2)
 {
-	register long x0 asm("x0") = function_id;
-	register long x1 asm("x1") = arg0;
-	register long x2 asm("x2") = arg1;
-	register long x3 asm("x3") = arg2;
-	asm volatile(
-			__asmeq("%0", "x0")
-			__asmeq("%1", "x1")
-			__asmeq("%2", "x2")
-			__asmeq("%3", "x3")
-			"smc	#0\n"
-		: "+r" (x0)
-		: "r" (x1), "r" (x2), "r" (x3));
+	struct arm_smccc_res res;
 
-	return function_id;
+	arm_smccc_smc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
+
+	return res.a0;
 }
 
 void aml_set_reboot_reason(uint64_t function_id, uint64_t arg0, uint64_t arg1, uint64_t arg2)
 {
-	register long x0 asm("x0") = function_id;
-	register long x1 asm("x1") = arg0;
-	register long x2 asm("x2") = arg1;
-	register long x3 asm("x3") = arg2;
-	asm volatile(
-			__asmeq("%0", "x0")
-			__asmeq("%1", "x1")
-			__asmeq("%2", "x2")
-			__asmeq("%3", "x3")
-			"smc	#0\n"
-			: "+r" (x0)
-			: "r" (x1), "r" (x2), "r" (x3));
+	struct arm_smccc_res res;
 
-	return ;
+	arm_smccc_smc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
+
 }
 
 unsigned long aml_sec_boot_check(unsigned long nType,
@@ -387,6 +286,7 @@ unsigned long aml_sec_boot_check(unsigned long nType,
 	unsigned long nOption)
 {
 	uint64_t ret = 1;
+	struct arm_smccc_res res;
 
 //#define AML_SECURE_LOG_TE
 
@@ -399,28 +299,9 @@ unsigned long aml_sec_boot_check(unsigned long nType,
 
 	AML_GET_TE(nT1);
 
-	asm __volatile__("" : : : "memory");
+	arm_smccc_smc(AML_DATA_PROCESS, nType, pBuffer, nLength, nOption, 0, 0, 0, &res);
 
-	register uint64_t x0 asm("x0") = AML_DATA_PROCESS;
-	register uint64_t x1 asm("x1") = nType;
-	register uint64_t x2 asm("x2") = pBuffer;
-	register uint64_t x3 asm("x3") = nLength;
-	register uint64_t x4 asm("x4") = nOption;
-
-	do {
-		asm volatile(
-		    __asmeq("%0", "x0")
-		    __asmeq("%1", "x0")
-		    __asmeq("%2", "x1")
-		    __asmeq("%3", "x2")
-		    __asmeq("%4", "x3")
-		    __asmeq("%5", "x4")
-		    "smc #0\n"
-		    : "=r"(x0)
-		    : "r"(x0), "r"(x1), "r"(x2),"r"(x3),"r"(x4));
-	} while (0);
-
-	ret = x0;
+	ret = res.a0;
 
 	AML_GET_TE(nT2);;
 
@@ -438,15 +319,9 @@ unsigned long aml_sec_boot_check(unsigned long nType,
 
 void set_usb_boot_function(unsigned long command)
 {
-	register long x0 asm("x0") = SET_USB_BOOT_FUNC;
-	register long x1 asm("x1") = command;
+	struct arm_smccc_res res;
 
-	asm volatile(
-			__asmeq("%0", "x0")
-			__asmeq("%1", "x1")
-			"smc	#0\n"
-		: "+r" (x0)
-		: "r" (x1));
+	arm_smccc_smc(SET_USB_BOOT_FUNC, command, 0, 0, 0, 0, 0, 0, &res);
 }
 
 void aml_system_off(void)
@@ -465,6 +340,8 @@ void aml_system_off(void)
 
 int __get_chip_id(unsigned char *buff, unsigned int size)
 {
+	struct arm_smccc_res res;
+
 	if (buff == NULL || size < 16)
 		return -1;
 
@@ -473,17 +350,9 @@ int __get_chip_id(unsigned char *buff, unsigned int size)
 			get_sharemem_info(GET_SHARE_MEM_OUTPUT_BASE);
 
 	if (sharemem_output_base) {
-		register long x0 asm("x0") = GET_CHIP_ID;
-		register long x1 asm("x1") = 2;
+		arm_smccc_smc(GET_CHIP_ID, 2, 0, 0, 0, 0, 0, 0, &res);
 
-		asm volatile(
-			__asmeq("%0", "x0")
-			__asmeq("%1", "x1")
-				"smc	#0\n"
-			: "+r" (x0)
-			: "r" (x1));
-
-		if (x0 == 0) {
+		if (res.a0 == 0) {
 			int version = *((unsigned int *)sharemem_output_base);
 
 			if (version == 2) {
@@ -520,9 +389,9 @@ int __get_chip_id(unsigned char *buff, unsigned int size)
 
 int32_t get_avbkey_from_fip(uint8_t *buf, uint32_t buflen)
 {
-	const unsigned cmd = GET_AVBKEY_FROM_FIP;
 	uint32_t retlen = 0;
 	uint32_t ret = 0;
+	struct arm_smccc_res res;
 
 	if (!buf)
 		return -1;
@@ -531,20 +400,11 @@ int32_t get_avbkey_from_fip(uint8_t *buf, uint32_t buflen)
 		sharemem_output_base =
 			get_sharemem_info(GET_SHARE_MEM_OUTPUT_BASE);
 
-	asm __volatile__("" : : : "memory");
-	register uint64_t x0 asm("x0") = cmd;
-	do {
-		asm volatile(
-		    __asmeq("%0", "x0")
-		    __asmeq("%1", "x0")
-		    "smc    #0\n"
-		    : "=r"(x0)
-		    : "r"(x0));
-	} while (0);
+	arm_smccc_smc(GET_AVBKEY_FROM_FIP, 0, 0, 0, 0, 0, 0, 0, &res);
 
-	if (!x0)
+	if (!res.a0)
 		ret = -1;
-	retlen = x0;
+	retlen = res.a0;
 
 	if (ret != -1 && buflen >= retlen)
 		memcpy(buf, (const void *)sharemem_output_base, retlen);

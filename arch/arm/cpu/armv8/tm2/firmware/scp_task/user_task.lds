@@ -41,4 +41,4 @@ SECTIONS
 	.bss_stack : { *(.bss_stack.usr_stack) }
 
 }
-ASSERT(_bssend <= (CONFIG_RAM_END_BL301 - 3*CONFIG_TASK_STACK_SIZE - 128), "Data is too big. Please fine-tune start address and LENGTH!");
+ASSERT(_bssend <= CONFIG_RAM_END_BL301, "Data is too big. Please fine-tune start address and LENGTH!");

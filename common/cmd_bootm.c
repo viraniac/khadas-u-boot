@@ -110,6 +110,12 @@ static void defendkey_process(void)
 	if (!bootargs)
 		return;
 
+#ifdef CONFIG_AML_PRODUCT_MODE
+	run_command("setenv bootconfig ${bootconfig} androidboot.production_mode=1", 0);
+#else
+	run_command("setenv bootconfig ${bootconfig} androidboot.production_mode=0", 0);
+#endif//#ifdef CONFIG_AML_PRODUCT_MODE
+
 	if (!strstr(bootargs,"defendkey"))
 	{
 		char *reboot_mode_s = NULL;
@@ -136,6 +142,19 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 	/* add reboot_mode in bootargs for kernel command line */
 	char *pbootargs = getenv("bootargs");
 	char *preboot_mode = getenv("reboot_mode");
+
+	char *recoverystr = "factory_reset";
+	char *precovery_mode = getenv("recovery_mode");
+	char *upgrade_step_s = getenv("upgrade_step");
+
+	//if recovery mode need set reboot_mode factory_reset
+	//for drm driver init recovery by reboot_mode
+	if (precovery_mode && !strcmp(precovery_mode, "true")) {
+		preboot_mode = recoverystr;
+	} else if (upgrade_step_s && !strcmp(upgrade_step_s, "3")) {
+		preboot_mode = recoverystr;
+	}
+
 	if (pbootargs && preboot_mode )
 	{
 		int nlen = strlen(pbootargs) + strlen(preboot_mode) + 64;
@@ -217,11 +236,8 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 #endif /*CONFIG_SKIP_KERNEL_DTB_SECBOOT_CHECK*/
 #endif /* ! CONFIG_SKIP_KERNEL_DTB_VERIFY */
 
+	run_command("get_avb_mode;", 0);
 	avb_s = getenv("avb2");
-	if (avb_s == NULL) {
-		run_command("get_avb_mode;", 0);
-		avb_s = getenv("avb2");
-	}
 	printf("avb2: %s\n", avb_s);
 	if (strcmp(avb_s, "1") == 0) {
 		AvbSlotVerifyData *out_data = NULL;
@@ -246,7 +262,7 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 				uint32_t version;
 				for (i = 0; i < AVB_MAX_NUMBER_OF_ROLLBACK_INDEX_LOCATIONS; i++) {
 					if (get_avb_antirollback(i, &version) &&
-							version != (uint32_t )out_data->rollback_indexes[i]) {
+						version < (uint32_t)out_data->rollback_indexes[i]) {
 						if (!set_avb_antirollback(i, (uint32_t )out_data->rollback_indexes[i]))
 							printf("rollback(%d) = %u failed\n", i, (uint32_t )out_data->rollback_indexes[i]);
 					}
@@ -284,6 +300,8 @@ int do_bootm(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 
 			boot_params.boot_patchlevel =
 				avb_get_boot_patchlevel_from_vbmeta(out_data);
+
+			create_csrs();
 
 			boot_params.device_locked = is_dev_unlocked? 0: 1;
 			if (is_dev_unlocked || (toplevel_vbmeta.flags &

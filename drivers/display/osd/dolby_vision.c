@@ -209,7 +209,7 @@ int is_dolby_enable(void)
 
 	printf("dolby_status %s %d\n", dolby_status, dv_fw_valid);
 
-	if (!dv_fw_valid)
+	if (!dv_fw_valid || !dolby_status)
 		return 0;
 	if (!strcmp(dolby_status, DOLBY_VISION_SET_STD) ||
 		!strcmp(dolby_status, DOLBY_VISION_SET_LL_YUV) ||
@@ -222,6 +222,9 @@ bool request_ll_mode(void)
 {
 	if (!dolby_status)
 		dolby_status = getenv("dolby_status");
+
+	if (!dolby_status)
+		return false;
 
 	if (!strcmp(dolby_status, DOLBY_VISION_SET_LL_RGB) ||
 		!strcmp(dolby_status, DOLBY_VISION_SET_LL_YUV)) {

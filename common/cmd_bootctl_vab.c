@@ -20,6 +20,7 @@
 #include <mmc.h>
 #include <amlogic/aml_mmc.h>
 #include <u-boot/sha1.h>
+#include <emmc_partitions.h>
 
 #ifdef CONFIG_BOOTLOADER_CONTROL_BLOCK
 
@@ -36,7 +37,10 @@
 #define WIPE_PACKAGE_OFFSET_IN_MISC 16 * 1024
 #define SYSTEM_SPACE_OFFSET_IN_MISC 32 * 1024
 #define SYSTEM_SPACE_SIZE_IN_MISC 32 * 1024
+#define BOOTLOADER_OFFSET		512
+#define BOOTLOADER_MAX_SIZE		(4 * 1024 * 1024)
 
+#define MERGE_STATE_FILE "/ota/state"
 
 extern int store_read_ops(
     unsigned char *partition_name,
@@ -143,6 +147,17 @@ typedef struct slot_metadata {
 	uint8_t reserved : 7;
 }slot_metadata;
 
+enum UpdateState {
+	None = 0,
+	Initiated,
+	Unverified,
+	Merging,
+	MergeNeedsReboot,
+	MergeCompleted,
+	MergeFailed,
+	Cancelled
+};
+
 /* Bootloader Control AB
  *
  * This struct can be used to manage A/B metadata. It is designed to
@@ -169,7 +184,8 @@ typedef struct bootloader_control {
 	// Per-slot information.  Up to 4 slots.
 	struct slot_metadata slot_info[4];
 	// Reserved for further use.
-	uint8_t reserved1[8];
+	uint8_t merge_flag;
+	uint8_t reserved1[7];
 	// CRC32 of all 28 bytes preceding this field (little endian
 	// format).
 	uint32_t crc32_le;
@@ -288,6 +304,7 @@ void boot_info_reset(bootloader_control* boot_ctrl)
 	boot_ctrl->version = BOOT_CTRL_VERSION;
 	boot_ctrl->nb_slot = 2;
 	boot_ctrl->roll_flag = 0;
+	boot_ctrl->merge_flag = -1;
 
 	for (slot = 0; slot < 4; ++slot) {
 		slot_metadata entry = {};
@@ -473,7 +490,6 @@ int write_bootloader(int copy, int dstindex)
 	char str[128];
 	u64 addr;
 	u64 size = 0x2000 * 512 - 512;
-	int map = 0;
 
 	buffer = (unsigned char *)malloc(size);
 	if (!buffer) {
@@ -498,7 +514,7 @@ int write_bootloader(int copy, int dstindex)
 		goto exit;
 	}
 
-	sprintf(str, "amlmmc read bootloader 0x%llx  0x200  0x%llx", addr, size);
+	sprintf(str, "amlmmc read 1 0x%llx 0x1  0x%llx", addr, size / 512);
 	printf("command: %s\n", str);
 	ret = run_command(str, 0);
 	if (ret != 0) {
@@ -506,19 +522,58 @@ int write_bootloader(int copy, int dstindex)
 		goto exit;
 	}
 
-	if (dstindex == 0) {
-		map = AML_BL_USER;
-	} else if (dstindex == 1) {
-		map = AML_BL_BOOT0;
-	} else if (dstindex == 2) {
-		map = AML_BL_BOOT1;
-	}
-
-	if (map) {
-		ret = amlmmc_write_bootloader(1, map, size, buffer);
-		if (ret) {
-			printf("update error");
+	switch (dstindex) {
+		case 0: {
+			sprintf(str, "amlmmc switch 1 user");
+			ret = run_command(str, 0);
+			if (ret != 0) {
+				printf("amlmmc cmd %s failed\n", str);
+				goto exit;
+			}
+			sprintf(str, "amlmmc write 1 0x%llx 0x1 0x%llx", addr, size / 512);
+			printf("command: %s\n", str);
+			ret = run_command(str, 0);
+			if (ret != 0) {
+				printf("amlmmc cmd %s failed\n", str);
+				goto exit;
+			}
+			break;
+		}
+		case 1: {
+			sprintf(str, "amlmmc switch 1 boot0");
+			ret = run_command(str, 0);
+			if (ret != 0) {
+				printf("amlmmc cmd %s failed\n", str);
+				goto exit;
+			}
+			sprintf(str, "amlmmc write 1 0x%llx 0x1	0x%llx", addr, size / 512);
+			printf("command: %s\n", str);
+			ret = run_command(str, 0);
+			if (ret != 0) {
+				printf("amlmmc cmd %s failed\n", str);
+				goto exit;
+			}
+			break;
+		}
+		case 2: {
+			sprintf(str, "amlmmc switch 1 boot1");
+			ret = run_command(str, 0);
+			if (ret != 0) {
+				printf("amlmmc cmd %s failed\n", str);
+				goto exit;
+			}
+			sprintf(str, "amlmmc write 1 0x%llx 0x1	0x%llx", addr, size /  512);
+			printf("command: %s\n", str);
+			ret = run_command(str, 0);
+			if (ret != 0) {
+				printf("amlmmc cmd %s failed\n", str);
+				goto exit;
+			}
+			break;
+		}
+		default: {
 			goto exit;
+			break;
 		}
 	}
 
@@ -531,6 +586,144 @@ exit:
 		buffer = NULL;
 	}
 	return ret;
+}
+
+static int write_bootloader_up(int i)
+{
+	unsigned char *buffer = NULL;
+	int capacity_boot = 0x2000 * 512;
+	int ret = 0;
+	char partname[32] = {0};
+	char *slot_name = NULL;
+	int bootloader_index = 0;
+	int size = BOOTLOADER_MAX_SIZE - BOOTLOADER_OFFSET;
+
+#ifdef CONFIG_MMC_MESON_GX
+	struct mmc *mmc = NULL;
+
+	if (store_get_type() == BOOT_EMMC)
+		mmc = find_mmc_device(1);
+
+	if (mmc)
+		capacity_boot = mmc->capacity_boot;
+#endif
+
+	printf("capacity_boot: 0x%x\n", capacity_boot);
+	buffer = (unsigned char *)malloc(capacity_boot);
+	if (!buffer) {
+		printf("ERROR! fail to allocate memory ...\n");
+		return -1;
+	}
+	memset(buffer, 0, capacity_boot);
+
+	slot_name = getenv("active_slot");
+	if (slot_name && (strcmp(slot_name, "_a") == 0))
+		strcpy((char *)partname, "bootloader_a");
+	else if (slot_name && (strcmp(slot_name, "_b") == 0))
+		strcpy((char *)partname, "bootloader_b");
+	else
+		strcpy((char *)partname, "bootloader_up");
+
+	ret = store_read_ops((unsigned char *)partname, buffer, 0, size);
+	if (ret) {
+		printf("Fail to read 0x%xB from part[%s] at offset 0\n",
+					size, "bootloader_up");
+		free(buffer);
+		return -1;
+	}
+
+	if (i == 0)
+		bootloader_index = AML_BL_BOOT0;
+	else
+		bootloader_index = AML_BL_BOOT1;
+
+	ret = amlmmc_write_bootloader(1, bootloader_index, size, buffer);
+	if (ret) {
+		printf("Failed to write boot0\n");
+		free(buffer);
+		return -1;
+	}
+
+	free(buffer);
+	return 0;
+}
+
+void bootloader_update_check(void)
+{
+	int ret = 0;
+	char *writeboot = getenv("write_boot");
+
+	if (writeboot && !strcmp(writeboot, "1")) {
+		if (has_boot_slot == 0) {
+			printf("non ab for kernel 5.15 update boot0 & boot1 from bootloader_up\n");
+			ret = write_bootloader_up(0);
+			ret += write_bootloader_up(1);
+		} else {
+			printf("ab for kernel 5.15 update boot0 from bootloader_a or _b\n");
+			ret = write_bootloader_up(0);
+		}
+		if (ret != 0)
+			run_command("reboot", 0);
+
+		setenv("write_boot", "0");
+		setenv("upgrade_step", "1");
+		run_command("saveenv", 0);
+		run_command("reboot", 0);
+	}
+}
+
+static int is_f2fs_by_name(char *name)
+{
+	int ret = -1;
+#ifdef CONFIG_AML_SD_EMMC
+	struct partitions *partition = NULL;
+
+	partition = find_mmc_partition_by_name(name);
+	if (!partition)
+		return ret;
+	ret = (partition->mask_flags >> 12) & 0x1;
+#endif
+
+	return ret;
+}
+
+/**
+ *get merge status
+ */
+int check_mergestatus(const char *filename)
+{
+	if (!filename)
+		return -1;
+
+#ifdef CONFIG_AML_SD_EMMC
+	int part_no = -1;
+	char cmd[256] = {0};
+
+	part_no = get_partition_num_by_name("metadata");
+	if (part_no < 0) {
+		printf("fail find part index for metadata\n");
+		return -1;
+	}
+
+	void *loadaddr = (void *)simple_strtoul("0x1080000", NULL, 16);
+
+	sprintf(cmd, "ext4load mmc 1:0x%X 0x1080000 %s",
+			part_no,
+			filename);
+
+	if (run_command(cmd, 0)) {
+		printf("command[%s] failed\n", cmd);
+		return -1;
+	}
+
+	char *pData = (char *)loadaddr;
+
+	printf("merge_state: %d\n", pData[1]);
+
+	if (pData[1] == Initiated || pData[1] == Unverified)
+		return 1;
+#endif
+	return 0;
 }
 
 static void update_after_failed_rollback(void)
@@ -652,7 +845,11 @@ static int do_GetValidSlot(
 			run_command("set_active_slot b", 0);
 			setenv("default_env", "1");
 			run_command("saveenv", 0);
-			if (write_bootloader(2, 0) == 0) {
+#ifdef CONFIG_AML_GPT
+			if (write_bootloader(2, 1) == 0)  {
+#else
+			if (write_bootloader(2, 0) == 0)  {
+#endif
 				printf("rollback ok\n");
 				run_command("reset", 0);
 			} else {
@@ -688,8 +885,11 @@ static int do_GetValidSlot(
 			run_command("set_active_slot a", 0);
 			setenv("default_env", "1");
 			run_command("saveenv", 0);
-
+#ifdef CONFIG_AML_GPT
+			if (write_bootloader(2, 1) == 0)  {
+#else
 			if (write_bootloader(1, 0) == 0)  {
+#endif
 				printf("rollback ok\n");
 				run_command("reset", 0);
 			} else {
@@ -715,7 +915,11 @@ static int do_GetValidSlot(
 			run_command("set_active_slot b", 0);
 			setenv("default_env", "1");
 			run_command("saveenv", 0);
-			if (write_bootloader(2, 0) == 0) {
+#ifdef CONFIG_AML_GPT
+			if (write_bootloader(2, 1) == 0)  {
+#else
+			if (write_bootloader(2, 0) == 0)  {
+#endif
 				printf("rollback ok\n");
 				run_command("reset", 0);
 			} else {
@@ -728,7 +932,11 @@ static int do_GetValidSlot(
 			run_command("set_active_slot a", 0);
 			setenv("default_env", "1");
 			run_command("saveenv", 0);
-			if (write_bootloader(1, 0) == 0) {
+#ifdef CONFIG_AML_GPT
+			if (write_bootloader(2, 1) == 0)  {
+#else
+			if (write_bootloader(1, 0) == 0)  {
+#endif
 				printf("rollback ok\n");
 				run_command("reset", 0);
 			} else {
@@ -738,6 +946,7 @@ static int do_GetValidSlot(
 		}
 	}
 
+	bootloader_update_check();
 	return 0;
 }
 
@@ -847,6 +1056,8 @@ static int do_SetUpdateTries
 	bool bootable_a, bootable_b;
 	int slot;
 	int update_flag = 0;
+	int merge_ret = -1;
+	char *rebootmode = getenv("reboot_mode");
 
 	if (has_boot_slot == 0) {
 		printf("device is not ab mode\n");
@@ -887,8 +1098,38 @@ static int do_SetUpdateTries
 		}
 	}
 
+	printf("boot_ctrl.merge_flag = %d\n", boot_ctrl.merge_flag);
+
 	if (update_flag == 1)
 		boot_info_save(&boot_ctrl, miscbuf);
+
+	if (boot_ctrl.merge_flag < 1) {
+		printf("can't get merge_flag from bootctrl\n");
+		printf("try to read it from metadata\n");
+		if (is_f2fs_by_name("metadata") == 0) {
+			printf("metadata is ext4\n");
+			merge_ret = check_mergestatus(MERGE_STATE_FILE);
+		}
+	} else if (boot_ctrl.merge_flag == Initiated ||
+		boot_ctrl.merge_flag == Unverified) {
+		printf("merge_flag is Initiated or Unverified\n");
+		merge_ret = 1;
+	}
+
+	if (rebootmode && (!strcmp(rebootmode, "fastboot")) &&
+		update_flag == 1 &&
+		merge_ret == 1) {
+		printf("reboot bootloader during merge, rollback\n");
+		if (slot == 0 && bootable_a) {
+			if (boot_ctrl.slot_info[0].successful_boot == 0)
+				boot_ctrl.slot_info[0].tries_remaining = 0;
+		} else if (slot == 1 && bootable_b) {
+			if (boot_ctrl.slot_info[1].successful_boot == 0)
+				boot_ctrl.slot_info[1].tries_remaining = 0;
+		}
+		boot_info_save(&boot_ctrl, miscbuf);
+		run_command("reboot", 0);
+	}
 
 	printf("%s boot_ctrl.roll_flag = %d\n", __func__, boot_ctrl.roll_flag);
 	if (boot_ctrl.roll_flag == 1)

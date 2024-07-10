@@ -63,6 +63,9 @@
 #define CONFIG_ADC_POWER_KEY_CHAN   2  /*channel range: 0-7*/
 #define CONFIG_ADC_POWER_KEY_VAL    0  /*sample value range: 0-1023*/
 
+/*smc*/
+#define CONFIG_ARM_SMCCC       1
+
 /* args/envs */
 #define CONFIG_SYS_MAXARGS  64
 #define CONFIG_EXTRA_ENV_SETTINGS \
@@ -174,29 +177,42 @@
 	"recovery_from_sdcard="\
 	      "setenv bootargs ${bootargs} aml_dt=${aml_dt};"\
 		"if fatload mmc 0 ${loadaddr} aml_autoscript; then "\
+			"if avb memory recovery ${loadaddr}; then " \
+			"avb recovery 1;" \
 			"autoscr ${loadaddr}; "\
+			"fi;"\
 		"fi; "\
 		"if fatload mmc 0 ${loadaddr} recovery.img; then "\
+			"if avb memory recovery ${loadaddr}; then " \
+			"avb recovery 1;" \
 			"if fatload mmc 0 ${dtb_mem_addr} dtb.img; then "\
 				"echo sd dtb.img loaded; "\
 			"fi; "\
 			"bootm ${loadaddr}; "\
+			"fi;"\
 		"fi; "\
 		"\0"\
 	"recovery_from_udisk="\
 	      "setenv bootargs ${bootargs} aml_dt=${aml_dt};"\
 		"if fatload usb 0 ${loadaddr} aml_autoscript; then "\
+			"if avb memory recovery ${loadaddr}; then " \
+			"avb recovery 1;" \
 			"autoscr ${loadaddr}; "\
+			"fi;"\
 		"fi; "\
 		"if fatload usb 0 ${loadaddr} recovery.img; then "\
+			"if avb memory recovery ${loadaddr}; then " \
 			"if fatload usb 0 ${dtb_mem_addr} dtb.img; then "\
 				"echo udisk dtb.img loaded; "\
 			"fi; "\
+			"avb recovery 1;" \
 			"bootm ${loadaddr}; "\
+			"fi;"\
 		"fi; "\
 		"\0"\
 	"recovery_from_flash="\
                 "setenv bootargs ${bootargs} aml_dt=${aml_dt};"\
+		"avb recovery 1;" \
 		"if imgread kernel recovery ${loadaddr}; then "\
 			"bootm ${loadaddr}; "\
 		"fi"\

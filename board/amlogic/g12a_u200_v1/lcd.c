@@ -386,27 +386,30 @@ struct lcd_config_s lcd_config_dft = {
 		.model_name = "default",
 		.lcd_type = LCD_TYPE_MAX,
 		.lcd_bits = 8,
-		.h_active = 768,
-		.v_active = 1024,
-		.h_period = 948,
-		.v_period = 1140,
 
 		.screen_width   = 119,
 		.screen_height  = 159,
 	},
 
 	.lcd_timing = {
-		.clk_auto = 1,
-		.lcd_clk = 64843200,
-		.ss_level = 0,
-		.fr_adjust_type = 0,
+		.dft_timing = {
+			.h_active = 768,
+			.v_active = 1024,
+			.h_period = 948,
+			.v_period = 1140,
+			.pixel_clk = 64843200,
 
-		.hsync_width = 64,
-		.hsync_bp    = 56,
-		.hsync_pol   = 0,
-		.vsync_width = 50,
-		.vsync_bp    = 30,
-		.vsync_pol   = 0,
+			.hsync_width = 64,
+			.hsync_bp    = 56,
+			.hsync_pol   = 0,
+			.vsync_width = 50,
+			.vsync_bp    = 30,
+			.vsync_pol   = 0,
+
+			.fr_adjust_type = 0,
+		},
+		.pll_flag = 1,
+		.ss_level = 0,
 	},
 
 	.lcd_control = {

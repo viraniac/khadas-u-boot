@@ -15,6 +15,7 @@
 #include <asm/arch/thermal.h>
 #include <asm/cpu_id.h>
 #include <asm/arch/bl31_apis.h>
+#include <linux/arm-smccc.h>
 
 #ifdef CONFIG_AML_MESON_TXHD
 #define NEW_THERMAL_MODE 1
@@ -916,22 +917,10 @@ static int do_temp_triming(cmd_tbl_t *cmdtp, int flag1,
 int tsensor_tz_calibration(unsigned int type, unsigned int data)
 {
 	int ret;
+	struct arm_smccc_res res;
 
-	register long x0 asm("x0") = TSENSOR_CALI_SET;
-	register long x1 asm("x1") = type;
-	register long x2 asm("x2") = data;
-	register long x3 asm("x3") = 0;
-	do {
-		asm volatile(
-			__asmeq("%0", "x0")
-			__asmeq("%1", "x1")
-			__asmeq("%2", "x2")
-			__asmeq("%3", "x3")
-			"smc    #0\n"
-			: "+r" (x0)
-			: "r" (x1), "r" (x2), "r" (x3));
-	} while (0);
-	ret = x0;
+	arm_smccc_smc(TSENSOR_CALI_SET, type, data, 0, 0, 0, 0, 0, &res);
+	ret = res.a0;
 
 	if (!ret)
 		return -1;
@@ -1170,9 +1159,6 @@ int r1p1_read_entry(void)
 				case 0x1:
 					printf("temp type no support\n");
 				break;
-				default:
-					printf("thermal version not support!!!Please check!\n");
-					return -1;
 				}
 			break;
 			case MESON_CPU_MAJOR_ID_T5:

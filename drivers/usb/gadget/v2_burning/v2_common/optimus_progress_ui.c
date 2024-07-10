@@ -19,7 +19,7 @@ extern int lcd_drawchars (ushort x, ushort y, uchar *str, int count);
 #endif// #ifdef CONFIG_VIDEO_AMLLCD
 
 #ifdef CONFIG_AML_VOUT
-#define _VIDEO_DEV_OPEN "hdmitx hpd;echo 1;osd open;echo 2; osd clear; echo 3;vout output ${outputmode};echo 4;bmp scale;"
+#define _VIDEO_DEV_OPEN "hdmitx hpd;echo 1;setenv display_layer osd0;osd open;echo 2; osd clear; echo 3;vout output ${outputmode};echo 4;bmp scale;"
 #else
 #define _VIDEO_DEV_OPEN "video dev bl_on;"
 #endif// #ifdef CONFIG_VIDEO_AMLTVOUT

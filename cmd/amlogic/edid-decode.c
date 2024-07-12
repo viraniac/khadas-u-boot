@@ -161,10 +161,8 @@ static const char *khadas_support_modes[] = {
 	"1600x1200p60hz",
 	"1680x1050p60hz",
 	"1920x1200p60hz",
-	"2560x1080p60hz",
 	"2560x1440p60hz",
 	"2560x1600p60hz",
-	"2560x1080p60hz",
 };
 
 static void

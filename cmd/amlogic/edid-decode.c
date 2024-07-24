@@ -161,6 +161,7 @@ static const char *khadas_support_modes[] = {
 	"1600x1200p60hz",
 	"1680x1050p60hz",
 	"1920x1200p60hz",
+	"2560x1080p60hz",
 	"2560x1440p60hz",
 	"2560x1600p60hz",
 };
@@ -638,6 +639,18 @@ detailed_block(unsigned char *x, int in_extension)
 		phsync, pvsync, syncmethod, x[17] & 0x80 ? " interlaced" : "",
 		stereo
 	);
+
+	/*
+	 * For HDMI 1.x displays, the kernel edid parsing code from amlogic relies on max tmds information being availble
+	 * otherwise it limits the maximum pclk to be HDMI 1.0 range making it skip any higher clock modes.
+	 * Lets do the same here as well so that we would choose a working resolution
+	 */
+	if (claims_one_point_oh && !claims_one_point_four) {
+		if (((x[0] + (x[1] << 8)) / 100) > 165 ) {
+			printf("Skipping detailed mode %4dx%4d as its not supported by the kernel\n", ha, va);
+			return 1;
+		}
+	}
 
 	/* detailed timings in extension block will be excluded
 	 * from candidates to find the best mode.

@@ -728,7 +728,7 @@ static const struct reg_t tvregs_vesa_800x480p60hz[] = {
 
    {P_ENCI_VIDEO_EN, 0,},
    {MREG_END_MARKER, 0}
-}
+};
 
 static const struct reg_t tvregs_vesa_2048x1080p24hz[] = {
 	{P_ENCP_VIDEO_EN, 0,},

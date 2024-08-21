@@ -1905,7 +1905,10 @@ bool hdmitx_edid_check_valid_mode(struct hdmitx_dev *hdev,
 	 * in hdmitx_timing table, so when match name, will return
 	 * 4x3 or 64x27 mode fist. But user prefer 16x9 first, so try 16x9 first;
 	 */
-	vic = hdmitx21_get_prefer_vic(hdev, para->timing.vic & 0xff);
+	if (para->timing.vic < HDMITX_VESA_OFFSET)
+		vic = hdmitx21_get_prefer_vic(hdev, para->timing.vic & 0xff);
+	else
+		vic = hdmitx21_get_prefer_vic(hdev, para->timing.vic);
 	/* check if vic supported by RX */
 	if (hdmitx21_edid_validate_mode(hdev, vic))
 		svd_flag = 1;

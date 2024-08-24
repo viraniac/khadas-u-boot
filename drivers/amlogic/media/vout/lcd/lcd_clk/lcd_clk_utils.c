@@ -555,7 +555,7 @@ static unsigned char lcd_clk_generate_DSI_1PLL(struct aml_lcd_drv_s *pdrv)
 	for (enc_xd = 1; enc_xd < cconf->data->xd_max; enc_xd++) {
 		pll_out = enc_xd;
 		pll_out = pll_out * cconf->fout;
-		if (pll_out > cconf->data->pll_out_fmax || pll_out < cconf->data->pll_out_fmin)
+		if (pll_out > bitrate_max || pll_out < bitrate_min)
 			continue;
 		for (phy_N = 1; phy_N < cconf->data->phy_div_max; phy_N++) {
 			phy_clk = div_around(pll_out, phy_N);

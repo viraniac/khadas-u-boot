@@ -152,6 +152,10 @@ static int do_vout_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv
 				vout_viu_mux(VOUT_VIU1_SEL, VIU_MUX_ENCL);
 				vpp_matrix_update(VPP_CM_RGB);
 				if (lcd_drv->lcd_enable) {
+
+					lcd_drv->lcd_enable(mode, frac);
+					if (lcd_drv->lcd_disable)
+						lcd_drv->lcd_disable();
 					lcd_drv->lcd_enable(mode, frac);
 					run_command("setenv vout_init enable", 0);
 					free(mode);

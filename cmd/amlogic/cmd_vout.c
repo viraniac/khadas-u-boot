@@ -397,6 +397,8 @@ static int do_vout_output(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv
 			vpp_matrix_update(VPP_CM_RGB);
 #endif
 		aml_lcd_driver_enable(venc_index, mode, frac);
+		aml_lcd_driver_disable(venc_index);
+		aml_lcd_driver_enable(venc_index, mode, frac);
 		run_command("setenv vout_init enable", 0);
 		return CMD_RET_SUCCESS;
 	}

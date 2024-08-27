@@ -54,6 +54,7 @@ static int has_valid_descriptor_ordering = 1;
 static int has_valid_descriptor_pad = 1;
 static int has_valid_range_descriptor = 1;
 static int has_valid_max_dotclock = 1;
+static int has_max_tmds_clock = 0;
 static int has_valid_string_termination = 1;
 static int manufacturer_name_well_formed = 0;
 static int seen_non_detailed_descriptor = 0;
@@ -640,18 +641,6 @@ detailed_block(unsigned char *x, int in_extension)
 		stereo
 	);
 
-	/*
-	 * For HDMI 1.x displays, the kernel edid parsing code from amlogic relies on max tmds information being availble
-	 * otherwise it limits the maximum pclk to be HDMI 1.0 range making it skip any higher clock modes.
-	 * Lets do the same here as well so that we would choose a working resolution
-	 */
-	if (claims_one_point_oh && !claims_one_point_four) {
-		if (((x[0] + (x[1] << 8)) / 100) > 165 ) {
-			printf("Skipping detailed mode %4dx%4d as its not supported by the kernel\n", ha, va);
-			return 1;
-		}
-	}
-
 	/* detailed timings in extension block will be excluded
 	 * from candidates to find the best mode.
 	 */
@@ -976,8 +965,10 @@ cea_hdmi_block(unsigned char *x)
 			printf("    DVI_Dual\n");
 	}
 
-	if (length > 6)
+	if (length > 6) {
+		has_max_tmds_clock = 1;
 		printf("    Maximum TMDS clock: %dMHz\n", x[7] * 5);
+	}
 
 	/* XXX the walk here is really ugly, and needs to be length-checked */
 	if (length > 7) {
@@ -1622,8 +1613,6 @@ parse_extension(unsigned char *x)
 	return conformant_extension;
 }
 
-static int edid_lines = 0;
-
 /* E-EDID Standard, Table 3.18 */
 static const struct {
 	int x, y, refresh;
@@ -1724,7 +1713,7 @@ void print_available_timings(void)
 int parse_edid(unsigned char *edid, unsigned int blk_len, unsigned char count)
 {
 	unsigned char *x;
-	int analog, i;
+	int analog, i, j, removed_dtd_count;
 
 	/* Initialization */
 	IEEEOUI = 0x0; /* default DVI */
@@ -1751,9 +1740,6 @@ int parse_edid(unsigned char *edid, unsigned int blk_len, unsigned char count)
 		if (count < EDID_RETRY_COUNT)	return -EDID_ERR_RETRY;
 		if (count == EDID_RETRY_COUNT)	return -EDID_ERR_NO_VALID_EDID;
 	}
-
-	/* set edid_lines */
-	edid_lines = ((128 * blk_len) / 16);
 
 	printf("Manufacturer: %s Model %x Serial Number %u\n",
 			manufacturer_name(edid + 0x08),
@@ -1985,7 +1971,7 @@ int parse_edid(unsigned char *edid, unsigned int blk_len, unsigned char count)
 
 	x = edid;
 
-	for (edid_lines /= 8; edid_lines > 1; edid_lines--) {
+	for (i = 0; i < edid[0x7e]; i++) {
 		x += 128;
 		nonconformant_extension += parse_extension(x);
 	}
@@ -2083,6 +2069,44 @@ int parse_edid(unsigned char *edid, unsigned int blk_len, unsigned char count)
 	if (warning_zero_preferred_refresh)
 		printf("Warning: CVT block does not set preferred refresh rate\n");
 #endif
+
+	/*
+	 * For EDID 1.x displays, the kernel edid parsing code from amlogic relies on max tmds information being availble
+	 * otherwise it limits the maximum pclk to < 165MHz  range making it skip any higher clock modes.
+	 * Lets remove any detailed timings that is going to be ignored by the kernel
+	 */
+	if (claims_one_point_oh && !has_max_tmds_clock) {
+		printf("Warning: Max TMDS clock is not set, some DTD information will be ignored\n");
+		removed_dtd_count = 0;
+		for (i = 0; i < detailed_cnt; i++) {
+			// check if we are supposed to remove the current dtd
+			if (detailed_timings[i].pclk > 165000) {
+				printf("Warning: Ignoring %dx%d mode\n", detailed_timings[i].height, detailed_timings[i].width);
+				removed_dtd_count++;
+			} else {
+				// shift dtd if there were any invalid dtds before this one
+				if (removed_dtd_count == 0)
+					continue;
+
+				j = i - removed_dtd_count;
+				detailed_timings[j].width = detailed_timings[i].width;
+				detailed_timings[j].height = detailed_timings[i].height;
+				detailed_timings[j].pclk = detailed_timings[i].pclk;
+				detailed_timings[j].hdisp = detailed_timings[i].hdisp;
+				detailed_timings[j].hsyncstart = detailed_timings[i].hsyncstart;
+				detailed_timings[j].hsyncend = detailed_timings[i].hsyncend;
+				detailed_timings[j].htotal = detailed_timings[i].htotal;
+				detailed_timings[j].vdisp = detailed_timings[i].vdisp;
+				detailed_timings[j].vsyncstart = detailed_timings[i].vsyncstart;
+				detailed_timings[j].vsyncend = detailed_timings[i].vsyncend;
+				detailed_timings[j].vtotal = detailed_timings[i].vtotal;
+				detailed_timings[j].hsync_flag = detailed_timings[i].hsync_flag;
+				detailed_timings[j].vsync_flag = detailed_timings[i].vsync_flag;
+				detailed_timings[j].scanmode = detailed_timings[i].scanmode;
+			}
+		}
+		detailed_cnt = detailed_cnt - removed_dtd_count;
+	}
 
 	return 0;
 }

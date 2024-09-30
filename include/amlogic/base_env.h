@@ -81,7 +81,6 @@
 		"os_ident ${os_ident_addr}; fi\0"\
 	"fatload_dev=usb\0"\
 	"fs_type=""rootfstype=ramfs""\0"\
-	"disable_ir=0\0"\
 	"default_governor=performance\0"\
 	"upgrade_check_base="\
 		"echo recovery_status=${recovery_status};"\
@@ -97,10 +96,9 @@
 		"logo=${display_layer},loaded,${fb_addr} "\
 		"vout=${outputmode},${vout_init} panel_type=${panel_type} "\
 		"hdmitx=${cecconfig},${colorattribute} hdmimode=${hdmimode} "\
-		"hdmichecksum=${hdmichecksum} dolby_vision_on=${dolby_vision_on} "\
-		"hdr_policy=${hdr_policy} hdr_priority=${hdr_priority} "\
+		"hdmichecksum=${hdmichecksum} "\
 		"hdr_force_mode=${hdr_force_mode} dolby_status=${dolby_status} "\
-		"frac_rate_policy=${frac_rate_policy} hdmi_read_edid=${hdmi_read_edid} "\
+		"frac_rate_policy=${frac_rate_policy} "\
 		"osd_reverse=${osd_reverse} video_reverse=${video_reverse} ;"\
 		"\0"\
 	"storeboot_base="\

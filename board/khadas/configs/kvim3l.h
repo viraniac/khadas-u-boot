@@ -457,9 +457,16 @@
          "\0"\
 		BOOTENV\
 		"pxe_boot=dhcp; pxe get && pxe boot\0"\
+		"bootcmd_spi="\
+			"saradc open 2 && saradc getval && saradc close; "\
+			"if test ${saradc_val} -lt 0x100; then "\
+				"setenv orig_source ${boot_source}; setenv boot_source spi; setenv devtype spi; setenv devnum 0; "\
+				"sf probe && sf read $loadaddr 0x160000 0x8000 && script $loadaddr - 0 1; "\
+				"setenv boot_source ${orig_source}; "\
+			"fi\0"\
 		"bootcmd_legacy=run legacyboot\0"\
 		"bootcmd_storeboot=run storeboot\0"\
-		"boot_targets=legacy usb0 mmc0 mmc1 storeboot pxe dhcp\0"
+		"boot_targets=spi legacy usb0 mmc0 mmc1 storeboot pxe dhcp\0"
 
 #define CONFIG_PREBOOT  \
 			"run upgrade_check;"\
